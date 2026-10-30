@@ -27,6 +27,20 @@ def test_slack_deduplicates_same_message():
     assert len(parse_slack_search({"messages": {"matches": [match, match]}})) == 1
 
 
+def test_dm_history_keeps_other_people_and_drops_me_and_bots():
+    from mini_reid.sources import parse_slack_dm_history
+
+    data = {"messages": [
+        {"user": "UOTHER", "ts": "1793341041.1", "text": "can you send the deck"},
+        {"user": "UME", "ts": "1793341042.1", "text": "sure"},
+        {"bot_id": "B1", "ts": "1793341043.1", "text": "bot"},
+    ]}
+    items = parse_slack_dm_history("D1", data, "UME")
+    assert len(items) == 1
+    assert items[0]["native_id"] == "D1:1793341041.1"
+    assert items[0]["is_dm"] is True
+
+
 def _msg(mid, sender, subject, internal_ms, snippet="hello"):
     return {
         "id": mid,

@@ -28,6 +28,19 @@ def test_new_rows_ignores_noise():
     assert new_rows([noise], [], {}, NOW) == []
 
 
+def test_overdue_today_excludes_notes_and_done():
+    from mini_reid.watcher import overdue_today
+
+    rows = [
+        {"id": "a", "what": "late task", "due": "2026-10-29", "status": "open"},
+        {"id": "b", "what": "today task", "due": "2026-10-30", "status": "open"},
+        {"id": "c", "what": "a note", "due": "2026-10-01", "status": "open", "kind": "note"},
+        {"id": "d", "what": "done task", "due": "2026-10-01", "status": "done"},
+    ]
+    out = overdue_today(rows, NOW)
+    assert [r["id"] for r in out] == ["a"]
+
+
 def test_fire_reminders_sends_once(tmp_path, monkeypatch):
     from mini_reid import watcher as w
     from mini_reid.ledger import save

@@ -87,6 +87,50 @@ def slack_me(token: str) -> str:
     return d["user_id"]
 
 
+def parse_slack_dm_history(channel_id: str, data: dict, me: str,
+                           team: str = "gopantas") -> list[dict]:
+    """Messages other people sent Ridha in a DM. Mentions never appear there."""
+    out = []
+    for m in data.get("messages") or []:
+        if m.get("bot_id") or m.get("subtype") or m.get("user") in (None, me):
+            continue
+        ts = m.get("ts") or ""
+        out.append({
+            "source": "slack",
+            "native_id": f"{channel_id}:{ts}",
+            "kind": "dm",
+            "channel": channel_id,
+            "channel_id": channel_id,
+            "author": m.get("user") or "?",
+            "ts": datetime.fromtimestamp(float(ts), MYT).isoformat() if ts else "",
+            "text": (m.get("text") or "").strip(),
+            "link": f"https://{team}.slack.com/archives/{channel_id}/p{ts.replace('.', '')}",
+            "is_dm": True,
+            "direction": "owed_by_me",
+        })
+    return out
+
+
+def fetch_slack_dms(days: int, token: str, me: str) -> list[dict]:
+    """Recent messages in Ridha's direct messages, from other people."""
+    ims = _get_json(
+        "https://slack.com/api/conversations.list?" + urllib.parse.urlencode(
+            {"types": "im", "limit": 200}),
+        {"Authorization": f"Bearer {token}"})
+    items = []
+    oldest = (datetime.now(MYT) - timedelta(days=days)).timestamp()
+    for ch in ims.get("channels") or []:
+        cid = ch.get("id")
+        if not cid or ch.get("user") == me:
+            continue
+        hist = _get_json(
+            "https://slack.com/api/conversations.history?"
+            + urllib.parse.urlencode({"channel": cid, "oldest": f"{oldest:.6f}", "limit": 20}),
+            {"Authorization": f"Bearer {token}"})
+        items.extend(parse_slack_dm_history(cid, hist, me))
+    return items
+
+
 def fetch_slack(days: int, token: str, me: str) -> list[dict]:
     since = (datetime.now(MYT) - timedelta(days=days)).strftime("%Y-%m-%d")
     items, page = [], 1
@@ -167,7 +211,10 @@ def fetch_gmail(days: int, env: dict[str, str]) -> list[dict]:
     access = gmail_access(env)
     out: list[dict] = []
     for query, kind in [
-        (f"is:unread newer_than:{days}d -in:spam -in:trash -category:promotions", "inbox"),
+        # Read mail counts too. An email opened and never answered is the exact
+        # failure this exists to catch.
+        (f"in:inbox newer_than:{days}d -in:spam -in:trash "
+         f"-category:promotions -category:social", "inbox"),
         (f"in:sent newer_than:{days}d -in:spam -in:trash", "sent"),
     ]:
         ids = _gmail_list(access, query)

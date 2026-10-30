@@ -2,6 +2,13 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (core coverage)
+
+- Gmail now reads all inbox mail, not only unread. Opened-and-unanswered no longer slips.
+- Slack DMs to Ridha are indexed as commitments; mentions never appear in a DM.
+- Daily overdue nudge after 09:00, once per day, so aging work does not go quiet.
+- 100 tests passing.
+
 ## 2026-10-31 (digest brief)
 
 - Morning digest now opens with a written three-sentence Brief, then the sections.

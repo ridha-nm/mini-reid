@@ -14,7 +14,8 @@ from .closure import propose_closures
 from .extract import extract
 from .ledger import apply_stalled, dedupe_by_link, load, merge, save
 from .render import render
-from .sources import fetch_gmail, fetch_jira, fetch_slack, load_env, slack_me
+from .sources import (fetch_gmail, fetch_jira, fetch_slack, fetch_slack_dms,
+                      load_env, slack_me)
 
 MYT = timezone(timedelta(hours=8))
 LEDGER = "ledger.json"
@@ -39,7 +40,9 @@ def collect(days: int, offline: bool) -> tuple[list[dict], list[str]]:
         token = env.get("SLACK_USER_TOKEN")
         if not token:
             raise RuntimeError("SLACK_USER_TOKEN missing. Add Mini-Reid's xoxp token to .env")
-        items += fetch_slack(days, token, slack_me(token))
+        me = slack_me(token)
+        items += fetch_slack(days, token, me)
+        items += fetch_slack_dms(days, token, me)
     except Exception as ex:  # noqa: BLE001 - one dead source must not kill the run
         errors.append(f"Slack: {ex}")
     try:

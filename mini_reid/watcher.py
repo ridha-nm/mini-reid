@@ -75,6 +75,36 @@ def fire_reminders(env: dict, ledger_path: str, now: datetime) -> int:
     return fired
 
 
+def overdue_today(rows: list[dict], now: datetime) -> list[dict]:
+    today = now.date().isoformat()
+    return [r for r in rows
+            if r.get("direction", "owed_by_me") == "owed_by_me"
+            and r.get("status") not in {"done", "dropped"}
+            and r.get("kind") not in {"note", "reminder"}
+            and ((r.get("due") or "") < today or r.get("status") == "stalled")]
+
+
+def nudge_overdue(env: dict, ledger_path: str, now: datetime) -> int:
+    """Once a day after 09:00, restate what is overdue. Silence is how things rot."""
+    import json
+    from pathlib import Path
+
+    state = Path("watcher_state.json")
+    today = now.date().isoformat()
+    seen = json.loads(state.read_text()) if state.exists() else {}
+    if now.hour < 9 or seen.get("overdue_date") == today:
+        return 0
+    rows = overdue_today(load(ledger_path), now)
+    if rows:
+        lines = "\n".join(
+            f"• *{r.get('what','')[:110]}* — {r.get('client') or 'unassigned'} — "
+            f"{r.get('due') or 'no date'}"
+            for r in rows[:10])
+        send_dm(env, f"*Still overdue ({len(rows)})*\n{lines}")
+    state.write_text(json.dumps({"overdue_date": today}))
+    return len(rows)
+
+
 def main() -> int:
     env = load_env(".env")
     clients = load_clients("clients.json")
@@ -84,6 +114,9 @@ def main() -> int:
     fired = fire_reminders(env, ledger_path, now)
     if fired:
         print(f"[{now:%H:%M:%S}] fired {fired} reminder(s)", flush=True)
+    nudged = nudge_overdue(env, ledger_path, now)
+    if nudged:
+        print(f"[{now:%H:%M:%S}] overdue nudge: {nudged}", flush=True)
 
     items, errors = collect(days=1, offline=False)
     existing = load(ledger_path)
