@@ -1,0 +1,16 @@
+.env
+digest.md
+ledger.json
+run.log
+launchd.out.log
+launchd.err.log
+__pycache__/
+.pytest_cache/
+*.pyc
+.DS_Store
+.venv/
+watcher.log
+bot.out.log
+bot.err.log
+model.log
+ledger*.json

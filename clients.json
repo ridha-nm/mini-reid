@@ -1,0 +1,109 @@
+{
+  "ioi": {
+    "name": "IOI Properties",
+    "group": "direct",
+    "domains": ["ioiproperties.com.my"],
+    "aliases": ["IOI", "IOIPG"],
+    "slack_channels": ["ioi-properties-working-group", "C050LSCDK28"]
+  },
+  "knight-frank": {
+    "name": "Knight Frank",
+    "group": "direct",
+    "domains": ["my.knightfrank.com", "knightfrank.com.my"],
+    "aliases": ["Knight Frank", "KF"],
+    "slack_channels": ["knight-frank-wg", "C09M744N8GY"]
+  },
+  "gamuda": {
+    "name": "Gamuda",
+    "group": "direct",
+    "domains": ["gamuda.com.my", "gamudaland.com.my", "gamuda.com.au"],
+    "aliases": ["Gamuda", "Gamuda Land"],
+    "slack_channels": ["gamuda", "C07M2H54MNE"],
+    "cycle": "gamuda-biweekly",
+    "cadence_days": 14
+  },
+  "eupe": {
+    "name": "Eupe",
+    "group": "direct",
+    "domains": ["eupe.com.my"],
+    "aliases": ["Eupe"],
+    "slack_channels": ["eupe-working-group", "C09HF2YMW91"]
+  },
+  "kelington": {
+    "name": "Kelington",
+    "group": "direct",
+    "domains": ["kelingtongroup.com"],
+    "aliases": ["Kelington"],
+    "slack_channels": []
+  },
+  "tmk": {
+    "name": "TMK",
+    "group": "direct",
+    "domains": ["tmkchemical.com"],
+    "aliases": ["TMK", "TMK Chemical"],
+    "slack_channels": []
+  },
+  "sfia": {
+    "name": "SFIA",
+    "group": "safe",
+    "domains": [],
+    "aliases": ["SFIA"],
+    "slack_channels": ["sfia-working-group"]
+  },
+  "suslab": {
+    "name": "Suslab",
+    "group": "safe",
+    "domains": ["suslab.net"],
+    "aliases": ["Suslab", "Sustainable Lab"],
+    "slack_channels": []
+  },
+  "dti": {
+    "name": "DTI",
+    "group": "safe",
+    "domains": ["dtinfrastructure.com.au"],
+    "aliases": ["DTI", "DT Infrastructure"],
+    "slack_channels": []
+  },
+  "bank-rakyat": {
+    "name": "Bank Rakyat",
+    "group": "ghb",
+    "domains": [],
+    "aliases": ["Bank Rakyat"],
+    "slack_channels": []
+  },
+  "agrobank": {
+    "name": "Agrobank",
+    "group": "ghb",
+    "domains": [],
+    "aliases": ["Agrobank"],
+    "slack_channels": []
+  },
+  "maybank": {
+    "name": "Maybank",
+    "group": "ghb",
+    "domains": [],
+    "aliases": ["Maybank"],
+    "slack_channels": []
+  },
+  "kossan": {
+    "name": "Kossan",
+    "group": "gvc",
+    "domains": ["kossan.com.my"],
+    "aliases": ["Kossan"],
+    "slack_channels": []
+  },
+  "pos-malaysia": {
+    "name": "POS Malaysia",
+    "group": "gvc",
+    "domains": ["pos.com.my"],
+    "aliases": ["POS Malaysia", "POS"],
+    "slack_channels": ["pos-malaysia-working-group", "C0646H8JD1S"]
+  },
+  "ajinomoto": {
+    "name": "Ajinomoto",
+    "group": "gvc",
+    "domains": [],
+    "aliases": ["Ajinomoto"],
+    "slack_channels": []
+  }
+}
