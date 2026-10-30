@@ -9,7 +9,8 @@ from datetime import timedelta
 from .capture import parse_capture
 from .ledger import commitment_id, load, merge, save
 
-MENTION = re.compile(r"<@[A-Z0-9]+>")
+# Slack sends mentions as <@U123> or <@U123|mini-reid>. Both must strip cleanly.
+MENTION = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
 COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
             "find", "list", "not", "remind"}
 MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not", "remind"}
@@ -122,13 +123,26 @@ def parse_command(text: str) -> tuple[str, str]:
     if body.lower() in {"help", "?", "commands"}:
         return "help", ""
     m = re.match(
-        r"^(add|note|done|drop|due|snooze|waiting|find|not|remind|ask)\s*:\s*(.+)$",
-        body, re.I)
+        r"^(add|task|todo|to-do|note|done|drop|due|snooze|waiting|find|not|remind|ask)"
+        r"\s*:\s*(.+)$", body, re.I)
     if m:
-        return m.group(1).lower(), m.group(2).strip()
+        act = m.group(1).lower()
+        return ("add" if act in {"task", "todo", "to-do"} else act), m.group(2).strip()
     m = re.match(r"^(?:please\s+)?remind(?:\s+me)?(?:\s+to)?\s+(.+)$", body, re.I)
     if m:
         return "remind", m.group(1).strip()
+
+    # Natural ways to say "put this on my list".
+    m = re.match(
+        r"^(?:add|task|todo|to-do)\s+(?:this\s+)?"
+        r"(?:to\s+(?:my\s+)?(?:to-?do(?:\s+list)?|list|tasks?)\s*:?\s*)?(.+)$",
+        body, re.I)
+    if m:
+        return "add", m.group(1).strip()
+    m = re.match(r"^note\s+(?:that\s+)?(.+)$", body, re.I)
+    if m:
+        return "note", m.group(1).strip()
+
     if re.match(r"^(thanks|thank you|noted|ok|okay|got it)\b", body, re.I):
         return "ack", body
     return "unknown", body

@@ -12,6 +12,23 @@ def test_parses_add_with_mention():
     assert parse_command("<@U123> add: Eupe item by Friday") == ("add", "Eupe item by Friday")
 
 
+def test_mention_with_label_is_stripped():
+    assert parse_command("<@U0CEE242B5E|mini-reid> add: send the deck") == (
+        "add", "send the deck")
+
+
+def test_natural_add_phrasings():
+    assert parse_command("<@U1> add this to my todo: send the deck") == ("add", "send the deck")
+    assert parse_command("<@U1> task: send the deck") == ("add", "send the deck")
+    assert parse_command("<@U1> add the FSD review by Friday") == (
+        "add", "the FSD review by Friday")
+
+
+def test_note_that_phrasing():
+    assert parse_command("<@U1> note that Daniel wants the mapping redone") == (
+        "note", "Daniel wants the mapping redone")
+
+
 def test_parses_note_and_done():
     assert parse_command("<@U123> note: Daniel wants the mapping redone")[0] == "note"
     assert parse_command("<@U123> done: Eupe item")[0] == "done"

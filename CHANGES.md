@@ -2,6 +2,14 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (self-tag hardening)
+
+- Slack mention form `<@U123|mini-reid>` now strips correctly; it previously fell through
+  to a note instead of a command.
+- Natural add phrasings: `task:`, `todo:`, `add this to my todo:`, `add <thing>`.
+- `note that ...` works.
+- 103 tests passing.
+
 ## 2026-10-31 (core coverage)
 
 - Gmail now reads all inbox mail, not only unread. Opened-and-unanswered no longer slips.
