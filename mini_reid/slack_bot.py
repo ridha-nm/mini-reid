@@ -102,6 +102,7 @@ HELP = """*Mini-Reid commands*
 • `drop: Eupe waste` — remove it quietly
 • `not: anything that is not part c` — wrong item, teach it to ignore this kind
 • `remind me to send the deck tomorrow at 3pm` — a timed DM
+• `ask: what did we agree with Eupe on waste` — answer from your own writing, with sources
 • `find: eupe` — search the ledger
 • `list` — ten nearest open items
 • `help` — this
@@ -119,7 +120,8 @@ def parse_command(text: str) -> tuple[str, str]:
     if body.lower() in {"help", "?", "commands"}:
         return "help", ""
     m = re.match(
-        r"^(add|note|done|drop|due|snooze|waiting|find|not|remind)\s*:\s*(.+)$", body, re.I)
+        r"^(add|note|done|drop|due|snooze|waiting|find|not|remind|ask)\s*:\s*(.+)$",
+        body, re.I)
     if m:
         return m.group(1).lower(), m.group(2).strip()
     m = re.match(r"^(?:please\s+)?remind(?:\s+me)?(?:\s+to)?\s+(.+)$", body, re.I)
@@ -354,6 +356,31 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         action, body = parse_command(text)
         if user == owner:
             action = owner_action(action, body)
+
+        if action == "ask":
+            allow = {u.strip() for u in env.get("KB_ALLOWLIST", "").split(",") if u.strip()}
+            if user != owner and user not in allow:
+                web.chat_postMessage(
+                    channel=channel,
+                    text="You are not on the list for that. Ask Ridha to add you.")
+                return
+            try:
+                from .kb import answer as kb_answer
+                from .kb import load as kb_load
+
+                index = kb_load()
+                if not index:
+                    reply = "Knowledge base is empty. Ridha needs to run the index build."
+                else:
+                    body_text, hits = kb_answer(body, index)
+                    sources = "\n".join(
+                        f"[{i}] {h['source']} · {h['link']}"
+                        for i, h in enumerate(hits, 1) if h.get("link"))
+                    reply = f"{body_text}\n\n{sources}"
+            except Exception as ex:  # noqa: BLE001
+                reply = f"Could not answer: {type(ex).__name__}"
+            web.chat_postMessage(channel=channel, text=reply[:3900])
+            return
         print(f"[{datetime.now(MYT):%H:%M:%S}] {user} in {channel}: {text[:120]!r} -> {action}",
               flush=True)
 

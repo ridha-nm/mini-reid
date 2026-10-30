@@ -2,6 +2,14 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (knowledge base)
+
+- `kb.py`: local retrieval over Ridha's own Slack messages, Gmail sent mail and local documents.
+- Embeddings via Ollama `nomic-embed-text`; answers via `llama3.2:3b` with numbered citations.
+- Slack command `ask: <question>`, allowed for Ridha and anyone in `KB_ALLOWLIST`.
+- Full index build runs locally; `kb.json` is gitignored and never leaves the machine.
+- 92 tests passing.
+
 ## 2026-10-31 (early)
 
 - `remind:` and "remind me to ..." with a parsed time. Watcher fires it as a DM once.

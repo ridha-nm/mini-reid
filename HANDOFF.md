@@ -52,6 +52,8 @@ waiting: <item> on Daniel    move it to Waiting on others
 drop: <item>                 remove it without deleting history
 find: <text>                 search the ledger
 not: <item>                  wrong item, teach it to ignore this kind
+remind: send deck tomorrow at 3pm   timed DM
+ask: what did we agree with Eupe    answer from your own writing
 list                         ten nearest open items
 ```
 
@@ -73,6 +75,16 @@ Only Ridha can change the ledger. Anyone else gets a ✅ reaction and no reply.
 
 `.env`, mode 600, never committed. Slack app tokens (`xapp`, `xoxb`, `xoxp`), Gmail
 OAuth paths, Jira API token, `SLACK_OWNER_ID`.
+
+## Knowledge base
+
+```bash
+.venv/bin/python -m mini_reid.kb --build     # index Slack sent, Gmail sent, local docs
+.venv/bin/python -m mini_reid.kb --ask "what did we agree with Eupe on waste"
+```
+
+Answers cite passages. `KB_ALLOWLIST` in `.env` lists Slack user ids allowed to use
+`ask:`; empty means only Ridha. Index lives in `kb.json`, local and gitignored.
 
 ## Weekly scorecard
 
