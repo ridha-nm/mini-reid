@@ -90,9 +90,9 @@ measure of whether tuning works.
 
 - Rules-only extraction copies the email opener; proper task wording needs the model.
 - The 3B model takes about 8 minutes for a full pass and occasionally returns bad JSON.
-- No completion detection. Items close only on `done:`.
+- Completion is proposed from sent mail, but nothing auto-closes; `done:` confirms.
 - Watcher takes ~40 s per cycle, which is why it runs every 2 minutes.
-- No git repository yet.
+- Repo: github.com/ridha-nm/mini-reid (private). CI runs tests only, no secrets.
 
 ## Next, agreed order
 
