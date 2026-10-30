@@ -20,8 +20,12 @@ QUERY = re.compile(
 
 def owner_action(action: str, body: str) -> str:
     """Ridha can talk normally. A question stays a question; anything else is a note."""
-    if action == "unknown" and (body or "").strip() and not QUERY.search(body):
-        return "note"
+    text = (body or "").strip()
+    if action == "unknown" and text:
+        if not QUERY.search(text):
+            return "note"
+        if re.search(r"\b(due|today|tomorrow|open|status|overdue)\b", text, re.I):
+            return "list"
     return action
 
 
