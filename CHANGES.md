@@ -2,6 +2,17 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (search-style answers)
+
+- Answers are the top 1-3 things Ridha actually wrote, verbatim, with sources.
+- Similarity floor 0.55: below it, "I do not know." Measured: real questions score
+  0.63-0.81, off-topic tops out at 0.46.
+- Client named in the question scopes retrieval, with a top-up when filtering starves it.
+- Gmail quoted-reply markers stripped.
+- Tested five scenarios: IOI deadline, Gamuda dashboard, SRSL pending, DTI-Spark,
+  and an off-topic control. The control correctly refused.
+- 94 tests passing.
+
 ## 2026-10-31 (extractive answers)
 
 - Answers are now verbatim excerpts from the best passage, with the source link. No

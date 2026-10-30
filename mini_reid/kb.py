@@ -13,7 +13,6 @@ from .sources import _get_json, _gmail_list as gmail_list, gmail_access
 
 INDEX = "kb.json"
 EMBED_MODEL = "nomic-embed-text"
-GEN_MODEL = "llama3.2:3b"
 OLLAMA = "http://localhost:11434"
 
 TEXT_SUFFIXES = {".md", ".txt"}
@@ -110,7 +109,9 @@ def gmail_sent_docs(env: dict, limit: int = 200) -> list[dict]:
             continue
         text = _plain_text(msg.get("payload") or {})
         text = re.sub(r"<[^>]+>", " ", text)
-        text = re.sub(r"\s+", " ", __import__("html").unescape(text)).strip()
+        text = __import__("html").unescape(text)
+        text = re.sub(r">[>\s]*>", " ", text)   # quoted-reply markers
+        text = re.sub(r"\s+", " ", text).strip()
         if len(text) < 40:
             continue
         docs += _doc("gmail", "sent mail",
@@ -203,6 +204,7 @@ def search(index: list[dict], question: str, k: int = 8) -> list[dict]:
         if key in seen:
             continue
         seen.add(key)
+        d = dict(d, score=round(cosine(q, d.get("vec") or []), 3))
         out.append(d)
         if len(out) >= k:
             break
@@ -231,52 +233,34 @@ def _prefer_client(question: str, hits: list[dict]) -> list[dict]:
         kept = [h for h in hits if relevant(h)]
         # Project notes about a client are not the client's own record.
         primary = [h for h in kept if h.get("source") != "local"]
-        return primary or kept or hits
+        chosen = primary or kept
+        if len(chosen) < 3:
+            # Filtering too hard starves the answer. Top up from the unfiltered hits.
+            chosen = chosen + [h for h in hits if h not in chosen]
+        return chosen
     except Exception:  # noqa: BLE001 - a broken registry must not break answering
         return hits
 
 
-PROMPT = """Copy the single sentence from the passages below that best answers the
-question. Copy it verbatim, word for word. Do not paraphrase. Do not add anything.
-If no passage answers it, reply exactly: I do not know.
-
-Passages:
-{passages}
-
-Question: {question}
-Answer:"""
-
-
-_SENTENCE = re.compile(r"(?<=[.!?])\s+")
-
-
-def _best_sentence(question: str, hits: list[dict]) -> tuple[str, dict] | None:
-    """Return the best-matching sentence plus the two after it, for context."""
-    from .closure import _words
-
-    want = _words(question)
-    best, best_score, best_hit = None, 0, None
-    for h in hits[:3]:
-        sentences = [s.strip() for s in _SENTENCE.split(h.get("text") or "")]
-        for i, sentence in enumerate(sentences):
-            if len(sentence) < 25:
-                continue
-            score = len(want & _words(sentence))
-            if score > best_score:
-                excerpt = " ".join(sentences[i:i + 3])[:450]
-                best, best_score, best_hit = excerpt, score, h
-    return (best, best_hit) if best and best_score >= 2 else None
+MIN_SCORE = 0.55
 
 
 def answer(question: str, index: list[dict], generator=None, k: int = 8) -> tuple[str, list[dict]]:
-    """Deterministic extractive answer: a verbatim sentence, never a generated claim."""
+    """Return the most relevant things you actually wrote, verbatim, with sources.
+
+    No generation. A question below the similarity floor gets "I do not know."
+    """
     hits = search(index, question, k * 4)
-    hits = _prefer_client(question, hits)[:k]
-    found = _best_sentence(question, hits)
-    if not found:
-        return "I do not know.", hits[:1]
-    sentence, hit = found
-    return sentence, [hit]
+    hits = _prefer_client(question, hits)
+    hits = [h for h in hits if h.get("score", 0) >= MIN_SCORE][:3]
+    if not hits:
+        return "I do not know.", []
+
+    lines = []
+    for h in hits:
+        body = re.sub(r"\s+", " ", h.get("text") or "").strip()[:320]
+        lines.append(f"• {body}")
+    return "\n".join(lines), hits
 
 
 def main(argv: list[str] | None = None) -> int:
