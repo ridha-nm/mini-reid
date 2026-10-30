@@ -2,6 +2,17 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (extractive answers)
+
+- Answers are now verbatim excerpts from the best passage, with the source link. No
+  generated text, so nothing can be invented.
+- Client named in the question filters retrieval to that client; project notes are
+  deprioritised over the client's own record.
+- A failed index source keeps its previous passages and retries per message.
+- Finding: the 3B model is unreliable at selecting and summarising. Extractive is the
+  honest ceiling until a larger model is tested.
+- 94 tests passing.
+
 ## 2026-10-31 (kb answers)
 
 - Retrieval returns one passage per source document; long emails no longer fill every slot.

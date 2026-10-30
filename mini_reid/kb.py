@@ -209,11 +209,36 @@ def search(index: list[dict], question: str, k: int = 8) -> list[dict]:
     return out
 
 
-PROMPT = """Answer the question using ONLY the passages below. Do not use outside
-knowledge. If the passages only partly answer, say what is known and what is missing.
-If nothing relevant is there, say exactly: I do not know.
-Every sentence that states a fact must end with its passage number like [1].
-Be concise: three sentences at most.
+def _prefer_client(question: str, hits: list[dict]) -> list[dict]:
+    """If the question names a client, keep only that client's passages."""
+    try:
+        from .clients import load_clients, match_client
+
+        clients = load_clients("clients.json")
+        m = match_client(question, "", clients)
+        if not m:
+            return hits
+        c = clients[m["slug"]]
+        terms = [c.get("name", "")] + list(c.get("aliases", []))
+        channels = [x for x in c.get("slack_channels", []) if x.startswith(("C", "D", "G"))]
+
+        def relevant(h: dict) -> bool:
+            text = (h.get("text") or "").lower()
+            link = h.get("link") or ""
+            return (any(t and t.lower() in text for t in terms)
+                    or any(ch in link for ch in channels))
+
+        kept = [h for h in hits if relevant(h)]
+        # Project notes about a client are not the client's own record.
+        primary = [h for h in kept if h.get("source") != "local"]
+        return primary or kept or hits
+    except Exception:  # noqa: BLE001 - a broken registry must not break answering
+        return hits
+
+
+PROMPT = """Copy the single sentence from the passages below that best answers the
+question. Copy it verbatim, word for word. Do not paraphrase. Do not add anything.
+If no passage answers it, reply exactly: I do not know.
 
 Passages:
 {passages}
@@ -222,24 +247,36 @@ Question: {question}
 Answer:"""
 
 
-def answer(question: str, index: list[dict], generator=None, k: int = 8) -> tuple[str, list[dict]]:
-    hits = search(index, question, k)
-    passages = "\n".join(
-        f"[{i + 1}] ({h['source']}) {h['text'][:700]}" for i, h in enumerate(hits))
-    prompt = PROMPT.format(passages=passages, question=question)
+_SENTENCE = re.compile(r"(?<=[.!?])\s+")
 
-    if generator is None:
-        req = urllib.request.Request(
-            f"{OLLAMA}/api/generate",
-            data=json.dumps({"model": GEN_MODEL, "prompt": prompt,
-                             "stream": False,
-                             "options": {"temperature": 0}}).encode(),
-            headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=300) as r:
-            text = json.load(r)["response"]
-    else:
-        text = generator(prompt)
-    return text.strip(), hits
+
+def _best_sentence(question: str, hits: list[dict]) -> tuple[str, dict] | None:
+    """Return the best-matching sentence plus the two after it, for context."""
+    from .closure import _words
+
+    want = _words(question)
+    best, best_score, best_hit = None, 0, None
+    for h in hits[:3]:
+        sentences = [s.strip() for s in _SENTENCE.split(h.get("text") or "")]
+        for i, sentence in enumerate(sentences):
+            if len(sentence) < 25:
+                continue
+            score = len(want & _words(sentence))
+            if score > best_score:
+                excerpt = " ".join(sentences[i:i + 3])[:450]
+                best, best_score, best_hit = excerpt, score, h
+    return (best, best_hit) if best and best_score >= 2 else None
+
+
+def answer(question: str, index: list[dict], generator=None, k: int = 8) -> tuple[str, list[dict]]:
+    """Deterministic extractive answer: a verbatim sentence, never a generated claim."""
+    hits = search(index, question, k * 4)
+    hits = _prefer_client(question, hits)[:k]
+    found = _best_sentence(question, hits)
+    if not found:
+        return "I do not know.", hits[:1]
+    sentence, hit = found
+    return sentence, [hit]
 
 
 def main(argv: list[str] | None = None) -> int:
