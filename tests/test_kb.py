@@ -7,6 +7,10 @@ def test_chunk_splits_with_overlap():
     assert all(len(p) <= 800 for p in parts)
 
 
+def test_chunk_unescapes_entities():
+    assert "daniel.sim@eupe.com.my" in chunk("To: Daniel &lt;daniel.sim@eupe.com.my&gt;")[0]
+
+
 def test_chunk_of_empty_is_empty():
     assert chunk("   ") == []
 

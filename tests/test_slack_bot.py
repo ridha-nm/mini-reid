@@ -119,8 +119,8 @@ def test_owner_can_speak_plainly_but_questions_stay_questions():
     assert owner_action("unknown", "remind me to send the deck") == "note"
     assert owner_action("unknown", "book the SFF flights") == "note"
     assert owner_action("unknown", "what is due today?") == "list"
-    assert owner_action("unknown", "why is this here?") == "unknown"
-    assert owner_action("unknown", "show me the dashboard items") == "unknown"
+    assert owner_action("unknown", "why is this here?") == "ask"
+    assert owner_action("unknown", "show me the dashboard items") == "ask"
     assert owner_action("list", "") == "list"
 
 

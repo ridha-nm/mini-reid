@@ -77,6 +77,7 @@ def owner_action(action: str, body: str) -> str:
             return "note"
         if re.search(r"\b(due|today|tomorrow|open|status|overdue)\b", text, re.I):
             return "list"
+        return "ask"
     return action
 
 
@@ -363,8 +364,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         seen.add((channel, ts))
 
         action, body = parse_command(text)
+        allow = {u.strip() for u in env.get("KB_ALLOWLIST", "").split(",") if u.strip()}
         if user == owner:
             action = owner_action(action, body)
+        elif action == "unknown" and QUERY.search(body) and user in allow:
+            action = "ask"  # allowlisted people can ask in plain language too
+
+        # Replaying old commands after a wake invents side effects. Only questions.
+        if late and action != "ask":
+            return
 
         if action == "ask":
             allow = {u.strip() for u in env.get("KB_ALLOWLIST", "").split(",") if u.strip()}
@@ -446,12 +454,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
         last = float(_state().get("last_ts") or 0)
         if not last:
+            # First run: look back one hour, not zero. Otherwise a message sent just
+            # before the restart is invisible forever.
             import time
             from pathlib import Path as P
             import json as _json
 
-            P(STATE).write_text(_json.dumps({"last_ts": str(time.time())}))
-            return
+            last = time.time() - 3600
+            P(STATE).write_text(_json.dumps({"last_ts": f"{last:.6f}"}))
 
         from .sources import _get_json
 
@@ -480,6 +490,28 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             if ch and user:
                 process(ch, user, text, m["ts"], late=True)
                 late += 1
+        # DMs carry no literal mention, so search never returns them. Read the DM
+        # channel directly.
+        try:
+            from .notify import _post as slack_post
+            from .sources import _get_json as slack_get
+
+            bot = env["SLACK_BOT_TOKEN"]
+            opened = slack_post("conversations.open", bot, users=env["SLACK_OWNER_ID"])
+            dm = (opened.get("channel") or {}).get("id")
+            if dm:
+                hist = slack_get(
+                    "https://slack.com/api/conversations.history?"
+                    + urllib.parse.urlencode({"channel": dm, "oldest": f"{last:.6f}", "limit": 50}),
+                    {"Authorization": f"Bearer {bot}"})
+                for m in reversed(hist.get("messages") or []):
+                    if m.get("bot_id") or m.get("subtype") or not m.get("user"):
+                        continue
+                    process(dm, m["user"], m.get("text") or "", m["ts"], late=True)
+                    late += 1
+        except Exception as ex:  # noqa: BLE001
+            print(f"catch-up DM read failed: {type(ex).__name__}", flush=True)
+
         if late:
             print(f"catch-up: processed {late} missed message(s)", flush=True)
 

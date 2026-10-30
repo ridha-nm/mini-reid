@@ -31,7 +31,10 @@ def embed(text: str, model: str = EMBED_MODEL) -> list[float]:
 
 
 def chunk(text: str, size: int = 800, overlap: int = 100) -> list[str]:
-    text = re.sub(r"\s+", " ", text or "").strip()
+    import html as _html
+
+    text = _html.unescape(text or "")
+    text = re.sub(r"\s+", " ", text).strip()
     if not text:
         return []
     out, start = [], 0
