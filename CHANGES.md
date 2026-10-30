@@ -2,6 +2,12 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-30 (night, final)
+
+- Item matching is fuzzy: a fragment or any word order works, and an ambiguous match
+  asks which one instead of guessing.
+- 80 tests passing.
+
 ## 2026-10-30 (night, later)
 
 - Model batches now split on failure until the bad item is isolated, so one malformed

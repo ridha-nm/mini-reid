@@ -45,6 +45,24 @@ def test_done_closes_matching_item(tmp_path):
     assert "Closed" in reply
 
 
+def test_done_accepts_a_fragment_not_the_exact_title(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Confirm Eupe waste mapping categories", NOW, clients, ledger)
+    reply = apply_command("done", "waste mapping", NOW, clients, ledger)
+    assert load(ledger)[0]["status"] == "done"
+    assert "Closed" in reply
+
+
+def test_ambiguous_command_asks_which_one(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Confirm Eupe waste mapping categories", NOW, clients, ledger)
+    apply_command("add", "Confirm Eupe dashboard categories", NOW, clients, ledger)
+    reply = apply_command("done", "confirm eupe categories", NOW, clients, ledger)
+    assert reply.startswith("Which one?")
+
+
 def test_not_drops_the_row_and_records_a_correction(tmp_path, monkeypatch):
     from mini_reid import learning
 

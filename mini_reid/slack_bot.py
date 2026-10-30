@@ -46,14 +46,41 @@ def parse_command(text: str) -> tuple[str, str]:
     return "unknown", body
 
 
-def _find(rows: list[dict], target: str) -> dict | None:
-    t = target.lower().strip()
-    for r in rows:
-        if r.get("status") in {"done", "dropped"}:
-            continue
-        if t and t in (r.get("what") or "").lower():
-            return r
-    return None
+def _candidates(rows: list[dict], target: str) -> list[dict]:
+    """Substring first, then word-overlap. Few words is enough."""
+    from .closure import _words
+
+    t = (target or "").lower().strip()
+    if not t:
+        return []
+    open_rows = [r for r in rows if r.get("status") not in {"done", "dropped"}]
+    exact = [r for r in open_rows if t in (r.get("what") or "").lower()]
+    if exact:
+        return exact
+
+    want = _words(t)
+    if not want:
+        return []
+    scored = []
+    for r in open_rows:
+        have = _words(r.get("what") or "")
+        score = len(want & have) / len(want)
+        if score >= 0.6:
+            scored.append((score, r))
+    scored.sort(key=lambda x: -x[0])
+    return [r for _, r in scored]
+
+
+def _pick(rows: list[dict], target: str) -> tuple[dict | None, str | None]:
+    """Return (row, error). Ambiguous matches ask for one more word."""
+    found = _candidates(rows, target)
+    if not found:
+        return None, f"No open item matches “{target}”."
+    t = (target or "").lower().strip()
+    if len(found) > 1 and t not in (found[0].get("what") or "").lower():
+        listing = "\n".join(f"• {r['what'][:80]}" for r in found[:3])
+        return None, f"Which one?\n{listing}\nAdd a word that only fits one."
+    return found[0], None
 
 
 def _shift(text: str, now):
@@ -95,16 +122,9 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
         return "Noted."
 
     if action == "done":
-        target = body.lower()
-        best = None
-        for r in rows:
-            if r.get("status") in {"done", "dropped"}:
-                continue
-            if target in (r.get("what") or "").lower():
-                best = r
-                break
-        if not best:
-            return f"No open item matches “{body}”."
+        best, err = _pick(rows, body)
+        if err:
+            return err
         best["status"] = "done"
         best["closed_at"] = now.isoformat()
         best["closed_how"] = "manual"
@@ -117,7 +137,7 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
     if action == "not":
         from . import learning
 
-        row = _find(rows, body)
+        row, err = _pick(rows, body)
         if row:
             row["status"] = "dropped"
             row["closed_at"] = now.isoformat()
@@ -126,6 +146,8 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
             learning.add(row.get("what", ""), reason=body,
                          source=row.get("source", ""))
             return f"Removed as not a commitment: {row['what'][:80]}"
+        if err and err.startswith("Which one?"):
+            return err
         learning.add(body, reason="manual correction", source="manual")
         return "Recorded. I will ignore similar messages from now on."
 
@@ -154,9 +176,9 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
             r"thursday|friday|saturday|sunday|\d{4}-\d{2}-\d{2})\s*$", body, re.I)
         if not m:
             return "Use: due: <item> by Friday   or   snooze: <item> 3d"
-        row = _find(rows, m.group(1))
-        if not row:
-            return f"No open item matches “{m.group(1)}”."
+        row, err = _pick(rows, m.group(1))
+        if err:
+            return err
         d = _shift(m.group(2), now)
         if not d:
             return "Could not read that date."
@@ -168,9 +190,9 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
         return f"Due {d}: {row['what'][:80]}"
 
     if action == "drop":
-        row = _find(rows, body)
-        if not row:
-            return f"No open item matches “{body}”."
+        row, err = _pick(rows, body)
+        if err:
+            return err
         row["status"] = "dropped"
         row["closed_at"] = now.isoformat()
         row["closed_how"] = "manual"
@@ -180,9 +202,9 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
     if action == "waiting":
         m = re.match(r"^(.*?)\s+on\s+(.+)$", body, re.I)
         target, person = (m.group(1), m.group(2)) if m else (body, "")
-        row = _find(rows, target)
-        if not row:
-            return f"No open item matches “{target}”."
+        row, err = _pick(rows, target)
+        if err:
+            return err
         row["direction"] = "owed_to_me"
         if person:
             row["asker"] = person.strip()[:40]
