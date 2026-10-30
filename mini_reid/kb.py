@@ -315,9 +315,12 @@ SYNTH_MODEL = "llama3.2:3b"
 
 SYNTH_PROMPT = """Answer the question using ONLY the passages. Write two or three
 sentences. End every sentence that states a fact with its passage number like [2].
-Passages are in date order. If they conflict, the most recent one wins: report the
-current state, not the earlier one. If the passages do not contain the answer,
-reply exactly: I do not know.
+
+Passages are NEWEST FIRST. Passage [1] is the most recent. If an earlier passage says
+something is complete but a newer one reports feedback, comments, or work still to do,
+say that explicitly: what is done, and what is still outstanding.
+
+If the passages do not contain the answer, reply exactly: I do not know.
 
 Passages:
 {passages}
@@ -391,14 +394,28 @@ def answer(question: str, index: list[dict], generator=None, k: int = 8) -> tupl
 
     No generation. A question below the similarity floor gets "I do not know."
     """
-    hits = search(index, question, k * 4)
-    hits = _prefer_client(question, hits)
+    raw = search(index, question, k * 4)
+    top = raw[0] if raw else None
+    hits = _prefer_client(question, raw)
+    # The best match can lack the client's name ("Thank you for the detailed
+    # feedback..."). Never let the client filter throw away the top hit.
+    if top and top.get("source") != "local" and top not in hits:
+        hits = [top] + hits
     # Project notes answer questions about Mini-Reid itself, not about work.
     if not re.search(r"mini[- ]reid|handoff|spec|this project", question, re.I):
         hits = [h for h in hits if h.get("source") != "local"]
+    # A hit is one chunk. The sentence that answers the question may sit in a
+    # neighbouring chunk of the same email, so expand back to the whole document.
+    by_link: dict[str, list[str]] = {}
+    for d in index:
+        key = d.get("link") or (d.get("text") or "")[:60]
+        by_link.setdefault(key, []).append(d.get("text") or "")
+
     cleaned = []
     for h in hits:
-        body = strip_email_junk(h.get("text") or "")
+        key = h.get("link") or (h.get("text") or "")[:60]
+        full = " ".join(by_link.get(key, [h.get("text") or ""]))[:1600]
+        body = strip_email_junk(full)
         if h.get("score", 0) >= MIN_SCORE and usable(body):
             cleaned.append(dict(h, text=body))
     hits, seen = [], set()
@@ -410,7 +427,8 @@ def answer(question: str, index: list[dict], generator=None, k: int = 8) -> tupl
         hits.append(h)
         if len(hits) == 3:
             break
-    hits = sorted(hits, key=lambda h: h.get("date") or "9999")
+    # Newest first, so the model sees the latest state before older claims.
+    hits = sorted(hits, key=lambda h: h.get("date") or "0000", reverse=True)
     if not hits:
         return "I do not know.", []
 

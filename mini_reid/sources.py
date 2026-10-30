@@ -111,6 +111,30 @@ def parse_slack_dm_history(channel_id: str, data: dict, me: str,
     return out
 
 
+_NAME_CACHE: dict[str, str] = {}
+
+
+def slack_user_name(token: str, user_id: str) -> str:
+    """Slack gives IDs in DM history. People read names."""
+    if not user_id:
+        return "?"
+    if user_id in _NAME_CACHE:
+        return _NAME_CACHE[user_id]
+    name = user_id
+    try:
+        d = _get_json(
+            "https://slack.com/api/users.info?"
+            + urllib.parse.urlencode({"user": user_id}),
+            {"Authorization": f"Bearer {token}"})
+        u = d.get("user") or {}
+        prof = u.get("profile") or {}
+        name = prof.get("display_name") or u.get("real_name") or u.get("name") or user_id
+    except Exception:  # noqa: BLE001 - a name lookup must never break capture
+        pass
+    _NAME_CACHE[user_id] = name
+    return name
+
+
 def fetch_slack_dms(days: int, token: str, me: str) -> list[dict]:
     """Recent messages in Ridha's direct messages, from other people."""
     ims = _get_json(
@@ -127,7 +151,9 @@ def fetch_slack_dms(days: int, token: str, me: str) -> list[dict]:
             "https://slack.com/api/conversations.history?"
             + urllib.parse.urlencode({"channel": cid, "oldest": f"{oldest:.6f}", "limit": 20}),
             {"Authorization": f"Bearer {token}"})
-        items.extend(parse_slack_dm_history(cid, hist, me))
+        for item in parse_slack_dm_history(cid, hist, me):
+            item["author"] = slack_user_name(token, item["author"])
+            items.append(item)
     return items
 
 

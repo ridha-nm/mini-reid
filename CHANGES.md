@@ -2,6 +2,16 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (names and better retrieval)
+
+- Slack user IDs resolved to display names in DM captures.
+- Model cannot return a client that is not a real slug; ID echoes are discarded.
+- Index rebuilt with received mail: 753 passages (389 Gmail).
+- Answers expand a hit back to its full message, so the answering sentence is not
+  lost to chunking.
+- Top overall match is never discarded by the client filter.
+- 103 tests passing.
+
 ## 2026-10-31 (self-tag hardening)
 
 - Slack mention form `<@U123|mini-reid>` now strips correctly; it previously fell through
