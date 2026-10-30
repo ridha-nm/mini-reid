@@ -15,9 +15,16 @@ MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not"}
 
 
 def other_note(action: str, body: str, user: str) -> str | None:
-    """What someone else's message becomes. Only mutating commands leave a trace."""
-    if action in MUTATING and (body or "").strip():
-        return f"from <@{user}>: {body.strip()}"
+    """What someone else's message becomes.
+
+    Any sentence counts. A command keeps its words, free text keeps its words,
+    and only pure acknowledgements ("thanks") leave no trace.
+    """
+    text = (body or "").strip()
+    if not text:
+        return None
+    if action in MUTATING or action == "unknown":
+        return f"from <@{user}>: {text}"
     return None
 
 HELP = """*Mini-Reid commands*

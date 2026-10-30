@@ -87,6 +87,13 @@ def test_other_people_can_only_leave_a_note():
     assert other_note("ack", "thanks", "U999") is None
 
 
+def test_plain_sentence_becomes_a_note():
+    from mini_reid.slack_bot import other_note
+
+    note = other_note("unknown", "please remind ridha to send the deck", "U999")
+    assert note == "from <@U999>: please remind ridha to send the deck"
+
+
 def test_help_lists_commands(tmp_path):
     assert parse_command("<@U1> help") == ("help", "")
     text = apply_command("help", "", NOW, {}, str(tmp_path / "ledger.json"))
