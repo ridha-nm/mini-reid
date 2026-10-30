@@ -2,6 +2,16 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (better answers)
+
+- Passages are cleaned at answer time: headers, address lists, URLs and Google
+  boilerplate removed even if the index is stale.
+- Unusable passages are dropped rather than shown.
+- Passages carry dates; answers show when something was said.
+- Synthesis step added: 8B local model writes 2-3 sentences with mandatory citations;
+  rejected output falls back to verbatim excerpts.
+- 97 tests passing.
+
 ## 2026-10-31 (catch-up)
 
 - Catch-up on wake: on startup the bot answers questions addressed to it while the Mac

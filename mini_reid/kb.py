@@ -44,9 +44,42 @@ def chunk(text: str, size: int = 800, overlap: int = 100) -> list[str]:
     return out
 
 
-def _doc(source: str, title: str, link: str, text: str) -> list[dict]:
-    return [{"source": source, "title": title, "link": link, "text": part}
+def _doc(source: str, title: str, link: str, text: str, date: str = "") -> list[dict]:
+    return [{"source": source, "title": title, "link": link, "text": part, "date": date}
             for part in chunk(text)]
+
+
+BOILERPLATE = re.compile(
+    r"gmail is email that|accounts\.google\.com|unsubscribe|view this email in",
+    re.I)
+
+
+ADDR = re.compile(r"[^;<>]{0,60}<[^<>@\s]+@[^<>]+>;?\s*")
+
+
+def strip_email_junk(text: str) -> str:
+    """Remove headers, address lists and boilerplate at answer time as well."""
+    t = re.sub(r"https?://\S+", " ", text or "")
+    for marker in ("Subject:", "subject:"):
+        i = t.rfind(marker)
+        if i != -1:
+            t = t[i + len(marker):]
+            m = re.search(r"(Dear |Hi |Hello )", t)
+            if m:
+                t = t[m.start():]
+            break
+    t = ADDR.sub(" ", t)
+    t = re.sub(r"(From|To|Cc|Bcc|Date|Sent):\s*", " ", t)
+    b = BOILERPLATE.search(t)
+    if b:
+        t = t[:b.start()]
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def usable(text: str) -> bool:
+    """Drop passages that are headers, links or Google boilerplate."""
+    body = re.sub(r"https?://\S+", " ", text or "")
+    return len(re.findall(r"[A-Za-z]{3,}", body)) >= 12 and not BOILERPLATE.search(body)
 
 
 def local_docs(roots: list[str]) -> list[dict]:
@@ -82,8 +115,14 @@ def slack_sent_docs(token: str, limit: int = 300) -> list[dict]:
             text = (m.get("text") or "").strip()
             if len(text) < 20:
                 continue
+            from datetime import datetime as _dt
+
+            try:
+                when = _dt.fromtimestamp(float(m.get("ts", 0))).strftime("%Y-%m-%d")
+            except (TypeError, ValueError):
+                when = ""
             docs += _doc("slack", (m.get("channel") or {}).get("name", "slack"),
-                         m.get("permalink") or "", text)
+                         m.get("permalink") or "", text, when)
         if len(matches) < 100:
             break
         page += 1
@@ -113,12 +152,20 @@ def gmail_sent_docs(env: dict, limit: int = 200) -> list[dict]:
         text = _plain_text(msg.get("payload") or {})
         text = re.sub(r"<[^>]+>", " ", text)
         text = __import__("html").unescape(text)
+        text = re.sub(r"(?im)^\s*(from|to|cc|bcc|subject|date|sent):.*$", " ", text)
         text = re.sub(r">[>\s]*>", " ", text)   # quoted-reply markers
+        text = re.sub(r"https?://\S+", " ", text)
         text = re.sub(r"\s+", " ", text).strip()
         if len(text) < 40:
             continue
+        from datetime import datetime as _dt
+
+        try:
+            when = _dt.fromtimestamp(int(msg.get("internalDate", 0)) / 1000).strftime("%Y-%m-%d")
+        except (TypeError, ValueError):
+            when = ""
         docs += _doc("gmail", "sent mail",
-                     f"https://mail.google.com/mail/u/0/#all/{mid}", text)
+                     f"https://mail.google.com/mail/u/0/#all/{mid}", text, when)
     return docs[:limit]
 
 
@@ -246,6 +293,42 @@ def _prefer_client(question: str, hits: list[dict]) -> list[dict]:
 
 
 MIN_SCORE = 0.55
+SYNTH_MODEL = "llama3.1:8b"
+
+SYNTH_PROMPT = """Answer the question using ONLY the passages. Write two or three
+sentences. End every sentence that states a fact with its passage number like [2].
+If the passages do not contain the answer, reply exactly: I do not know.
+
+Passages:
+{passages}
+
+Question: {question}
+Answer:"""
+
+
+def synthesize(question: str, hits: list[dict], model: str = SYNTH_MODEL) -> str | None:
+    """Grounded summary with citations. Returns None if the output is unusable."""
+    passages = "\n".join(
+        f"[{i}] ({h.get('date') or h['source']}) {h['text'][:600]}"
+        for i, h in enumerate(hits, 1))
+    prompt = SYNTH_PROMPT.format(passages=passages, question=question)
+    try:
+        req = urllib.request.Request(
+            f"{OLLAMA}/api/generate",
+            data=json.dumps({"model": model, "prompt": prompt, "stream": False,
+                             "options": {"temperature": 0}}).encode(),
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=300) as r:
+            text = (json.load(r).get("response") or "").strip()
+    except Exception:  # noqa: BLE001 - fall back to extractive
+        return None
+
+    low = text.lower()
+    if low.startswith("i do not know"):
+        return text
+    if not re.search(r"\[\d\]", text) or len(text) > 1200:
+        return None
+    return text
 
 
 def answer(question: str, index: list[dict], generator=None, k: int = 8) -> tuple[str, list[dict]]:
@@ -258,14 +341,24 @@ def answer(question: str, index: list[dict], generator=None, k: int = 8) -> tupl
     # Project notes answer questions about Mini-Reid itself, not about work.
     if not re.search(r"mini[- ]reid|handoff|spec|this project", question, re.I):
         hits = [h for h in hits if h.get("source") != "local"]
-    hits = [h for h in hits if h.get("score", 0) >= MIN_SCORE][:3]
+    cleaned = []
+    for h in hits:
+        body = strip_email_junk(h.get("text") or "")
+        if h.get("score", 0) >= MIN_SCORE and usable(body):
+            cleaned.append(dict(h, text=body))
+    hits = cleaned[:3]
     if not hits:
         return "I do not know.", []
 
+    summary = synthesize(question, hits)
+    if summary and len(summary) > 30:
+        return summary, hits
+
     lines = []
     for h in hits:
-        body = re.sub(r"\s+", " ", h.get("text") or "").strip()[:320]
-        lines.append(f"• {body}")
+        body = h["text"][:300]
+        when = f" · {h['date']}" if h.get("date") else ""
+        lines.append(f"• {body}{when}")
     return "\n".join(lines), hits
 
 
