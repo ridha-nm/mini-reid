@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -91,10 +92,22 @@ def gmail_sent_docs(env: dict, limit: int = 200) -> list[dict]:
     access = gmail_access(env)
     ids = gmail_list(access, "in:sent", limit)
     docs = []
-    for mid in ids:
+    for n, mid in enumerate(ids):
         url = (f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{mid}?"
                + urllib.parse.urlencode({"format": "full"}))
-        msg = _get_json(url, {"Authorization": f"Bearer {access}"})
+        msg = None
+        for attempt in range(3):
+            try:
+                msg = _get_json(url, {"Authorization": f"Bearer {access}"})
+                break
+            except Exception:  # noqa: BLE001 - transient quota and 5xx
+                if attempt == 2:
+                    raise
+                time.sleep(2 ** attempt)
+        if n and n % 20 == 0:
+            time.sleep(1)
+        if msg is None:
+            continue
         text = _plain_text(msg.get("payload") or {})
         text = re.sub(r"<[^>]+>", " ", text)
         text = re.sub(r"\s+", " ", __import__("html").unescape(text)).strip()
@@ -125,17 +138,25 @@ def _key(text: str) -> str:
 
 def build(roots: list[str], env: dict, use_slack: bool = True,
           use_gmail: bool = True, existing: list[dict] | None = None) -> list[dict]:
+    existing = existing or []
+
+    def keep(source: str) -> list[dict]:
+        """A source that fails must not erase what we already had."""
+        return [d for d in existing if d.get("source") == source]
+
     docs = local_docs(roots)
     if use_slack and env.get("SLACK_USER_TOKEN"):
         try:
             docs += slack_sent_docs(env["SLACK_USER_TOKEN"])
         except Exception as ex:  # noqa: BLE001 - one dead source must not stop the build
-            print(f"slack index failed: {type(ex).__name__}", flush=True)
+            print(f"slack index failed: {type(ex).__name__}; keeping previous", flush=True)
+            docs += keep("slack")
     if use_gmail:
         try:
             docs += gmail_sent_docs(env)
         except Exception as ex:  # noqa: BLE001
-            print(f"gmail index failed: {type(ex).__name__}", flush=True)
+            print(f"gmail index failed: {type(ex).__name__}; keeping previous", flush=True)
+            docs += keep("gmail")
 
     cached = {_key(d["text"]): d["vec"] for d in (existing or []) if d.get("vec")}
     seen = set()
