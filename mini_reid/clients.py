@@ -57,4 +57,12 @@ def match_client(text: str, sender: str, clients: dict[str, dict],
         if _text_match(text, c):
             return {"slug": slug, "name": c["name"], "group": c["group"],
                     "matched_by": "text"}
+    # Last resort: a known client domain quoted inside the message itself, for
+    # example a forwarded SRSL thread on a Gamuda account.
+    low = (text or "").lower()
+    for slug, c in clients.items():
+        for dom in c.get("domains", []):
+            if dom.lower() in low:
+                return {"slug": slug, "name": c["name"], "group": c["group"],
+                        "matched_by": "domain_in_text"}
     return None

@@ -28,6 +28,18 @@ def test_matches_slack_channel(c):
     assert (m["slug"], m["matched_by"]) == ("ioi", "channel")
 
 
+def test_srsl_domain_maps_to_gamuda(c):
+    m = match_client("x", "wanadlinamira@srslrt.com.my", c)
+    assert (m["slug"], m["matched_by"]) == ("gamuda", "domain")
+
+
+def test_client_domain_inside_text_is_matched(c):
+    m = match_client("Forwarded thread from daniel@eupe.com.my about waste",
+                     "someone@unknown.example", c)
+    assert m["slug"] == "eupe"
+    assert m["matched_by"] in {"text", "domain_in_text"}
+
+
 def test_unknown_domain_is_none(c):
     assert match_client("hello", "someone@unknown.example", c) is None
 

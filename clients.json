@@ -16,8 +16,8 @@
   "gamuda": {
     "name": "Gamuda",
     "group": "direct",
-    "domains": ["gamuda.com.my", "gamudaland.com.my", "gamuda.com.au"],
-    "aliases": ["Gamuda", "Gamuda Land"],
+    "domains": ["gamuda.com.my", "gamudaland.com.my", "gamuda.com.au", "srslrt.com.my"],
+    "aliases": ["Gamuda", "Gamuda Land", "SRSL"],
     "slack_channels": ["gamuda", "C07M2H54MNE"],
     "cycle": "gamuda-biweekly",
     "cadence_days": 14

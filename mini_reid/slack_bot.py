@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import threading
+import urllib.parse
 from datetime import timedelta
 
 from .capture import parse_capture
@@ -335,20 +336,28 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
     client = SocketModeClient(app_token=env["SLACK_APP_TOKEN"], web_client=web)
 
     seen: set[tuple[str, str]] = set()
+    STATE = "bot_state.json"
 
-    def handle(_socket_client, req):
-        client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
-        event = (req.payload or {}).get("event") or {}
-        if event.get("bot_id") or event.get("subtype"):
-            return
-        text = event.get("text") or ""
-        user = event.get("user") or ""
-        channel = event.get("channel") or ""
-        ts = event.get("ts") or ""
-        if not channel or not user:
-            return
+    def _state() -> dict:
+        import json
+        from pathlib import Path as P
 
-        # Slack retries an event until it is acknowledged. Same event, once.
+        f = P(STATE)
+        return json.loads(f.read_text()) if f.exists() else {}
+
+    def _mark(ts: str) -> None:
+        import json
+        from pathlib import Path as P
+
+        s = _state()
+        try:
+            if not s.get("last_ts") or float(ts) > float(s["last_ts"]):
+                s["last_ts"] = ts
+                P(STATE).write_text(json.dumps(s))
+        except ValueError:
+            pass
+
+    def process(channel: str, user: str, text: str, ts: str, late: bool = False) -> None:
         if (channel, ts) in seen:
             return
         seen.add((channel, ts))
@@ -379,17 +388,21 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     reply = f"{body_text}\n\n{sources}"
             except Exception as ex:  # noqa: BLE001
                 reply = f"Could not answer: {type(ex).__name__}"
+            if late:
+                reply = "_(answered late, I was offline)_\n" + reply
             web.chat_postMessage(channel=channel, text=reply[:3900])
+            _mark(ts)
             return
+
         print(f"[{datetime.now(MYT):%H:%M:%S}] {user} in {channel}: {text[:120]!r} -> {action}",
               flush=True)
 
-        # Anyone other than Ridha gets a reaction, never a reply.
         if user != owner:
-            try:
-                web.reactions_add(channel=channel, timestamp=ts, name="white_check_mark")
-            except Exception as ex:  # noqa: BLE001
-                print(f"  react failed: {type(ex).__name__}: {ex}", flush=True)
+            if not late:
+                try:
+                    web.reactions_add(channel=channel, timestamp=ts, name="white_check_mark")
+                except Exception as ex:  # noqa: BLE001
+                    print(f"  react failed: {type(ex).__name__}: {ex}", flush=True)
             note = other_note(action, body, user)
             if note:
                 apply_command("note", note, datetime.now(MYT), clients, ledger_path)
@@ -397,8 +410,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     from .notify import send_dm
 
                     send_dm(env, f"*Note from <@{user}>*\n{(body or '').strip()[:500]}")
-                except Exception as ex:  # noqa: BLE001 - a failed ping must not break the bot
+                except Exception as ex:  # noqa: BLE001
                     print(f"  note dm failed: {type(ex).__name__}", flush=True)
+            _mark(ts)
             return
 
         try:
@@ -407,7 +421,67 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             print(f"[error] {type(ex).__name__}: {ex}", flush=True)
             reply = f"Something broke: {type(ex).__name__}"
         print(f"  reply: {reply[:120]!r}", flush=True)
+        if late:
+            reply = "_(answered late, I was offline)_\n" + reply
         web.chat_postMessage(channel=channel, text=reply)
+        _mark(ts)
+
+    def handle(_socket_client, req):
+        client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
+        event = (req.payload or {}).get("event") or {}
+        if event.get("bot_id") or event.get("subtype"):
+            return
+        text = event.get("text") or ""
+        user = event.get("user") or ""
+        channel = event.get("channel") or ""
+        ts = event.get("ts") or ""
+        if not channel or not user:
+            return
+        process(channel, user, text, ts)
+
+    def catch_up(me_id: str) -> None:
+        """Answer questions asked while the Mac was asleep. Best effort, late."""
+        token = env.get("SLACK_USER_TOKEN")
+        if not token or not me_id:
+            return
+        last = float(_state().get("last_ts") or 0)
+        if not last:
+            import time
+            from pathlib import Path as P
+            import json as _json
+
+            P(STATE).write_text(_json.dumps({"last_ts": str(time.time())}))
+            return
+
+        from .sources import _get_json
+
+        url = ("https://slack.com/api/search.messages?"
+               + urllib.parse.urlencode({"query": f"<@{me_id}>", "count": 50,
+                                         "sort": "timestamp", "sort_dir": "desc"}))
+        try:
+            d = _get_json(url, {"Authorization": f"Bearer {token}"})
+        except Exception as ex:  # noqa: BLE001
+            print(f"catch-up search failed: {type(ex).__name__}", flush=True)
+            return
+        if not d.get("ok"):
+            print(f"catch-up search error: {d.get('error')}", flush=True)
+            return
+
+        late = 0
+        for m in reversed((d.get("messages") or {}).get("matches") or []):
+            try:
+                if float(m.get("ts", 0)) <= last:
+                    continue
+            except ValueError:
+                continue
+            ch = (m.get("channel") or {}).get("id")
+            user = m.get("user")
+            text = m.get("text") or ""
+            if ch and user:
+                process(ch, user, text, m["ts"], late=True)
+                late += 1
+        if late:
+            print(f"catch-up: processed {late} missed message(s)", flush=True)
 
     import logging
 
@@ -418,6 +492,10 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
     ident = web.auth_test()
     print(f"[{datetime.now(MYT):%H:%M:%S}] listening as @{ident.get('user')} "
           f"({ident.get('user_id')}) in {ident.get('team')}", flush=True)
+    try:
+        catch_up(ident.get("user_id"))
+    except Exception as ex:  # noqa: BLE001 - catch-up must never stop the listener
+        print(f"catch-up failed: {type(ex).__name__}: {ex}", flush=True)
     threading.Event().wait()
     return 0
 

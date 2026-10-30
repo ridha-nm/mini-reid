@@ -2,6 +2,14 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (catch-up)
+
+- Catch-up on wake: on startup the bot answers questions addressed to it while the Mac
+  was asleep, marked "answered late, I was offline". State in `bot_state.json`.
+- SRSL mapped to Gamuda (`srslrt.com.my`), and client matching now also looks for a
+  known client domain quoted inside the message.
+- 96 tests passing.
+
 ## 2026-10-31 (index rebuilt)
 
 - Index rebuilt: 561 passages, 200 Gmail with quote markers stripped.
