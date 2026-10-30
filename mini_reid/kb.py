@@ -96,6 +96,8 @@ def gmail_sent_docs(env: dict, limit: int = 200) -> list[dict]:
                + urllib.parse.urlencode({"format": "full"}))
         msg = _get_json(url, {"Authorization": f"Bearer {access}"})
         text = _plain_text(msg.get("payload") or {})
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", __import__("html").unescape(text)).strip()
         if len(text) < 40:
             continue
         docs += _doc("gmail", "sent mail",
@@ -170,15 +172,27 @@ def cosine(a: list[float], b: list[float]) -> float:
     return num / (da * db) if da and db else 0.0
 
 
-def search(index: list[dict], question: str, k: int = 5) -> list[dict]:
+def search(index: list[dict], question: str, k: int = 8) -> list[dict]:
     q = embed(question)
     scored = sorted(index, key=lambda d: cosine(q, d.get("vec") or []), reverse=True)
-    return scored[:k]
+    # One passage per source document. Otherwise one long email fills every slot.
+    out, seen = [], set()
+    for d in scored:
+        key = d.get("link") or d["text"][:80]
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(d)
+        if len(out) >= k:
+            break
+    return out
 
 
 PROMPT = """Answer the question using ONLY the passages below. Do not use outside
-knowledge. If the passages do not contain the answer, say exactly: I do not know.
+knowledge. If the passages only partly answer, say what is known and what is missing.
+If nothing relevant is there, say exactly: I do not know.
 Every sentence that states a fact must end with its passage number like [1].
+Be concise: three sentences at most.
 
 Passages:
 {passages}

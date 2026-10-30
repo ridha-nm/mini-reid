@@ -2,6 +2,15 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (kb answers)
+
+- Retrieval returns one passage per source document; long emails no longer fill every slot.
+- Gmail passages strip HTML before indexing.
+- Answer prompt now gives partial answers when evidence is partial, instead of always
+  "I do not know".
+- First real answer verified: Eupe waste mapping, citing the source message.
+- 93 tests passing.
+
 ## 2026-10-31 (kb refresh)
 
 - Knowledge index rebuilds itself nightly at 02:00 via `com.minireid.kb`.
