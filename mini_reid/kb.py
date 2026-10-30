@@ -129,9 +129,20 @@ def slack_sent_docs(token: str, limit: int = 300) -> list[dict]:
     return docs[:limit]
 
 
+def gmail_inbox_docs(env: dict, limit: int = 200) -> list[dict]:
+    """Received mail. Without this, replies like 'reverted with comments' are invisible."""
+    access = gmail_access(env)
+    ids = gmail_list(access, "in:inbox -in:spam -in:trash", limit)
+    return _gmail_docs(access, ids, limit)
+
+
 def gmail_sent_docs(env: dict, limit: int = 200) -> list[dict]:
     access = gmail_access(env)
     ids = gmail_list(access, "in:sent", limit)
+    return _gmail_docs(access, ids, limit)
+
+
+def _gmail_docs(access: str, ids: list[str], limit: int) -> list[dict]:
     docs = []
     for n, mid in enumerate(ids):
         url = (f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{mid}?"
@@ -206,8 +217,12 @@ def build(roots: list[str], env: dict, use_slack: bool = True,
         try:
             docs += gmail_sent_docs(env)
         except Exception as ex:  # noqa: BLE001
-            print(f"gmail index failed: {type(ex).__name__}; keeping previous", flush=True)
+            print(f"gmail sent index failed: {type(ex).__name__}; keeping previous", flush=True)
             docs += keep("gmail")
+        try:
+            docs += gmail_inbox_docs(env)
+        except Exception as ex:  # noqa: BLE001
+            print(f"gmail inbox index failed: {type(ex).__name__}", flush=True)
 
     cached = {_key(d["text"]): d["vec"] for d in (existing or []) if d.get("vec")}
     seen = set()
@@ -297,7 +312,9 @@ SYNTH_MODEL = "llama3.1:8b"
 
 SYNTH_PROMPT = """Answer the question using ONLY the passages. Write two or three
 sentences. End every sentence that states a fact with its passage number like [2].
-If the passages do not contain the answer, reply exactly: I do not know.
+Passages are in date order. If they conflict, the most recent one wins: report the
+current state, not the earlier one. If the passages do not contain the answer,
+reply exactly: I do not know.
 
 Passages:
 {passages}
@@ -346,7 +363,16 @@ def answer(question: str, index: list[dict], generator=None, k: int = 8) -> tupl
         body = strip_email_junk(h.get("text") or "")
         if h.get("score", 0) >= MIN_SCORE and usable(body):
             cleaned.append(dict(h, text=body))
-    hits = cleaned[:3]
+    hits, seen = [], set()
+    for h in cleaned:
+        key = h["text"][:120].lower()
+        if key in seen:
+            continue  # same email quoted in a reply chain
+        seen.add(key)
+        hits.append(h)
+        if len(hits) == 3:
+            break
+    hits = sorted(hits, key=lambda h: h.get("date") or "9999")
     if not hits:
         return "I do not know.", []
 
