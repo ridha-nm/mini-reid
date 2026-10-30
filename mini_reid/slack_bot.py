@@ -18,6 +18,8 @@ MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not", "r
 TIME_RE = re.compile(
     r"\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b"
     r"|\b(?:at\s+)(\d{1,2}):(\d{2})\b", re.I)
+RELATIVE = re.compile(
+    r"\bin\s+(\d+)\s*(minutes?|mins?|hours?|hrs?|days?|weeks?)\b", re.I)
 DATE_TOKEN = re.compile(
     r"\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
     r"\d{4}-\d{2}-\d{2})\b", re.I)
@@ -26,6 +28,23 @@ DATE_TOKEN = re.compile(
 def parse_remind(body: str, now) -> tuple[dict | None, str]:
     """Return (row_fields, cleaned_what). Time is optional; date defaults today."""
     from .extract import parse_due
+
+    rel = RELATIVE.search(body or "")
+    if rel:
+        n = int(rel.group(1))
+        unit = rel.group(2).lower()
+        if unit.startswith("min"):
+            delta = timedelta(minutes=n)
+        elif unit.startswith("h"):
+            delta = timedelta(hours=n)
+        elif unit.startswith("d"):
+            delta = timedelta(days=n)
+        else:
+            delta = timedelta(weeks=n)
+        at = (now + delta).replace(second=0, microsecond=0)
+        clean = re.sub(r"\s+", " ", RELATIVE.sub(" ", body or "")).strip(" ,.")
+        return ({"remind_at": at.isoformat(), "due": at.date().isoformat(),
+                 "what": clean or body}, clean)
 
     hour = minute = None
     m = TIME_RE.search(body or "")

@@ -116,6 +116,21 @@ def test_remind_at_parses_date_and_time():
     assert clean == "send the deck"
 
 
+def test_remind_accepts_relative_minutes():
+    from mini_reid.slack_bot import parse_remind
+
+    fields, clean = parse_remind("check the ledger in 2 minutes", NOW)
+    assert fields["remind_at"].startswith("2026-10-30T09:02")
+    assert clean == "check the ledger"
+
+
+def test_remind_accepts_relative_hours():
+    from mini_reid.slack_bot import parse_remind
+
+    fields, _ = parse_remind("call Daniel in 3 hours", NOW)
+    assert fields["remind_at"].startswith("2026-10-30T12:00")
+
+
 def test_remind_in_the_past_moves_to_tomorrow():
     from mini_reid.slack_bot import parse_remind
 
