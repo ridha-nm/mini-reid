@@ -2,6 +2,13 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (index rebuilt)
+
+- Index rebuilt: 561 passages, 200 Gmail with quote markers stripped.
+- Project notes (SPEC, CHANGES, HANDOFF) no longer appear in work answers; they still
+  answer questions about Mini-Reid itself.
+- 94 tests passing.
+
 ## 2026-10-31 (search-style answers)
 
 - Answers are the top 1-3 things Ridha actually wrote, verbatim, with sources.

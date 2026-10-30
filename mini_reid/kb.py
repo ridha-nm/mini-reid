@@ -252,6 +252,9 @@ def answer(question: str, index: list[dict], generator=None, k: int = 8) -> tupl
     """
     hits = search(index, question, k * 4)
     hits = _prefer_client(question, hits)
+    # Project notes answer questions about Mini-Reid itself, not about work.
+    if not re.search(r"mini[- ]reid|handoff|spec|this project", question, re.I):
+        hits = [h for h in hits if h.get("source") != "local"]
     hits = [h for h in hits if h.get("score", 0) >= MIN_SCORE][:3]
     if not hits:
         return "I do not know.", []
