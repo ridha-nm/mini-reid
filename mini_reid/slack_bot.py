@@ -270,6 +270,12 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             note = other_note(action, body, user)
             if note:
                 apply_command("note", note, datetime.now(MYT), clients, ledger_path)
+                try:
+                    from .notify import send_dm
+
+                    send_dm(env, f"*Note from <@{user}>*\n{(body or '').strip()[:500]}")
+                except Exception as ex:  # noqa: BLE001 - a failed ping must not break the bot
+                    print(f"  note dm failed: {type(ex).__name__}", flush=True)
             return
 
         try:
