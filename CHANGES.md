@@ -2,6 +2,14 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (kb refresh)
+
+- Knowledge index rebuilds itself nightly at 02:00 via `com.minireid.kb`.
+- Rebuild is incremental: unchanged passages reuse their vectors.
+- Decisions: knowledge stays local. GitHub Actions runs tests only; indexing in CI would
+  require the Slack user and Gmail tokens in repository secrets.
+- 93 tests passing.
+
 ## 2026-10-31 (knowledge base)
 
 - `kb.py`: local retrieval over Ridha's own Slack messages, Gmail sent mail and local documents.

@@ -115,8 +115,14 @@ def _plain_text(part: dict) -> str:
     return " ".join(_plain_text(p) for p in part.get("parts") or [])
 
 
+def _key(text: str) -> str:
+    import hashlib
+
+    return hashlib.sha1(text[:400].encode()).hexdigest()
+
+
 def build(roots: list[str], env: dict, use_slack: bool = True,
-          use_gmail: bool = True) -> list[dict]:
+          use_gmail: bool = True, existing: list[dict] | None = None) -> list[dict]:
     docs = local_docs(roots)
     if use_slack and env.get("SLACK_USER_TOKEN"):
         try:
@@ -129,15 +135,22 @@ def build(roots: list[str], env: dict, use_slack: bool = True,
         except Exception as ex:  # noqa: BLE001
             print(f"gmail index failed: {type(ex).__name__}", flush=True)
 
+    cached = {_key(d["text"]): d["vec"] for d in (existing or []) if d.get("vec")}
     seen = set()
     index = []
+    embedded = 0
     for d in docs:
-        key = hash(d["text"][:200])
+        key = _key(d["text"])
         if key in seen:
             continue
         seen.add(key)
-        d["vec"] = embed(d["text"])
+        if key in cached:
+            d["vec"] = cached[key]
+        else:
+            d["vec"] = embed(d["text"])
+            embedded += 1
         index.append(d)
+    print(f"passages: {len(index)} ({embedded} newly embedded)", flush=True)
     return index
 
 
@@ -208,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
     env = load_env(".env")
     if args.build:
         roots = [p for p in (args.paths or env.get("KB_PATHS", ".")).split(",") if p]
-        index = build([r.strip() for r in roots], env)
+        index = build([r.strip() for r in roots], env, existing=load())
         save(index)
         print(f"indexed {len(index)} passages -> {INDEX}")
         return 0
