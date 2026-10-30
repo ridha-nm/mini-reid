@@ -37,7 +37,7 @@ def test_brief_counts_and_names_the_most_urgent():
          "due": "2026-10-30", "status": "open"},
         {"id": "c", "what": "Later thing", "client": "ioi", "due": "2026-12-01", "status": "open"},
     ]
-    text = brief(rows)
+    text = brief(rows, NOW)
     assert "2 overdue" in text
     assert "Send FSD" in text
     assert "Overdue by client" in text

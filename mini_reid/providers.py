@@ -148,8 +148,9 @@ def extract_batch(items: list[dict], provider, now: datetime,
             "stalled_since": None,
             "ack_policy": "bot_may_ack",
             "closure": "open",
-            # A model may echo a Slack user id as the client. Only real slugs pass.
-            "client": _val(out.get("client")) if _val(out.get("client")) in valid_clients else None,
+            # Client attribution belongs to the rule matcher, not the model. The 3B
+            # model invented "ioi" for DMs that had nothing to do with IOI.
+            "client": None,
             "created_at": src.get("ts") or now.isoformat(),
             "last_activity": src.get("ts") or now.isoformat(),
             "closed_at": None,

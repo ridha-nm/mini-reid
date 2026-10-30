@@ -136,7 +136,14 @@ def main() -> int:
                 candidates[start:start + 5], provider, now, list(clients))
             rewritten.extend(rows)
         if rewritten:
-            fresh = rewritten
+            by_nid = {r["native_id"]: r for r in rewritten}
+            merged = []
+            for r in fresh:
+                better = by_nid.pop(r["native_id"], None)
+                if better:
+                    better = dict(better, client=r.get("client"), asker=r.get("asker"))
+                merged.append(better or r)
+            fresh = merged + list(by_nid.values())
 
     if fresh:
         ledger = apply_stalled(merge(existing, fresh), now)

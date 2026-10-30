@@ -119,6 +119,9 @@ def main(argv: list[str] | None = None) -> int:
         merged: list[dict] = []
         for r in rule_rows:
             better = by_nid.pop(r["native_id"], None) if r["native_id"] in attempted else None
+            if better:
+                # Client comes from rules, never from the model. It invents "ioi".
+                better = dict(better, client=r.get("client"), asker=r.get("asker"))
             merged.append(better or r)
         incoming += merged + list(by_nid.values())
     else:
@@ -136,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             from .kb import brief as make_brief
 
-            brief_text = make_brief(ledger)
+            brief_text = make_brief(ledger, now)
         except Exception as ex:  # noqa: BLE001 - a missing summary must not block the digest
             errors.append(f"Brief: {type(ex).__name__}")
 

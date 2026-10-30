@@ -329,15 +329,17 @@ Question: {question}
 Answer:"""
 
 
-def brief(rows: list[dict], model: str | None = None, limit: int = 3) -> str | None:
+def brief(rows: list[dict], now=None, model: str | None = None,
+          limit: int = 3) -> str | None:
     """Deterministic brief: counts first, then the most urgent items. No model.
 
-    The 3B model addressed this to the wrong person and invented framing. Counting
-    rows cannot do that.
+    Takes the date as an argument so it is reproducible and testable.
     """
-    from datetime import date
+    from datetime import datetime, timedelta, timezone
 
-    today = date.today()
+    if now is None:
+        now = datetime.now(timezone(timedelta(hours=8)))
+    today = now.date()
     open_rows = [r for r in rows
                  if r.get("status") not in {"done", "dropped"}
                  and r.get("kind") not in {"note", "reminder"}]
