@@ -329,38 +329,46 @@ Question: {question}
 Answer:"""
 
 
-BRIEF_PROMPT = """Write Ridha's morning brief in three sentences at most.
-Use only the items listed. Put the most urgent first. Name the client and the date.
-No links, no bullet points, no preamble.
+def brief(rows: list[dict], model: str | None = None, limit: int = 3) -> str | None:
+    """Deterministic brief: counts first, then the most urgent items. No model.
 
-Items:
-{items}
-"""
+    The 3B model addressed this to the wrong person and invented framing. Counting
+    rows cannot do that.
+    """
+    from datetime import date
 
+    today = date.today()
+    open_rows = [r for r in rows
+                 if r.get("status") not in {"done", "dropped"}
+                 and r.get("kind") not in {"note", "reminder"}]
+    if not open_rows:
+        return "Nothing open."
 
-def brief(rows: list[dict], model: str = SYNTH_MODEL, limit: int = 12) -> str | None:
-    """A short written summary of the day. None if the model is unavailable."""
-    open_rows = [r for r in rows if r.get("status") not in {"done", "dropped"}]
-    open_rows.sort(key=lambda r: (r.get("due") or "9999", r.get("what") or ""))
-    items = "\n".join(
-        f"- {r.get('what', '')[:120]} | {r.get('client') or 'unassigned'} | "
-        f"{r.get('due') or 'no date'} | {r.get('status')}"
-        for r in open_rows[:limit])
-    if not items:
-        return None
-    try:
-        req = urllib.request.Request(
-            f"{OLLAMA}/api/generate",
-            data=json.dumps({"model": model,
-                             "prompt": BRIEF_PROMPT.format(items=items),
-                             "stream": False,
-                             "options": {"temperature": 0, "num_predict": 300}}).encode(),
-            headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=300) as r:
-            text = (json.load(r).get("response") or "").strip()
-    except Exception:  # noqa: BLE001 - the digest must render without a summary
-        return None
-    return text if 20 < len(text) < 800 else None
+    def overdue(r: dict) -> bool:
+        return r.get("status") == "stalled" or (r.get("due") or "9999") < today.isoformat()
+
+    def due_soon(r: dict) -> bool:
+        return (r.get("due") or "9999") <= (today.fromordinal(today.toordinal() + 1)).isoformat()
+
+    late = sorted([r for r in open_rows if overdue(r)], key=lambda r: r.get("due") or "")
+    soon = [r for r in open_rows if not overdue(r) and due_soon(r)]
+
+    counts: dict[str, int] = {}
+    for r in late:
+        key = r.get("client") or "unassigned"
+        counts[key] = counts.get(key, 0) + 1
+    by_client = ", ".join(f"{k} {v}" for k, v in sorted(counts.items(), key=lambda x: -x[1]))
+
+    parts = [f"{len(late)} overdue, {len(soon)} due today or tomorrow."]
+    if late:
+        top = "; ".join(
+            f"{r.get('what', '')[:70]} ({r.get('client') or 'unassigned'}"
+            + (f", due {r['due']}" if r.get("due") else "") + ")"
+            for r in late[:limit])
+        parts.append(f"Most urgent: {top}.")
+    if by_client:
+        parts.append(f"Overdue by client: {by_client}.")
+    return " ".join(parts)
 
 
 def synthesize(question: str, hits: list[dict], model: str = SYNTH_MODEL) -> str | None:

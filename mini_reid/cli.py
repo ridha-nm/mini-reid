@@ -102,17 +102,25 @@ def main(argv: list[str] | None = None) -> int:
         provider = OllamaProvider(model=args.model)
         model_rows: list[dict] = []
         failed: list[dict] = []
+        attempted: set[str] = set()
         candidates = [i for i in items if i.get("kind") != "sent"]
         for start in range(0, len(candidates), 5):
-            rows, bad = extract_batch_safe(
-                candidates[start:start + 5], provider, now, list(clients))
+            chunk = candidates[start:start + 5]
+            rows, bad = extract_batch_safe(chunk, provider, now, list(clients))
             model_rows.extend(rows)
             failed.extend(bad)
+            bad_ids = {b.get("native_id") for b in bad}
+            attempted |= {i.get("native_id") for i in chunk} - bad_ids
         if failed:
             errors.append(f"Model: {len(failed)} item(s) fell back to rules")
-        # The model rewrites every task. Rules remain the fallback where it said nothing.
-        covered = {r["native_id"] for r in model_rows}
-        incoming += [r for r in rule_rows if r["native_id"] not in covered] + model_rows
+        # Rules decide what is a commitment. The model only improves the wording.
+        # The 3B model deleted real asks and kept jokes when it was given authority.
+        by_nid = {r["native_id"]: r for r in model_rows}
+        merged: list[dict] = []
+        for r in rule_rows:
+            better = by_nid.pop(r["native_id"], None) if r["native_id"] in attempted else None
+            merged.append(better or r)
+        incoming += merged + list(by_nid.values())
     else:
         incoming += rule_rows
 

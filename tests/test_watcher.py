@@ -28,6 +28,21 @@ def test_new_rows_ignores_noise():
     assert new_rows([noise], [], {}, NOW) == []
 
 
+def test_brief_counts_and_names_the_most_urgent():
+    from mini_reid.kb import brief
+
+    rows = [
+        {"id": "a", "what": "Send FSD", "client": "kasib", "due": "2026-10-27", "status": "open"},
+        {"id": "b", "what": "Clarify waste categories", "client": "gamuda",
+         "due": "2026-10-30", "status": "open"},
+        {"id": "c", "what": "Later thing", "client": "ioi", "due": "2026-12-01", "status": "open"},
+    ]
+    text = brief(rows)
+    assert "2 overdue" in text
+    assert "Send FSD" in text
+    assert "Overdue by client" in text
+
+
 def test_overdue_today_excludes_notes_and_done():
     from mini_reid.watcher import overdue_today
 

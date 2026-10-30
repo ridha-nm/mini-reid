@@ -44,12 +44,15 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
     buckets: dict[str, list[dict]] = {k: [] for k, _ in LABELS}
     used: set[str] = set()
     seen_links: set[str] = set()
+    seen_text: set[tuple[str, str]] = set()
 
     def take(key: str, row: dict) -> None:
         buckets[key].append(row)
         used.add(row["id"])
         if row.get("source_link"):
             seen_links.add(row["source_link"])
+        seen_text.add(((row.get("what") or "").lower().strip()[:80],
+                       row.get("client") or ""))
 
     for row in sorted(rows, key=lambda r: (r.get("due") or "9999-12-31", r.get("what") or "")):
         if row.get("status") in {"done", "dropped"} or row["id"] in used:
@@ -58,6 +61,9 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
             continue
         # One source message renders once, even if re-extraction made a second id.
         if row.get("source_link") and row["source_link"] in seen_links:
+            continue
+        text_key = ((row.get("what") or "").lower().strip()[:80], row.get("client") or "")
+        if text_key in seen_text:
             continue
         if row.get("direction") == "owed_to_me":
             take("waiting", row)

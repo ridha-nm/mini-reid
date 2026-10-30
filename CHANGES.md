@@ -2,6 +2,16 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (trustworthy digest)
+
+- Jokes and short DM chatter no longer become tasks; Google boilerplate stripped.
+- Duplicate tasks collapse in the digest.
+- Brief is deterministic: counts, three most urgent, overdue by client. No model.
+- Rules decide what is a commitment; the 3B model only improves wording. Given
+  authority it deleted real asks and kept jokes.
+- Gmail uses the subject line as the task name instead of the email's opening line.
+- 106 tests passing.
+
 ## 2026-10-31 (names and better retrieval)
 
 - Slack user IDs resolved to display names in DM captures.

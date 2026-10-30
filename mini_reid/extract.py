@@ -14,6 +14,11 @@ ASK = re.compile(
     r"\?|\b(please|can you|could you|kindly|confirm|review|send|share|provide|"
     r"update|follow up|action|need you|let us know|let me know|approve)\b", re.I)
 MENTION = re.compile(r"<@[A-Z0-9]+>")
+CHATTER = re.compile(
+    r"\b(lol|haha+|bahaha+|im tired|i'?m tired|no worries|working on it|"
+    r"noted|got it|sure|yep|yeah|okay|ok|thanks|thank you|see you|hmm)\b", re.I)
+BOILERPLATE_TEXT = re.compile(
+    r"accounts\.google\.com|gmail is email that|unsubscribe", re.I)
 SIGNATURE = re.compile(
     r"(ridha mohamed\s+sustainability data analyst|best regards,?\s*ridha|"
     r"mobile\. \+60|web\. www\.pantas\.com|address\. unit)",
@@ -85,6 +90,19 @@ def extract(item: dict, client: dict | None, now: datetime) -> list[dict]:
     # Never ingest our own digest or alerts.
     if text.startswith("Mini-Reid —") or "open commitments. Nothing sent." in text:
         return []
+
+    marker = BOILERPLATE_TEXT.search(text)
+    if marker:
+        text = text[: marker.start()].strip()
+        if len(text) < 12:
+            return []
+
+    # A DM is a conversation. Only an actual ask, question or dated request counts.
+    if item.get("kind") == "dm":
+        if len(text) < 20 and "?" not in text:
+            return []
+        if CHATTER.search(text) and "?" not in text:
+            return []
     # An inbox email only becomes a commitment when it actually asks for something.
     if item.get("source") == "gmail" and item.get("kind") == "inbox" and not ASK.search(text):
         return []
@@ -92,7 +110,7 @@ def extract(item: dict, client: dict | None, now: datetime) -> list[dict]:
     if item.get("due"):
         due, conf = item["due"], 0.95
     else:
-        due, conf = parse_due(text, now)
+        due, conf = parse_due(f"{item.get('subject') or ''} {text}", now)
 
     # Shared-alias mail with no date and no direct address is not Ridha's work.
     if item.get("source") == "gmail" and item.get("kind") == "inbox" and due is None:
@@ -100,10 +118,14 @@ def extract(item: dict, client: dict | None, now: datetime) -> list[dict]:
         if "ridha" not in to and "ridha" not in text.lower():
             return []
     ts = item.get("created_at") or item.get("ts") or now.isoformat()
+    # A subject line is a task name. The body opens with "Hi X, thanks for..."
+    subject = re.sub(r"^\s*((re|fw|fwd)\s*:\s*)+", "", item.get("subject") or "", flags=re.I)
+    what_text = subject.strip() if (item.get("source") == "gmail" and subject.strip()) else text
+
     return [{
-        "id": commitment_id(item.get("source", ""), item.get("native_id", ""), text),
+        "id": commitment_id(item.get("source", ""), item.get("native_id", ""), what_text),
         "direction": item.get("direction", "owed_by_me"),
-        "what": text[:200],
+        "what": what_text[:200],
         # A draft is Ridha replying, so the asker is whoever he is replying to.
         "asker": _asker(item.get("to") or "") if item.get("kind") == "draft" else _asker(author),
         "source": item.get("source", ""),
