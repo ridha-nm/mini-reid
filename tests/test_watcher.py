@@ -28,6 +28,21 @@ def test_new_rows_ignores_noise():
     assert new_rows([noise], [], {}, NOW) == []
 
 
+def test_fire_reminders_sends_once(tmp_path, monkeypatch):
+    from mini_reid import watcher as w
+    from mini_reid.ledger import save
+
+    sent = []
+    monkeypatch.setattr(w, "send_dm", lambda env, text: sent.append(text))
+    ledger = str(tmp_path / "ledger.json")
+    save(ledger, [{"id": "r1", "kind": "reminder", "what": "send the deck",
+                   "remind_at": "2026-10-30T08:00:00+08:00", "reminded": False}])
+
+    assert w.fire_reminders({}, ledger, NOW) == 1
+    assert w.fire_reminders({}, ledger, NOW) == 0
+    assert len(sent) == 1
+
+
 def test_alert_is_compact_and_has_a_link():
     rows = new_rows([ITEM], [], {}, NOW)
     text = format_alert(rows)

@@ -2,6 +2,14 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (early)
+
+- `remind:` and "remind me to ..." with a parsed time. Watcher fires it as a DM once.
+- Plain sentences from Ridha become notes; questions route to list or help.
+- Other people's plain sentences become notes with an instant DM. `list`/`find`/`help`
+  from others no longer create empty notes.
+- 88 tests passing.
+
 ## 2026-10-30 (night, final)
 
 - Item matching is fuzzy: a fragment or any word order works, and an ambiguous match

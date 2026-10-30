@@ -53,11 +53,37 @@ def format_alert(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def fire_reminders(env: dict, ledger_path: str, now: datetime) -> int:
+    rows = load(ledger_path)
+    fired = 0
+    for r in rows:
+        if r.get("kind") != "reminder" or r.get("reminded"):
+            continue
+        at = r.get("remind_at")
+        if not at:
+            continue
+        try:
+            when = datetime.fromisoformat(at)
+        except ValueError:
+            continue
+        if when <= now:
+            send_dm(env, f"*Reminder*\n{(r.get('what') or '')[:300]}")
+            r["reminded"] = True
+            fired += 1
+    if fired:
+        save(ledger_path, rows)
+    return fired
+
+
 def main() -> int:
     env = load_env(".env")
     clients = load_clients("clients.json")
     now = datetime.now(MYT)
     ledger_path = "ledger.json"
+
+    fired = fire_reminders(env, ledger_path, now)
+    if fired:
+        print(f"[{now:%H:%M:%S}] fired {fired} reminder(s)", flush=True)
 
     items, errors = collect(days=1, offline=False)
     existing = load(ledger_path)

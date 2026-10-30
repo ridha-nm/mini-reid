@@ -10,8 +10,58 @@ from .ledger import commitment_id, load, merge, save
 
 MENTION = re.compile(r"<@[A-Z0-9]+>")
 COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
-            "find", "list", "not"}
-MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not"}
+            "find", "list", "not", "remind"}
+MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not", "remind"}
+
+TIME_RE = re.compile(
+    r"\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b"
+    r"|\b(?:at\s+)(\d{1,2}):(\d{2})\b", re.I)
+DATE_TOKEN = re.compile(
+    r"\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+    r"\d{4}-\d{2}-\d{2})\b", re.I)
+
+
+def parse_remind(body: str, now) -> tuple[dict | None, str]:
+    """Return (row_fields, cleaned_what). Time is optional; date defaults today."""
+    from .extract import parse_due
+
+    hour = minute = None
+    m = TIME_RE.search(body or "")
+    if m:
+        if m.group(1):
+            hour, minute = int(m.group(1)), int(m.group(2) or 0)
+            ampm = (m.group(3) or "").lower()
+        else:
+            hour, minute = int(m.group(4)), int(m.group(5))
+            ampm = ""
+        if ampm == "pm" and hour < 12:
+            hour += 12
+        if ampm == "am" and hour == 12:
+            hour = 0
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            return None, body
+
+    date_text = DATE_TOKEN.search(body or "")
+    date_iso, _ = parse_due(body or "", now)
+    if date_iso is None and hour is not None:
+        date_iso = now.date().isoformat()
+
+    clean = TIME_RE.sub(" ", body or "")
+    clean = DATE_TOKEN.sub(" ", clean)
+    clean = re.sub(r"\s+", " ", clean).strip(" ,.")
+
+    if date_iso is None:
+        return None, body
+
+    if hour is None:
+        at = f"{date_iso}T09:00:00+08:00"
+    else:
+        at = f"{date_iso}T{hour:02d}:{minute:02d}:00+08:00"
+        if date_text is None:
+            candidate = __import__("datetime").datetime.fromisoformat(at)
+            if candidate <= now:
+                at = (candidate + timedelta(days=1)).isoformat(timespec="seconds")
+    return {"remind_at": at, "due": date_iso, "what": clean or body}, clean
 
 
 QUERY = re.compile(
@@ -51,6 +101,7 @@ HELP = """*Mini-Reid commands*
 • `waiting: Eupe waste on Daniel` — waiting on someone else
 • `drop: Eupe waste` — remove it quietly
 • `not: anything that is not part c` — wrong item, teach it to ignore this kind
+• `remind me to send the deck tomorrow at 3pm` — a timed DM
 • `find: eupe` — search the ledger
 • `list` — ten nearest open items
 • `help` — this
@@ -68,9 +119,12 @@ def parse_command(text: str) -> tuple[str, str]:
     if body.lower() in {"help", "?", "commands"}:
         return "help", ""
     m = re.match(
-        r"^(add|note|done|drop|due|snooze|waiting|find|not)\s*:\s*(.+)$", body, re.I)
+        r"^(add|note|done|drop|due|snooze|waiting|find|not|remind)\s*:\s*(.+)$", body, re.I)
     if m:
         return m.group(1).lower(), m.group(2).strip()
+    m = re.match(r"^(?:please\s+)?remind(?:\s+me)?(?:\s+to)?\s+(.+)$", body, re.I)
+    if m:
+        return "remind", m.group(1).strip()
     if re.match(r"^(thanks|thank you|noted|ok|okay|got it)\b", body, re.I):
         return "ack", body
     return "unknown", body
@@ -163,6 +217,24 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
 
     if action == "help":
         return HELP
+
+    if action == "remind":
+        fields, clean = parse_remind(body, now)
+        if fields is None:
+            return "Use: remind: send the deck tomorrow at 3pm"
+        row = {
+            "id": commitment_id("reminder", clean.lower(), clean),
+            "direction": "owed_by_me", "what": clean[:200], "source": "manual",
+            "native_id": clean.lower(), "kind": "reminder", "source_link": "",
+            "evidence": body[:200], "due": fields["due"], "due_confidence": 0.9,
+            "cycle": None, "status": "open", "stalled_since": None,
+            "ack_policy": "bot_may_ack", "closure": "open", "client": None,
+            "created_at": now.isoformat(), "last_activity": now.isoformat(),
+            "remind_at": fields["remind_at"], "reminded": False,
+            "closed_at": None, "closed_how": None,
+        }
+        save(ledger_path, merge(rows, [row]))
+        return f"Reminder set for {fields['remind_at'][:16].replace('T', ' ')}: {clean[:80]}"
 
     if action == "not":
         from . import learning

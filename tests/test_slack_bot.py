@@ -87,6 +87,32 @@ def test_other_people_can_only_leave_a_note():
     assert other_note("ack", "thanks", "U999") is None
 
 
+def test_remind_is_parsed_without_prefix():
+    assert parse_command("<@U1> remind me to send the deck tomorrow at 3pm")[0] == "remind"
+
+
+def test_remind_at_parses_date_and_time():
+    from mini_reid.slack_bot import parse_remind
+
+    fields, clean = parse_remind("send the deck tomorrow at 3pm", NOW)
+    assert fields["remind_at"].startswith("2026-10-31T15:00")
+    assert clean == "send the deck"
+
+
+def test_remind_in_the_past_moves_to_tomorrow():
+    from mini_reid.slack_bot import parse_remind
+
+    fields, _ = parse_remind("send the deck at 8am", NOW)
+    assert fields["remind_at"].startswith("2026-10-31T08:00")
+
+
+def test_remind_without_a_date_needs_one():
+    from mini_reid.slack_bot import parse_remind
+
+    fields, _ = parse_remind("send the deck", NOW)
+    assert fields is None
+
+
 def test_owner_can_speak_plainly_but_questions_stay_questions():
     from mini_reid.slack_bot import owner_action
 
