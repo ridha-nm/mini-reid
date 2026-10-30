@@ -34,6 +34,9 @@ For each message decide if someone owes something:
 - from is the person or team who asked.
 - client is one of: {clients}, or null.
 
+Ridha has previously said these are NOT commitments. Ignore the same kind of message:
+{ignored}
+
 Today is {today} ({weekday}).
 Return JSON exactly matching: {schema}
 No prose. Only JSON.
@@ -79,10 +82,14 @@ def _val(v) -> str | None:
 
 
 def _batch_prompt(items: list[dict], now: datetime, clients: list[str]) -> str:
+    from .learning import ignored_examples
+
     payload = [{"id": i["native_id"], "text": (i.get("text") or "")[:500],
                 "from": i.get("author", "")} for i in items]
+    ignored = ignored_examples()
     return PROMPT.format(
         clients=", ".join(clients),
+        ignored="\n".join(f"- {x}" for x in ignored) if ignored else "- none yet",
         today=now.date().isoformat(),
         weekday=now.strftime("%A"),
         schema=json.dumps(SCHEMA),

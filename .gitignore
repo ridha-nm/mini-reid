@@ -14,3 +14,6 @@ bot.out.log
 bot.err.log
 model.log
 ledger*.json
+corrections.json
+expected.txt
+scorecard.md

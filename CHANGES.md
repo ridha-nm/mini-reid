@@ -2,6 +2,16 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-30 (night)
+
+- `not:` command: drops a false positive and records it in `corrections.json`.
+- Those corrections are fed back into the model prompt as examples to ignore.
+- `help` command and command list.
+- `scorecard.py`: weekly recall check against a hand-written `expected.txt`.
+- Watcher now rewrites new items through the model before alerting, and dedupes by source link.
+- CI workflow runs tests on GitHub; live agent stays local.
+- 77 tests passing.
+
 ## 2026-10-30 (late)
 
 - Notes moved to their own digest section. They no longer sit among tasks.

@@ -9,7 +9,8 @@ from .capture import parse_capture
 from .ledger import commitment_id, load, merge, save
 
 MENTION = re.compile(r"<@[A-Z0-9]+>")
-COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting", "find", "list"}
+COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
+            "find", "list", "not"}
 
 HELP = """*Mini-Reid commands*
 • `add: confirm Eupe waste by Friday` — new task
@@ -19,6 +20,7 @@ HELP = """*Mini-Reid commands*
 • `snooze: Eupe waste 3d` — push it out (d days, w weeks)
 • `waiting: Eupe waste on Daniel` — waiting on someone else
 • `drop: Eupe waste` — remove it quietly
+• `not: anything that is not part c` — wrong item, teach it to ignore this kind
 • `find: eupe` — search the ledger
 • `list` — ten nearest open items
 • `help` — this
@@ -36,7 +38,7 @@ def parse_command(text: str) -> tuple[str, str]:
     if body.lower() in {"help", "?", "commands"}:
         return "help", ""
     m = re.match(
-        r"^(add|note|done|drop|due|snooze|waiting|find)\s*:\s*(.+)$", body, re.I)
+        r"^(add|note|done|drop|due|snooze|waiting|find|not)\s*:\s*(.+)$", body, re.I)
     if m:
         return m.group(1).lower(), m.group(2).strip()
     if re.match(r"^(thanks|thank you|noted|ok|okay|got it)\b", body, re.I):
@@ -111,6 +113,21 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
 
     if action == "help":
         return HELP
+
+    if action == "not":
+        from . import learning
+
+        row = _find(rows, body)
+        if row:
+            row["status"] = "dropped"
+            row["closed_at"] = now.isoformat()
+            row["closed_how"] = "not_commitment"
+            save(ledger_path, rows)
+            learning.add(row.get("what", ""), reason=body,
+                         source=row.get("source", ""))
+            return f"Removed as not a commitment: {row['what'][:80]}"
+        learning.add(body, reason="manual correction", source="manual")
+        return "Recorded. I will ignore similar messages from now on."
 
     if action == "list":
         open_rows = [r for r in rows if r.get("status") not in {"done", "dropped"}

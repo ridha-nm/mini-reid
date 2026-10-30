@@ -45,6 +45,20 @@ def test_done_closes_matching_item(tmp_path):
     assert "Closed" in reply
 
 
+def test_not_drops_the_row_and_records_a_correction(tmp_path, monkeypatch):
+    from mini_reid import learning
+
+    monkeypatch.setattr(learning, "PATH", str(tmp_path / "corrections.json"))
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "anything that is not part c", NOW, clients, ledger)
+    reply = apply_command("not", "anything that is not part c", NOW, clients, ledger)
+    assert load(ledger)[0]["status"] == "dropped"
+    assert load(ledger)[0]["closed_how"] == "not_commitment"
+    assert "not a commitment" in reply
+    assert learning.ignored_examples() == ["anything that is not part c"]
+
+
 def test_help_lists_commands(tmp_path):
     assert parse_command("<@U1> help") == ("help", "")
     text = apply_command("help", "", NOW, {}, str(tmp_path / "ledger.json"))

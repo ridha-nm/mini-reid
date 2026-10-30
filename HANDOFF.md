@@ -51,6 +51,7 @@ snooze: <item> 3d            push it out (d = days, w = weeks)
 waiting: <item> on Daniel    move it to Waiting on others
 drop: <item>                 remove it without deleting history
 find: <text>                 search the ledger
+not: <item>                  wrong item, teach it to ignore this kind
 list                         ten nearest open items
 ```
 
@@ -72,6 +73,18 @@ Only Ridha can change the ledger. Anyone else gets a ✅ reaction and no reply.
 
 `.env`, mode 600, never committed. Slack app tokens (`xapp`, `xoxb`, `xoxp`), Gmail
 OAuth paths, Jira API token, `SLACK_OWNER_ID`.
+
+## Weekly scorecard
+
+Write what you actually owed in `expected.txt`, one per line, **before** opening
+the digest on Friday. Then:
+
+```bash
+.venv/bin/python -m mini_reid.scorecard
+```
+
+It appends recall and the missed list to `scorecard.md`. This is the only real
+measure of whether tuning works.
 
 ## Known limits
 
