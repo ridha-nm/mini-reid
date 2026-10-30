@@ -11,6 +11,14 @@ from .ledger import commitment_id, load, merge, save
 MENTION = re.compile(r"<@[A-Z0-9]+>")
 COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
             "find", "list", "not"}
+MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not"}
+
+
+def other_note(action: str, body: str, user: str) -> str | None:
+    """What someone else's message becomes. Only mutating commands leave a trace."""
+    if action in MUTATING and (body or "").strip():
+        return f"from <@{user}>: {body.strip()}"
+    return None
 
 HELP = """*Mini-Reid commands*
 • `add: confirm Eupe waste by Friday` — new task
@@ -259,9 +267,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 web.reactions_add(channel=channel, timestamp=ts, name="white_check_mark")
             except Exception as ex:  # noqa: BLE001
                 print(f"  react failed: {type(ex).__name__}: {ex}", flush=True)
-            if action in COMMANDS:
-                apply_command("note", f"from <@{user}>: {body}", datetime.now(MYT),
-                              clients, ledger_path)
+            note = other_note(action, body, user)
+            if note:
+                apply_command("note", note, datetime.now(MYT), clients, ledger_path)
             return
 
         try:
