@@ -93,17 +93,19 @@ def main(argv: list[str] | None = None) -> int:
         rule_rows.extend(extract(item, client, now))
 
     if args.model:
-        from .providers import OllamaProvider, extract_batch
+        from .providers import OllamaProvider, extract_batch_safe
 
         provider = OllamaProvider(model=args.model)
         model_rows: list[dict] = []
+        failed: list[dict] = []
         candidates = [i for i in items if i.get("kind") != "sent"]
         for start in range(0, len(candidates), 5):
-            try:
-                model_rows.extend(extract_batch(
-                    candidates[start:start + 5], provider, now, list(clients)))
-            except Exception as ex:  # noqa: BLE001 - one bad batch must not kill the run
-                errors.append(f"Model batch {start // 5 + 1}: {type(ex).__name__}")
+            rows, bad = extract_batch_safe(
+                candidates[start:start + 5], provider, now, list(clients))
+            model_rows.extend(rows)
+            failed.extend(bad)
+        if failed:
+            errors.append(f"Model: {len(failed)} item(s) fell back to rules")
         # The model rewrites every task. Rules remain the fallback where it said nothing.
         covered = {r["native_id"] for r in model_rows}
         incoming += [r for r in rule_rows if r["native_id"] not in covered] + model_rows

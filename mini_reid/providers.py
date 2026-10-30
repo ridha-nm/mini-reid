@@ -97,6 +97,21 @@ def _batch_prompt(items: list[dict], now: datetime, clients: list[str]) -> str:
     )
 
 
+def extract_batch_safe(items: list[dict], provider, now: datetime,
+                       clients: list[str] | None = None
+                       ) -> tuple[list[dict], list[dict]]:
+    """Return (rows, failed_items). A bad response is split until the culprit is isolated."""
+    try:
+        return extract_batch(items, provider, now, clients), []
+    except Exception:  # noqa: BLE001 - the caller decides how to fall back
+        if len(items) <= 1:
+            return [], items
+        mid = len(items) // 2
+        left_rows, left_failed = extract_batch_safe(items[:mid], provider, now, clients)
+        right_rows, right_failed = extract_batch_safe(items[mid:], provider, now, clients)
+        return left_rows + right_rows, left_failed + right_failed
+
+
 def extract_batch(items: list[dict], provider, now: datetime,
                   clients: list[str] | None = None) -> list[dict]:
     """One call for many items. Malformed output raises; it never returns []."""

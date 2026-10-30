@@ -2,6 +2,12 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-30 (night, later)
+
+- Model batches now split on failure until the bad item is isolated, so one malformed
+  response no longer leaves a whole batch as raw text.
+- 78 tests passing.
+
 ## 2026-10-30 (night)
 
 - `not:` command: drops a false positive and records it in `corrections.json`.

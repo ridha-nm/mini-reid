@@ -66,19 +66,18 @@ def main() -> int:
     # Rewrite and filter through the local model before alerting. Rules alone
     # copy email openers and keep thread chatter that is not a commitment.
     if fresh:
-        from .providers import OllamaProvider, extract_batch
+        from .providers import OllamaProvider, extract_batch_safe
 
         by_nid = {i.get("native_id"): i for i in items}
         candidates = [by_nid[r["native_id"]] for r in fresh if r.get("native_id") in by_nid]
-        try:
-            rewritten: list[dict] = []
-            provider = OllamaProvider(model=env.get("OLLAMA_MODEL", "llama3.2:3b"))
-            for start in range(0, len(candidates), 5):
-                rewritten.extend(extract_batch(
-                    candidates[start:start + 5], provider, now, list(clients)))
+        rewritten: list[dict] = []
+        provider = OllamaProvider(model=env.get("OLLAMA_MODEL", "llama3.2:3b"))
+        for start in range(0, len(candidates), 5):
+            rows, _ = extract_batch_safe(
+                candidates[start:start + 5], provider, now, list(clients))
+            rewritten.extend(rows)
+        if rewritten:
             fresh = rewritten
-        except Exception as ex:  # noqa: BLE001 - fall back to rules rather than go silent
-            print(f"[{now:%H:%M:%S}] model rewrite failed: {type(ex).__name__}", flush=True)
 
     if fresh:
         ledger = apply_stalled(merge(existing, fresh), now)
