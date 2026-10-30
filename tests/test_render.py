@@ -27,6 +27,13 @@ def test_notes_get_their_own_section_not_the_task_buckets():
     assert "*New since yesterday" not in out
 
 
+def test_line_shows_person_channel_and_client_name():
+    row = dict(ROW, asker="Daniel", via="direct", client="ioi")
+    out = render([row], NOW, [], slack=True)
+    assert "from Daniel (direct)" in out
+    assert "IOI Properties" in out
+
+
 def test_brief_appears_above_the_sections():
     out = render([ROW], NOW, [], slack=True, brief="Eupe is the urgent one today.")
     assert "*Brief*" in out

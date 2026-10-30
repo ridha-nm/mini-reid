@@ -11,8 +11,9 @@ BOT_AUTHOR = re.compile(
     re.I)
 JIRA_NOTIFY = re.compile(r"atlassian\.net|\(jira\)|jira automation", re.I)
 ASK = re.compile(
-    r"\?|\b(please|can you|could you|kindly|confirm|review|send|share|provide|"
-    r"update|follow up|action|need you|let us know|let me know|approve)\b", re.I)
+    r"\?|\b(please|pls|plz|can you|can u|could you|kindly|confirm|review|send|share|"
+    r"provide|update|follow up|action|need you|let us know|let me know|approve|"
+    r"join|huddle|call|check)\b", re.I)
 MENTION = re.compile(r"<@[A-Z0-9]+>")
 CHATTER = re.compile(
     r"\b(lol|haha+|bahaha+|im tired|i'?m tired|no worries|working on it|"
@@ -54,6 +55,20 @@ def parse_due(text: str, now: datetime) -> tuple[str | None, float]:
     return None, 0.0
 
 
+def via_for(item: dict) -> str:
+    """Where it reached Ridha, and why it is his rather than the BD alias's."""
+    if item.get("kind") == "dm":
+        return "DM"
+    if item.get("source") == "slack":
+        return f"#{item.get('channel') or 'slack'}"
+    if item.get("source") == "jira":
+        return "Jira"
+    if item.get("source") == "gmail":
+        to = (item.get("to") or "").lower()
+        return "direct" if "ridha" in to else "bd@pantas.com"
+    return "manual"
+
+
 def _asker(author: str) -> str | None:
     raw = (author or "").split("<")[0].strip().strip('"').strip()
     if raw and "@" not in raw:
@@ -70,6 +85,9 @@ def _clean(text: str) -> str:
     m = SIGNATURE.search(text)
     if m:
         text = text[: m.start()]
+    # URLs carry "?" and query junk. They are not questions and not task text.
+    text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"<(?:https?://)[^>]*>", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -98,7 +116,8 @@ def extract(item: dict, client: dict | None, now: datetime) -> list[dict]:
             return []
 
     # A DM is a conversation. Only an actual ask, question or dated request counts.
-    if item.get("kind") == "dm":
+    # Search can also return a DM message as a "mention", so check the flag too.
+    if item.get("is_dm") or item.get("kind") == "dm":
         if len(text) < 20 and "?" not in text:
             return []
         if CHATTER.search(text) and "?" not in text:
@@ -111,6 +130,10 @@ def extract(item: dict, client: dict | None, now: datetime) -> list[dict]:
         due, conf = item["due"], 0.95
     else:
         due, conf = parse_due(f"{item.get('subject') or ''} {text}", now)
+
+    # A DM only counts when it actually asks for something, or carries a date.
+    if (item.get("is_dm") or item.get("kind") == "dm") and not (ASK.search(text) or due):
+        return []
 
     # Shared-alias mail with no date and no direct address is not Ridha's work.
     if item.get("source") == "gmail" and item.get("kind") == "inbox" and due is None:
@@ -128,6 +151,7 @@ def extract(item: dict, client: dict | None, now: datetime) -> list[dict]:
         "what": what_text[:200],
         # A draft is Ridha replying, so the asker is whoever he is replying to.
         "asker": _asker(item.get("to") or "") if item.get("kind") == "draft" else _asker(author),
+        "via": via_for(item),
         "source": item.get("source", ""),
         "native_id": item.get("native_id", ""),
         "kind": item.get("kind", ""),

@@ -40,16 +40,26 @@ def new_rows(items: list[dict], existing: list[dict], clients: dict, now: dateti
 
 def format_alert(rows: list[dict]) -> str:
     lines = [f"*{len(rows)} new*" if len(rows) > 1 else "*New*"]
+    from .render import _client_name
+
     for r in rows:
         what = (r.get("what") or "")[:120]
-        who = f" — from {r['asker']}" if r.get("asker") else ""
-        client = f" — {r['client']}" if r.get("client") else ""
-        due = f" — {r['due']}" if r.get("due") else ""
+        who = f"from {r['asker']}" if r.get("asker") else ""
+        if r.get("via"):
+            who = f"{who} ({r['via']})" if who else r["via"]
+        client = _client_name(r.get("client"))
+        due = r.get("due") or "no date"
         link = r.get("source_link") or ""
         if "/archives/D" in link:
             link = ""
         tail = f" — <{link}|open>" if link else ""
-        lines.append(f"• *{what}*{who}{client}{due}{tail}")
+        parts = [f"*{what}*"]
+        if who:
+            parts.append(who)
+        if client:
+            parts.append(client)
+        parts.append(due)
+        lines.append("• " + " — ".join(parts) + tail)
     return "\n".join(lines)
 
 

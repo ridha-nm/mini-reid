@@ -70,6 +70,20 @@ def test_informational_mail_without_an_ask_is_skipped():
     assert extract(item, None, NOW) == []
 
 
+def test_dm_conversation_is_not_a_commitment():
+    item = {"source": "slack", "native_id": "dm1", "kind": "dm", "author": "Julian",
+            "text": "oh if you have claude then the earlier ops mcp doc can access here",
+            "link": "l", "ts": "2026-10-30T08:00:00+08:00"}
+    assert extract(item, None, NOW) == []
+
+
+def test_dm_ask_is_a_commitment():
+    item = {"source": "slack", "native_id": "dm2", "kind": "dm", "author": "XieYi",
+            "text": "CAN U JOIN 10AM INTERVIEW", "link": "l",
+            "ts": "2026-10-30T08:00:00+08:00"}
+    assert len(extract(item, None, NOW)) == 1
+
+
 def test_shared_alias_undated_mail_not_addressed_is_skipped():
     item = {"source": "gmail", "native_id": "a1", "kind": "inbox", "author": "x@eupe.com.my",
             "to": "bd@pantas.com", "text": "please send the report for reference",

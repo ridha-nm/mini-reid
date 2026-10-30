@@ -16,23 +16,55 @@ def _due(row: dict) -> str | None:
     return row.get("due")
 
 
+_CLIENTS: dict[str, dict] = {}
+
+
+def _client_name(slug: str | None) -> str | None:
+    if not slug:
+        return None
+    if not _CLIENTS:
+        try:
+            from .clients import load_clients
+
+            _CLIENTS.update(load_clients("clients.json"))
+        except Exception:  # noqa: BLE001 - display must not fail on a missing registry
+            return slug
+    return (_CLIENTS.get(slug) or {}).get("name") or slug
+
+
 def _line(row: dict, slack: bool = False) -> str:
     what = (row.get("what") or "").strip()
     if len(what) > 140:
         what = what[:137].rstrip() + "…"
-    client = row.get("client") or "unassigned"
+    client = _client_name(row.get("client"))
     due = _due(row) or "no date"
     link = row.get("source_link") or ""
     asker = row.get("asker")
-    who = f" — from {asker}" if asker else ""
+    via = row.get("via")
+    who = f"from {asker}" if asker else ""
+    if via:
+        who = f"{who} ({via})" if who else via
     if slack:
         # A DM already tells you who it was from. No link needed.
         if "/archives/D" in link:
             link = ""
         tail = f" — <{link}|open>" if link else ""
-        return f"• *{what}*{who} — {client} — {due}{tail}"
+        parts = [f"*{what}*"]
+        if who:
+            parts.append(who)
+        if client:
+            parts.append(client)
+        parts.append(due)
+        return "• " + " — ".join(parts) + tail
+
     tail = f"  \n  [open]({link})" if link else ""
-    return f"- **{what}** — {client} — {due}{tail}"
+    parts = [f"**{what}**"]
+    if who:
+        parts.append(who)
+    if client:
+        parts.append(client)
+    parts.append(due)
+    return "- " + " — ".join(parts) + tail
 
 
 def render(rows: list[dict], now: datetime, review: list[str] | None = None,

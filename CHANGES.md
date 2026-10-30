@@ -2,6 +2,16 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (attribution and noise)
+
+- Every line shows where it came from: person, then channel, DM, direct mail or
+  bd@pantas.com alias, then the client name rather than its slug.
+- Client attribution belongs to the rule matcher; the model no longer assigns clients.
+- URL query strings no longer count as questions; URLs stripped from task text.
+- DMs kept only when they ask something or carry a date.
+- CI fixed: brief takes its date as an argument, so tests are clock-independent.
+- 109 tests passing.
+
 ## 2026-10-31 (trustworthy digest)
 
 - Jokes and short DM chatter no longer become tasks; Google boilerplate stripped.

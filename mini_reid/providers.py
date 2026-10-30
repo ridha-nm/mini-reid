@@ -7,6 +7,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 
+from .extract import via_for
 from .ledger import commitment_id
 
 SCHEMA = {
@@ -136,6 +137,7 @@ def extract_batch(items: list[dict], provider, now: datetime,
             "direction": "owed_by_me",
             "what": what[:200],
             "asker": (out.get("from") or "").strip()[:40] or None,
+            "via": via_for(src),
             "source": src.get("source", ""),
             "native_id": src["native_id"],
             "kind": src.get("kind", ""),
