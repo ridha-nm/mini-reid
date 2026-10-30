@@ -14,6 +14,17 @@ COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
 MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not"}
 
 
+QUERY = re.compile(
+    r"^\s*(what|when|who|how|show|list|any|status|which)\b|\?\s*$", re.I)
+
+
+def owner_action(action: str, body: str) -> str:
+    """Ridha can talk normally. A question stays a question; anything else is a note."""
+    if action == "unknown" and (body or "").strip() and not QUERY.search(body):
+        return "note"
+    return action
+
+
 def other_note(action: str, body: str, user: str) -> str | None:
     """What someone else's message becomes.
 
@@ -265,6 +276,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         seen.add((channel, ts))
 
         action, body = parse_command(text)
+        if user == owner:
+            action = owner_action(action, body)
         print(f"[{datetime.now(MYT):%H:%M:%S}] {user} in {channel}: {text[:120]!r} -> {action}",
               flush=True)
 

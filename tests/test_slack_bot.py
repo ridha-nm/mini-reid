@@ -87,6 +87,16 @@ def test_other_people_can_only_leave_a_note():
     assert other_note("ack", "thanks", "U999") is None
 
 
+def test_owner_can_speak_plainly_but_questions_stay_questions():
+    from mini_reid.slack_bot import owner_action
+
+    assert owner_action("unknown", "remind me to send the deck") == "note"
+    assert owner_action("unknown", "book the SFF flights") == "note"
+    assert owner_action("unknown", "what is due today?") == "unknown"
+    assert owner_action("unknown", "show me the dashboard items") == "unknown"
+    assert owner_action("list", "") == "list"
+
+
 def test_plain_sentence_becomes_a_note():
     from mini_reid.slack_bot import other_note
 
