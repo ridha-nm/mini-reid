@@ -36,7 +36,7 @@ def _line(row: dict, slack: bool = False) -> str:
 
 
 def render(rows: list[dict], now: datetime, review: list[str] | None = None,
-           slack: bool = False) -> str:
+           slack: bool = False, brief: str | None = None) -> str:
     today = now.date()
     week_end = today + timedelta(days=7)
     yesterday = now - timedelta(days=1)
@@ -84,8 +84,12 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
     total = sum(len(v) for v in buckets.values())
     if slack:
         out = [f"*Mini-Reid — {title}*", f"{total} open commitments. Nothing sent."]
+        if brief:
+            out.extend(["", f"*Brief*\n{brief}"])
     else:
         out = [f"# Mini-Reid — {title}", "", f"{total} open commitments. Nothing sent.", ""]
+        if brief:
+            out.extend([f"## Brief", "", brief, ""])
 
     for key, label in LABELS:
         items = buckets[key]

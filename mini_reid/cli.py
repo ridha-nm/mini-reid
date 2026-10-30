@@ -60,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--capture", help="add a commitment: 'add: Eupe item by Friday'")
     ap.add_argument("--model", help="local model for unclear items, e.g. llama3.2:3b")
     ap.add_argument("--deliver", action="store_true", help="DM the digest to Ridha")
+    ap.add_argument("--no-brief", action="store_true", help="skip the written summary")
     ap.add_argument("--ledger", default=LEDGER)
     ap.add_argument("--out", default=DIGEST)
     args = ap.parse_args(argv)
@@ -119,8 +120,17 @@ def main(argv: list[str] | None = None) -> int:
         ledger = propose_closures(ledger, sent)
     save(args.ledger, ledger)
 
-    out = render(ledger, now, sorted(review))
-    slack_out = render(ledger, now, sorted(review), slack=True)
+    brief_text = None
+    if not args.no_brief:
+        try:
+            from .kb import brief as make_brief
+
+            brief_text = make_brief(ledger)
+        except Exception as ex:  # noqa: BLE001 - a missing summary must not block the digest
+            errors.append(f"Brief: {type(ex).__name__}")
+
+    out = render(ledger, now, sorted(review), brief=brief_text)
+    slack_out = render(ledger, now, sorted(review), slack=True, brief=brief_text)
     if errors:
         out += "\n## Source errors\n\n" + "\n".join(f"- {e}" for e in errors) + "\n"
         slack_out += "\n\n*Source errors*\n" + "\n".join(f"• {e}" for e in errors)

@@ -27,6 +27,12 @@ def test_notes_get_their_own_section_not_the_task_buckets():
     assert "*New since yesterday" not in out
 
 
+def test_brief_appears_above_the_sections():
+    out = render([ROW], NOW, [], slack=True, brief="Eupe is the urgent one today.")
+    assert "*Brief*" in out
+    assert out.index("*Brief*") < out.index("*Today and tomorrow")
+
+
 def test_markdown_render_still_uses_markdown():
     out = render([ROW], NOW, [], slack=False)
     assert out.startswith("# Mini-Reid")

@@ -2,6 +2,14 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (digest brief)
+
+- Morning digest now opens with a written three-sentence Brief, then the sections.
+- Ask synthesis uses the fast local model; 8B proved unusable on 8 GB (5 min, timeout).
+- Gmail fetch no longer aborts the whole index on a single timeout.
+- Synthesis strips model preamble.
+- 98 tests passing.
+
 ## 2026-10-31 (better answers)
 
 - Passages are cleaned at answer time: headers, address lists, URLs and Google

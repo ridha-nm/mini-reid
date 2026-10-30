@@ -152,10 +152,12 @@ def _gmail_docs(access: str, ids: list[str], limit: int) -> list[dict]:
             try:
                 msg = _get_json(url, {"Authorization": f"Bearer {access}"})
                 break
-            except Exception:  # noqa: BLE001 - transient quota and 5xx
-                if attempt == 2:
-                    raise
+            except Exception:  # noqa: BLE001 - transient quota, 5xx and timeouts
                 time.sleep(2 ** attempt)
+        if msg is None:
+            skipped = globals().get("_skipped", 0) + 1
+            globals()["_skipped"] = skipped
+            continue
         if n and n % 20 == 0:
             time.sleep(1)
         if msg is None:
@@ -308,7 +310,8 @@ def _prefer_client(question: str, hits: list[dict]) -> list[dict]:
 
 
 MIN_SCORE = 0.55
-SYNTH_MODEL = "llama3.1:8b"
+# 8B is too slow on an 8 GB M2 (5 minutes, then a timeout). Override with KB_MODEL.
+SYNTH_MODEL = "llama3.2:3b"
 
 SYNTH_PROMPT = """Answer the question using ONLY the passages. Write two or three
 sentences. End every sentence that states a fact with its passage number like [2].
@@ -321,6 +324,40 @@ Passages:
 
 Question: {question}
 Answer:"""
+
+
+BRIEF_PROMPT = """Write Ridha's morning brief in three sentences at most.
+Use only the items listed. Put the most urgent first. Name the client and the date.
+No links, no bullet points, no preamble.
+
+Items:
+{items}
+"""
+
+
+def brief(rows: list[dict], model: str = SYNTH_MODEL, limit: int = 12) -> str | None:
+    """A short written summary of the day. None if the model is unavailable."""
+    open_rows = [r for r in rows if r.get("status") not in {"done", "dropped"}]
+    open_rows.sort(key=lambda r: (r.get("due") or "9999", r.get("what") or ""))
+    items = "\n".join(
+        f"- {r.get('what', '')[:120]} | {r.get('client') or 'unassigned'} | "
+        f"{r.get('due') or 'no date'} | {r.get('status')}"
+        for r in open_rows[:limit])
+    if not items:
+        return None
+    try:
+        req = urllib.request.Request(
+            f"{OLLAMA}/api/generate",
+            data=json.dumps({"model": model,
+                             "prompt": BRIEF_PROMPT.format(items=items),
+                             "stream": False,
+                             "options": {"temperature": 0, "num_predict": 300}}).encode(),
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=300) as r:
+            text = (json.load(r).get("response") or "").strip()
+    except Exception:  # noqa: BLE001 - the digest must render without a summary
+        return None
+    return text if 20 < len(text) < 800 else None
 
 
 def synthesize(question: str, hits: list[dict], model: str = SYNTH_MODEL) -> str | None:
@@ -340,6 +377,7 @@ def synthesize(question: str, hits: list[dict], model: str = SYNTH_MODEL) -> str
     except Exception:  # noqa: BLE001 - fall back to extractive
         return None
 
+    text = re.sub(r"^Here (?:are|is)[^.:\n]*[.:]\s*", "", text, flags=re.I).strip()
     low = text.lower()
     if low.startswith("i do not know"):
         return text
