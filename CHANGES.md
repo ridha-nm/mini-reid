@@ -1,6 +1,12 @@
 # Changes
 
-Append-only. Newest first. One entry per working session or material change.
+Append-only. Newest first.
+
+## 2026-10-31 (docs)
+
+- README, SPEC and HANDOFF rewritten to match what is actually built.
+- Plan document marked implemented and superseded.
+- 115 tests passing. One entry per working session or material change.
 
 ## 2026-10-31 (to-do digest)
 

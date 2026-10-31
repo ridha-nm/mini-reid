@@ -1,56 +1,74 @@
 # Mini-Reid
 
-Daily digest of everything that needs you, pulled from Slack and Gmail. Read-only.
+A personal commitment ledger. It reads Slack, Gmail and Jira, keeps what you owe in
+`ledger.json`, and puts it in front of you three ways: a morning to-do digest, alerts
+for new items, and a Slack bot you can talk to.
 
-**Nothing is ever sent.** No reply, no reaction, no label change.
+It runs on this Mac only. No cloud. Nothing leaves the machine except calls to Slack,
+Gmail and Jira.
+
+## What it does
+
+- **Morning digest** (08:30, Slack DM): counts, a short brief, then Overdue, Today,
+  This week, Waiting on others, No date, Notes.
+- **Watcher** (every 2 min): new Slack mentions, DMs to you, inbox mail including
+  already-read mail, and Jira issues assigned to you. New items get a DM and, where the
+  bot is in the channel, a ✅ on the source message.
+- **Bot** (`@minireid`): add, note, done, due, snooze, waiting, drop, not, remind, find,
+  list, ask, help. Only you can change the ledger.
+- **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
+  local documents. `ask:` returns passages from your own writing, with sources.
 
 ## Run
 
 ```bash
-python3 -m mini_reid.cli --days 1                      # rules only
-python3 -m mini_reid.cli --days 1 --model llama3.2:3b  # + local model on unclear items
-python3 -m mini_reid.cli --capture "add: Eupe item by Friday"
-python3 -m mini_reid.slack_bot                         # Socket Mode listener
+cd ~/mini-reid
+
+.venv/bin/python -m mini_reid.cli --days 1            # digest, rules only
+.venv/bin/python -m mini_reid.cli --days 1 --deliver  # digest to Slack DM
+.venv/bin/python -m mini_reid.watcher                 # one watcher cycle
+.venv/bin/python -m mini_reid.kb --build              # rebuild the knowledge index
+.venv/bin/python -m mini_reid.kb --ask "what did we agree with Eupe on waste"
+.venv/bin/python -m pytest tests/ -q                  # tests
 ```
 
-Tests: `.venv/bin/python -m pytest tests/ -q`
+`./run.sh` is the digest job. `./run_bot.sh` is the listener. `./run_watcher.sh` is one
+watcher pass.
 
-`digest.py` is the original read-only prototype. `mini_reid.cli` supersedes it.
+## Agents
+
+| launchd label | Cadence | Log |
+|---|---|---|
+| `com.minireid.bot` | always, KeepAlive | `bot.out.log`, `bot.err.log` |
+| `com.minireid.watcher` | every 120 s | `watcher.log` |
+| `com.minireid.daily` | 08:30 daily | `run.log` |
+| `com.minireid.model` | 06:00 daily | `model.log` |
+| `com.minireid.kb` | 02:00 daily | `kb.log` |
+
+Check them with `launchctl list | grep minireid`.
 
 ## Files
 
 | File | What |
 |---|---|
-| `digest.py` | the whole thing — collectors, triage, render |
-| `.env` | secrets. `chmod 600`. Gitignored. Never commit. |
-| `digest.md` | output, regenerated each run. Gitignored. |
+| `.env` | secrets, mode 600, never committed |
+| `ledger.json` | the commitments, local only |
+| `digest.md` | last rendered digest |
+| `clients.json` | client names, domains, Slack channels |
+| `kb.json` | knowledge index, local only |
+| `corrections.json` | items you marked `not:` |
+| `expected.txt` | Friday's manual list for the scorecard |
 
 ## Credentials
 
-Reuses existing read-only creds for the first pass:
+`.env` holds the Mini-Reid Slack app tokens (`xapp`, `xoxb`, `xoxp`), Gmail OAuth paths,
+the Jira API token and `SLACK_OWNER_ID`. Rotate the Slack user token if it is ever
+exposed; it can read every DM.
 
-- Slack — user token via `SLACK_ENV`
-- Gmail — OAuth refresh token via `GMAIL_CREDS` / `GMAIL_TOKEN`. The script only calls
-  read endpoints, but the current token also carries `gmail.send`. Swap in a read-only
-  token before this runs unattended.
-- Jira — **not connected.** Add `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` to `.env`.
-  Create a token at <https://id.atlassian.com/manage-profile/security/api-tokens>.
+## Known limits
 
-Replace with the agent's own credentials before this leaves your machine.
-
-## The Gemini key
-
-`GEMINI_API_KEY` is **not used yet** — the digest is deterministic, so no message
-content leaves this machine.
-
-When drafting is added, the free tier is a problem: Google's free tier reserves the
-right to use your inputs to improve its products. Your mail and Slack contain
-client-confidential material (IOI, Eupe, SRSL, Gamuda). Use a paid tier for any
-path that sends client content to a model.
-
-## Not built yet
-
-- Telegram delivery + urgent alerts
-- GitHub Actions schedule
-- Draft replies (approval-gated)
-- Jira collector (code exists, needs credentials)
+- The local 3B model is used only to reword tasks. It is not trusted to decide what is
+  a commitment, because it deleted real asks and kept jokes.
+- 8B local is unusable on 8 GB: about five minutes per answer.
+- Answers are extractive. They quote your own writing; they do not compose prose.
+- Nothing runs while the Mac sleeps. Catch-up answers questions on wake, late.
