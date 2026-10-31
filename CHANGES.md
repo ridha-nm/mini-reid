@@ -9,7 +9,7 @@ Append-only. Newest first. One entry per working session or material change.
 - Undated tasks no longer vanish after a day; they sit in "No date" until closed.
 - Nothing closes on its own. A draft that never went out stays open; a sent email only
   proposes closure. Only `done:` or a Jira reassignment closes a row.
-- 116 tests passing.
+- 115 tests passing.
 
 ## 2026-10-31 (jira precision, links)
 
