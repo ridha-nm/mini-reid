@@ -72,6 +72,14 @@ def test_fire_reminders_sends_once(tmp_path, monkeypatch):
     assert len(sent) == 1
 
 
+def test_alert_collapses_identical_items():
+    from mini_reid.watcher import format_alert
+
+    row = {"what": "Accepted: Django MCP", "client": None, "due": None, "source_link": ""}
+    text = format_alert([row, dict(row), dict(row)])
+    assert text.count("Accepted: Django MCP") == 1
+
+
 def test_alert_is_compact_and_has_a_link():
     rows = new_rows([ITEM], [], {}, NOW)
     text = format_alert(rows)

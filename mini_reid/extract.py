@@ -96,6 +96,11 @@ def extract(item: dict, client: dict | None, now: datetime) -> list[dict]:
     author = item.get("author") or ""
     if BOT_AUTHOR.search(author):
         return []
+    # Calendar responses are not work items. One invite can generate several.
+    if item.get("source") == "gmail" and re.match(
+            r"^\s*(accepted|declined|tentative|invitation|updated invitation|"
+            r"canceled|cancelled|new event|reminder)\s*:", item.get("subject") or "", re.I):
+        return []
     # Sent mail is activity, not a new commitment. It updates the ledger later.
     if item.get("kind") == "sent":
         return []

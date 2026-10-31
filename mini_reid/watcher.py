@@ -39,10 +39,16 @@ def new_rows(items: list[dict], existing: list[dict], clients: dict, now: dateti
 
 
 def format_alert(rows: list[dict]) -> str:
-    lines = [f"*{len(rows)} new*" if len(rows) > 1 else "*New*"]
+    """One line per distinct item, even when one invite produced several emails."""
     from .render import _client_name
 
+    lines = [f"*{len(rows)} new*" if len(rows) > 1 else "*New*"]
+    emitted: set[tuple[str, str]] = set()
     for r in rows:
+        key = ((r.get("what") or "").lower().strip()[:80], r.get("client") or "")
+        if key in emitted:
+            continue
+        emitted.add(key)
         what = (r.get("what") or "")[:120]
         who = f"from {r['asker']}" if r.get("asker") else ""
         if r.get("via"):

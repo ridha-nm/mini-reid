@@ -270,13 +270,17 @@ def parse_jira_issues(data: dict, base: str) -> list[dict]:
     for issue in data.get("issues") or []:
         f = issue.get("fields") or {}
         key = issue.get("key", "")
+        assignee = (f.get("assignee") or {}).get("displayName")
+        reporter = (f.get("reporter") or {}).get("displayName")
+        # Who actually asked. The reporter is often Ridha himself.
+        who = assignee or (reporter if reporter and reporter != "Ridha Mohamed" else "Jira")
         out.append({
             "source": "jira",
             "native_id": issue.get("id", key),
             "kind": "issue",
             "channel": "jira",
             "channel_id": "",
-            "author": ((f.get("reporter") or {}).get("displayName") or "jira"),
+            "author": who,
             "ts": f.get("updated") or "",
             "text": f.get("summary", ""),
             "subject": f.get("summary", ""),
@@ -298,6 +302,7 @@ def fetch_jira(days: int, env: dict[str, str]) -> list[dict]:
     auth = base64.b64encode(f"{email}:{token}".encode()).decode()
     jql = f"(assignee = currentUser() OR comment ~ currentUser()) AND updated >= -{days}d ORDER BY updated DESC"
     url = f"{base.rstrip('/')}/rest/api/3/search/jql?" + urllib.parse.urlencode(
-        {"jql": jql, "maxResults": 50, "fields": "summary,duedate,status,reporter,updated"})
+        {"jql": jql, "maxResults": 50,
+         "fields": "summary,duedate,status,reporter,assignee,updated"})
     data = _get_json(url, {"Authorization": f"Basic {auth}", "Accept": "application/json"})
     return parse_jira_issues(data, base)

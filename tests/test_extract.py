@@ -70,6 +70,14 @@ def test_informational_mail_without_an_ask_is_skipped():
     assert extract(item, None, NOW) == []
 
 
+def test_calendar_response_is_not_a_commitment():
+    item = {"source": "gmail", "native_id": "c1", "kind": "inbox", "author": "Myra <myra@pantas.com>",
+            "subject": "Accepted: Django MCP: Scope, Discussion and Timeline @ Mon Nov 2",
+            "text": "Myra Annatasha has accepted this invitation.",
+            "link": "l", "ts": "2026-10-30T08:00:00+08:00"}
+    assert extract(item, None, NOW) == []
+
+
 def test_dm_conversation_is_not_a_commitment():
     item = {"source": "slack", "native_id": "dm1", "kind": "dm", "author": "Julian",
             "text": "oh if you have claude then the earlier ops mcp doc can access here",

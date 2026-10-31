@@ -2,6 +2,14 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (calendar noise)
+
+- Calendar accept/decline/invite emails are dropped; one invite no longer becomes three tasks.
+- Alerts collapse identical items.
+- Jira rows show the assignee, not Ridha as reporter.
+- A clean rebuild for the last 24 hours produced 5 real rows.
+- 111 tests passing.
+
 ## 2026-10-31 (attribution and noise)
 
 - Every line shows where it came from: person, then channel, DM, direct mail or
