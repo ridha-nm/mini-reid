@@ -45,9 +45,6 @@ def _line(row: dict, slack: bool = False) -> str:
     if via:
         who = f"{who} ({via})" if who else via
     if slack:
-        # A DM already tells you who it was from. No link needed.
-        if "/archives/D" in link:
-            link = ""
         tail = f" — <{link}|open>" if link else ""
         parts = [f"*{what}*"]
         if who:

@@ -56,8 +56,6 @@ def format_alert(rows: list[dict]) -> str:
         client = _client_name(r.get("client"))
         due = r.get("due") or "no date"
         link = r.get("source_link") or ""
-        if "/archives/D" in link:
-            link = ""
         tail = f" — <{link}|open>" if link else ""
         parts = [f"*{what}*"]
         if who:

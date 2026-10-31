@@ -308,11 +308,10 @@ def fetch_jira(days: int, env: dict[str, str]) -> list[dict]:
     if not (base and email and token):
         raise RuntimeError("Jira credentials missing")
     auth = base64.b64encode(f"{email}:{token}".encode()).decode()
-    # Everything currently assigned (no date filter, so reassignment is detectable),
-    # plus recent issues that only mention Ridha in a comment.
-    jql = (f"(assignee = currentUser() AND statusCategory != Done) "
-           f"OR (comment ~ currentUser() AND updated >= -{days}d) "
-           f"ORDER BY updated DESC")
+    # Assigned only. A comment that mentions him on someone else's issue is not his
+    # work, and caused the Ramtin triage item to keep resurfacing.
+    jql = ("assignee = currentUser() AND statusCategory != Done "
+           "ORDER BY updated DESC")
     url = f"{base.rstrip('/')}/rest/api/3/search/jql?" + urllib.parse.urlencode(
         {"jql": jql, "maxResults": 50,
          "fields": "summary,duedate,status,reporter,assignee,project,updated"})

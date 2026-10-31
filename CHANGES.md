@@ -2,6 +2,13 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (jira precision, links)
+
+- Jira includes only issues assigned to Ridha. Comment mentions on other people's
+  issues no longer surface (the Ramtin triage case).
+- Every task line carries an open link again, including Slack DMs.
+- 113 tests passing.
+
 ## 2026-10-31 (jira loop)
 
 - Jira rows name the board when the issue is auto-assigned ("BO board"), and the real
