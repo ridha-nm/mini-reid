@@ -73,6 +73,20 @@ def test_dedupe_by_link_keeps_done_row():
     assert dedupe_by_link([a, b])[0]["id"] == "a"
 
 
+def test_draft_that_was_never_sent_stays_open():
+    # Stalled is not done. An unsent draft keeps its place on the list.
+    out = apply_stalled([row(kind="draft", created_at="2026-10-25T08:00:00+08:00")], NOW)
+    assert out[0]["status"] == "stalled"
+    assert out[0]["status"] != "done"
+    assert out[0].get("closed_at") is None
+
+
+def test_merge_never_marks_done_on_its_own():
+    live = row(id="a", status="open")
+    incoming = row(id="a", status="open")
+    assert merge([live], [incoming])[0]["status"] == "open"
+
+
 def test_draft_older_than_one_day_is_stalled():
     out = apply_stalled([row(kind="draft", created_at="2026-10-29T08:00:00+08:00")], NOW)
     assert out[0]["status"] == "stalled"

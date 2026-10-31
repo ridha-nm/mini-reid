@@ -2,6 +2,15 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (to-do digest)
+
+- Digest reads as a to-do list: counts header, Overdue, Today, This week, Waiting,
+  No date. Relative due labels ("2d overdue", "today", "in 3d").
+- Undated tasks no longer vanish after a day; they sit in "No date" until closed.
+- Nothing closes on its own. A draft that never went out stays open; a sent email only
+  proposes closure. Only `done:` or a Jira reassignment closes a row.
+- 116 tests passing.
+
 ## 2026-10-31 (jira precision, links)
 
 - Jira includes only issues assigned to Ridha. Comment mentions on other people's

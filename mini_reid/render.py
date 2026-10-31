@@ -8,12 +8,29 @@ LABELS = [
     ("today", "Today and tomorrow"),
     ("week", "This week"),
     ("waiting", "Waiting on others"),
-    ("new", "New since yesterday"),
+    ("undated", "No date"),
 ]
 
 
 def _due(row: dict) -> str | None:
     return row.get("due")
+
+
+def _due_label(row: dict, now: datetime) -> str:
+    due = row.get("due")
+    if not due:
+        return "no date"
+    try:
+        delta = (datetime.fromisoformat(due).date() - now.date()).days
+    except ValueError:
+        return due
+    if delta < 0:
+        return f"{-delta}d overdue"
+    if delta == 0:
+        return "today"
+    if delta == 1:
+        return "tomorrow"
+    return f"in {delta}d · {due}"
 
 
 _CLIENTS: dict[str, dict] = {}
@@ -32,12 +49,12 @@ def _client_name(slug: str | None) -> str | None:
     return (_CLIENTS.get(slug) or {}).get("name") or slug
 
 
-def _line(row: dict, slack: bool = False) -> str:
+def _line(row: dict, slack: bool = False, now: datetime | None = None) -> str:
     what = (row.get("what") or "").strip()
     if len(what) > 140:
         what = what[:137].rstrip() + "…"
     client = _client_name(row.get("client"))
-    due = _due(row) or "no date"
+    due = _due_label(row, now) if now else (_due(row) or "no date")
     link = row.get("source_link") or ""
     asker = row.get("asker")
     via = row.get("via")
@@ -47,20 +64,20 @@ def _line(row: dict, slack: bool = False) -> str:
     if slack:
         tail = f" — <{link}|open>" if link else ""
         parts = [f"*{what}*"]
-        if who:
-            parts.append(who)
         if client:
             parts.append(client)
         parts.append(due)
+        if who:
+            parts.append(who)
         return "• " + " — ".join(parts) + tail
 
     tail = f"  \n  [open]({link})" if link else ""
     parts = [f"**{what}**"]
-    if who:
-        parts.append(who)
     if client:
         parts.append(client)
     parts.append(due)
+    if who:
+        parts.append(who)
     return "- " + " — ".join(parts) + tail
 
 
@@ -105,24 +122,31 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
         elif due and due <= week_end.isoformat():
             take("week", row)
 
-    for row in rows:
+    # Everything open that has no deadline still belongs on the list. It used to
+    # vanish after one day, which is how undated work gets lost.
+    for row in sorted(rows, key=lambda r: r.get("created_at") or "", reverse=True):
         if row["id"] in used or row.get("status") in {"done", "dropped"}:
             continue
         if (row.get("direction") == "owed_to_me" or row.get("closure") == "proposed"
                 or row.get("kind") == "note"):
             continue
-        created = row.get("created_at") or ""
-        if created and datetime.fromisoformat(created) >= yesterday:
-            take("new", row)
+        take("undated", row)
 
-    title = now.strftime("%a %d %b %Y, %H:%M MYT")
+    buckets["overdue"].sort(key=lambda r: r.get("due") or "9999")
+    buckets["today"].sort(key=lambda r: r.get("due") or "9999")
+    buckets["week"].sort(key=lambda r: r.get("due") or "9999")
+
+    title = now.strftime("%a %d %b %Y")
     total = sum(len(v) for v in buckets.values())
+    counts = (f"{total} open · {len(buckets['overdue'])} overdue · "
+              f"{len(buckets['today'])} due today · {len(buckets['week'])} this week · "
+              f"{len(buckets['undated'])} no date · {len(buckets['waiting'])} waiting")
     if slack:
-        out = [f"*Mini-Reid — {title}*", f"{total} open commitments. Nothing sent."]
+        out = [f"*Mini-Reid — {title}*", counts]
         if brief:
             out.extend(["", f"*Brief*\n{brief}"])
     else:
-        out = [f"# Mini-Reid — {title}", "", f"{total} open commitments. Nothing sent.", ""]
+        out = [f"# Mini-Reid — {title}", "", counts, ""]
         if brief:
             out.extend([f"## Brief", "", brief, ""])
 
@@ -132,10 +156,10 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
             continue
         if slack:
             out.extend(["", f"*{label} ({len(items)})*"])
-            out.extend(_line(r, slack=True) for r in items)
+            out.extend(_line(r, slack=True, now=now) for r in items)
         else:
             out.extend(["", f"## {label} ({len(items)})", ""])
-            out.extend(_line(r) for r in items)
+            out.extend(_line(r, now=now) for r in items)
 
     proposed = [r for r in rows
                 if r.get("closure") == "proposed" and r.get("status") not in {"done", "dropped"}]
