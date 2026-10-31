@@ -2,6 +2,15 @@
 
 Append-only. Newest first. One entry per working session or material change.
 
+## 2026-10-31 (jira loop)
+
+- Jira rows name the board when the issue is auto-assigned ("BO board"), and the real
+  person when there is one.
+- Jira query lists everything currently assigned, not only recently updated.
+- Reassigning an issue closes its ledger row on the next run (`jira_reassigned`), so it
+  leaves the digest automatically. Skipped entirely if the Jira fetch fails.
+- 113 tests passing.
+
 ## 2026-10-31 (calendar noise)
 
 - Calendar accept/decline/invite emails are dropped; one invite no longer becomes three tasks.

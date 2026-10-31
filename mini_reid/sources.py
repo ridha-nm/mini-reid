@@ -272,8 +272,16 @@ def parse_jira_issues(data: dict, base: str) -> list[dict]:
         key = issue.get("key", "")
         assignee = (f.get("assignee") or {}).get("displayName")
         reporter = (f.get("reporter") or {}).get("displayName")
-        # Who actually asked. The reporter is often Ridha himself.
-        who = assignee or (reporter if reporter and reporter != "Ridha Mohamed" else "Jira")
+        project = ((f.get("project") or {}).get("key")
+                   or (f.get("project") or {}).get("name") or "Jira")
+        # RIJ items are auto-assigned to Ridha, so the assignee says nothing.
+        # The board is the honest source; a real human assignee wins if present.
+        if assignee and assignee != "Ridha Mohamed":
+            who = assignee
+        elif reporter and reporter != "Ridha Mohamed":
+            who = reporter
+        else:
+            who = f"{project} board"
         out.append({
             "source": "jira",
             "native_id": issue.get("id", key),
@@ -300,9 +308,13 @@ def fetch_jira(days: int, env: dict[str, str]) -> list[dict]:
     if not (base and email and token):
         raise RuntimeError("Jira credentials missing")
     auth = base64.b64encode(f"{email}:{token}".encode()).decode()
-    jql = f"(assignee = currentUser() OR comment ~ currentUser()) AND updated >= -{days}d ORDER BY updated DESC"
+    # Everything currently assigned (no date filter, so reassignment is detectable),
+    # plus recent issues that only mention Ridha in a comment.
+    jql = (f"(assignee = currentUser() AND statusCategory != Done) "
+           f"OR (comment ~ currentUser() AND updated >= -{days}d) "
+           f"ORDER BY updated DESC")
     url = f"{base.rstrip('/')}/rest/api/3/search/jql?" + urllib.parse.urlencode(
         {"jql": jql, "maxResults": 50,
-         "fields": "summary,duedate,status,reporter,assignee,updated"})
+         "fields": "summary,duedate,status,reporter,assignee,project,updated"})
     data = _get_json(url, {"Authorization": f"Basic {auth}", "Accept": "application/json"})
     return parse_jira_issues(data, base)

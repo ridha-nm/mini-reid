@@ -45,6 +45,17 @@ def test_merge_keeps_original_created_at():
     assert merge([old], [new])[0]["created_at"] == "2026-10-01T09:00:00+08:00"
 
 
+def test_reconcile_jira_closes_reassigned_issue():
+    from mini_reid.ledger import reconcile_jira
+
+    rows = [{"id": "a", "source": "jira", "native_id": "1", "status": "open"},
+            {"id": "b", "source": "jira", "native_id": "2", "status": "open"}]
+    out = reconcile_jira(rows, {"2"}, NOW)
+    assert out[0]["status"] == "done"
+    assert out[0]["closed_how"] == "jira_reassigned"
+    assert out[1]["status"] == "open"
+
+
 def test_dedupe_by_link_keeps_one_row_per_message():
     from mini_reid.ledger import dedupe_by_link
 

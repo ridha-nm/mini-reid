@@ -34,6 +34,22 @@ def save(path: str, rows: list[dict]) -> None:
     Path(path).write_text(json.dumps(rows, indent=1, ensure_ascii=False) + "\n")
 
 
+def reconcile_jira(rows: list[dict], live_ids: set[str], now: datetime) -> list[dict]:
+    """A Jira row disappears when the issue is no longer assigned to him.
+
+    Reassigning in Jira is the user's way of saying "not mine". The ledger has to
+    agree on the next run or the item nags forever.
+    """
+    out = []
+    for r in rows:
+        if (r.get("source") == "jira" and r.get("status") not in TERMINAL
+                and r.get("native_id") not in live_ids):
+            r = dict(r, status="done", closed_at=now.isoformat(),
+                     closed_how="jira_reassigned")
+        out.append(r)
+    return out
+
+
 def dedupe_by_link(rows: list[dict]) -> list[dict]:
     """One row per source message. Prefers a terminal row, then the newest."""
     kept: dict[str, dict] = {}

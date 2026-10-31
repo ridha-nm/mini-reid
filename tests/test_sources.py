@@ -72,3 +72,13 @@ def test_jira_maps_issue_key_due_and_status():
     assert item["link"].endswith("/browse/BO-8834")
     assert item["due"] == "2026-11-06"
     assert item["status"] == "To Do"
+
+
+def test_jira_auto_assigned_item_names_the_board():
+    data = {"issues": [{"id": "1", "key": "BO-1", "fields": {
+        "summary": "x", "status": {"name": "To Do"},
+        "assignee": {"displayName": "Ridha Mohamed"},
+        "reporter": {"displayName": "Ridha Mohamed"},
+        "project": {"key": "BO"}}}]}
+    item = parse_jira_issues(data, "https://x")[0]
+    assert item["author"] == "BO board"
