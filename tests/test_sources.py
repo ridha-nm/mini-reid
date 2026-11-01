@@ -82,3 +82,30 @@ def test_jira_auto_assigned_item_names_the_board():
         "project": {"key": "BO"}}}]}
     item = parse_jira_issues(data, "https://x")[0]
     assert item["author"] == "BO board"
+
+
+def test_dm_history_pages_through_the_whole_window(monkeypatch):
+    from mini_reid import sources
+
+    pages = [
+        {"ok": True, "messages": [{"ts": "1"}, {"ts": "2"}],
+         "response_metadata": {"next_cursor": "abc"}},
+        {"ok": True, "messages": [{"ts": "3"}],
+         "response_metadata": {"next_cursor": ""}},
+    ]
+    calls = []
+
+    def fake_get(url, headers):
+        calls.append(url)
+        return pages.pop(0)
+
+    monkeypatch.setattr(sources, "_get_json", fake_get)
+    msgs = sources._dm_history("tok", "D1", 100.0)
+    assert [m["ts"] for m in msgs] == ["1", "2", "3"]
+    assert "cursor=abc" in calls[1]
+
+
+def test_jira_keeps_the_issue_type():
+    data = {"issues": [{"id": "1", "key": "BO-1", "fields": {
+        "summary": "Eupe Corporation Berhad", "issuetype": {"name": "Epic"}}}]}
+    assert parse_jira_issues(data, "https://x")[0]["issue_type"] == "Epic"

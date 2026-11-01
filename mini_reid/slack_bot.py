@@ -12,8 +12,9 @@ from .ledger import commitment_id, load, merge, save
 # Slack sends mentions as <@U123> or <@U123|mini-reid>. Both must strip cleanly.
 MENTION = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
 COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
-            "find", "list", "not", "remind"}
-MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not", "remind"}
+            "find", "list", "not", "remind", "edit"}
+MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
+            "remind", "edit"}
 
 TIME_RE = re.compile(
     r"\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b"
@@ -119,17 +120,110 @@ HELP = """*Mini-Reid commands*
 • `note: Daniel wants the mapping redone` — remember it, no deadline
 • `done: Eupe waste` — close it
 • `due: Eupe waste by Monday` — change the date
+• `edit: #1 to Confirm Eupe waste mapping by Monday` — rename and re-date
 • `snooze: Eupe waste 3d` — push it out (d days, w weeks)
 • `waiting: Eupe waste on Daniel` — waiting on someone else
 • `drop: Eupe waste` — remove it quietly
 • `not: anything that is not part c` — wrong item, teach it to ignore this kind
 • `remind me to send the deck tomorrow at 3pm` — a timed DM
+• `remind @Arman to send the deck at 3pm` — DM someone else (anyone can set these)
 • `ask: what did we agree with Eupe on waste` — answer from your own writing, with sources
 • `find: eupe` — search the ledger
-• `list` — ten nearest open items
+• `list` — numbered open items; `#1` works with done, due, drop, edit and snooze
 • `help` — this
 
 You can also just ask me something and I will say if I cannot do it."""
+
+
+def split_target(body: str, users: dict[str, str],
+                 sender: str) -> tuple[str | None, str]:
+    """Split 'remind Arman to X' into (Arman's id, 'X'). None = self.
+
+    A mention, 'me', 'for <name>', or '<name> to' names the recipient. Anything
+    else stays part of the reminder text.
+    """
+    text = (body or "").strip()
+    m = re.match(r"^(?:for\s+)?<@([A-Z0-9]+)(?:\|[^>]*)?>\s*:?\s*(?:to\s+)?",
+                 text, re.I)
+    if m:
+        return m.group(1), text[m.end():].strip()
+    m = re.match(r"^me\s*:?\s*(?:to\s+)?", text, re.I)
+    if m:
+        return sender, text[m.end():].strip()
+    m = re.match(r"^for\s+([A-Za-z0-9._'-]+)\s*:?\s*(?:to\s+)?", text, re.I)
+    if m and users.get(m.group(1).lower()):
+        return users[m.group(1).lower()], text[m.end():].strip()
+    m = re.match(r"^([A-Za-z0-9._'-]+)\s+to\s+", text, re.I)
+    if m and users.get(m.group(1).lower()):
+        return users[m.group(1).lower()], text[m.end():].strip()
+    return None, text
+
+
+def should_schedule_reminder(action: str, requester: str, owner: str,
+                             target: str | None) -> bool:
+    """All reminders are Slack-scheduled. `add:` only leaves the owner's ledger
+    when it names another person or comes from someone else."""
+    if action == "remind":
+        return True
+    if action == "add":
+        return requester != owner or (target is not None and target != owner)
+    return False
+
+
+def load_users(token: str) -> dict[str, str]:
+    """Lowercased workspace name -> user id. Ambiguous names are left out."""
+    from .sources import _get_json
+
+    found: dict[str, set[str]] = {}
+    cursor = ""
+    while True:
+        url = "https://slack.com/api/users.list?limit=200"
+        if cursor:
+            url += "&cursor=" + urllib.parse.quote(cursor)
+        d = _get_json(url, {"Authorization": f"Bearer {token}"})
+        if not d.get("ok"):
+            break
+        for u in d.get("members") or []:
+            if u.get("deleted") or u.get("is_bot"):
+                continue
+            p = u.get("profile") or {}
+            names = {u.get("name") or "", p.get("display_name") or "",
+                     p.get("real_name") or "",
+                     (p.get("real_name") or "").split(" ")[0]}
+            for name in names:
+                key = name.strip().lower()
+                if key:
+                    found.setdefault(key, set()).add(u["id"])
+        cursor = (d.get("response_metadata") or {}).get("next_cursor") or ""
+        if not cursor:
+            break
+    return {k: next(iter(v)) for k, v in found.items() if len(v) == 1}
+
+
+def is_bot_addressed(event: dict, bot_user_id: str) -> bool:
+    """DMs reach the bot directly; channel messages must mention it."""
+    channel = event.get("channel") or ""
+    if channel.startswith("D"):
+        return True
+    return bool(bot_user_id) and f"<@{bot_user_id}>" in (event.get("text") or "")
+
+
+def edit_ack_target(event: dict, bot_user_id: str) -> tuple[str, str] | None:
+    """An edit that still mentions the bot gets a ✅. It is not re-run.
+
+    Slack never refires app_mention for an edited message, so without this the
+    edit is invisible. Replaying the command would duplicate ledger rows.
+    """
+    if event.get("subtype") != "message_changed" or not bot_user_id:
+        return None
+    msg = event.get("message") or {}
+    if msg.get("bot_id") or not msg.get("user"):
+        return None
+    channel = event.get("channel") or ""
+    ts = msg.get("ts") or ""
+    if not (channel and ts) or f"<@{bot_user_id}>" not in (msg.get("text") or ""):
+        return None
+    return channel, ts
 
 
 def parse_command(text: str) -> tuple[str, str]:
@@ -142,7 +236,7 @@ def parse_command(text: str) -> tuple[str, str]:
     if body.lower() in {"help", "?", "commands"}:
         return "help", ""
     m = re.match(
-        r"^(add|task|todo|to-do|note|done|drop|due|snooze|waiting|find|not|remind|ask)"
+        r"^(add|task|todo|to-do|note|done|drop|due|snooze|waiting|find|not|remind|ask|edit)"
         r"\s*:\s*(.+)$", body, re.I)
     if m:
         act = m.group(1).lower()
@@ -192,8 +286,35 @@ def _candidates(rows: list[dict], target: str) -> list[dict]:
     return [r for _, r in scored]
 
 
+def _ref(row: dict) -> str:
+    """Sender, channel and source link for a list line."""
+    who = f"from {row['asker']}" if row.get("asker") else ""
+    if row.get("via"):
+        who = f"{who} ({row['via']})" if who else row["via"]
+    out = f" — {who}" if who else ""
+    if row.get("source_link"):
+        out += f" — <{row['source_link']}|open>"
+    return out
+
+
+def _open_sorted(rows: list[dict]) -> list[dict]:
+    """The order `list` prints; numbers stay stable across commands."""
+    open_rows = [r for r in rows if r.get("status") not in {"done", "dropped"}
+                 and r.get("kind") != "note"]
+    open_rows.sort(key=lambda r: r.get("due") or "9999")
+    return open_rows
+
+
 def _pick(rows: list[dict], target: str) -> tuple[dict | None, str | None]:
-    """Return (row, error). Ambiguous matches ask for one more word."""
+    """Return (row, error). `#N` picks from the numbered list."""
+    t = (target or "").strip()
+    m = re.fullmatch(r"#(\d+)", t)
+    if m:
+        items = _open_sorted(rows)
+        i = int(m.group(1))
+        if 1 <= i <= len(items):
+            return items[i - 1], None
+        return None, f"No open item #{i}."
     found = _candidates(rows, target)
     if not found:
         return None, f"No open item matches “{target}”."
@@ -291,14 +412,13 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
         return "Recorded. I will ignore similar messages from now on."
 
     if action == "list":
-        open_rows = [r for r in rows if r.get("status") not in {"done", "dropped"}
-                     and r.get("kind") != "note"]
-        open_rows.sort(key=lambda r: r.get("due") or "9999")
+        open_rows = _open_sorted(rows)
         if not open_rows:
             return "Nothing open."
         return "Open:\n" + "\n".join(
-            f"• {r['what'][:90]}" + (f" — {r['due']}" if r.get("due") else "")
-            for r in open_rows[:10])
+            f"{i}. {r['what'][:90]}" + (f" — {r['due']}" if r.get("due") else "")
+            + _ref(r)
+            for i, r in enumerate(open_rows[:25], 1))
 
     if action == "find":
         hits = [r for r in rows
@@ -327,6 +447,34 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
         row["last_activity"] = now.isoformat()
         save(ledger_path, rows)
         return f"Due {d}: {row['what'][:80]}"
+
+    if action == "edit":
+        from .extract import parse_due
+
+        m = re.match(r"^(.*)\s+to\s+(.+)$", body or "", re.I)
+        if not m:
+            return "Use: edit: <item> to <new name> [by <when>]"
+        target, new = m.group(1).strip(), m.group(2).strip()
+        row, err = _pick(rows, target)
+        if err:
+            return err
+        due = None
+        b = re.match(r"^(.*?)\s+by\s+(.+)$", new, re.I)
+        if b:
+            d = parse_due(b.group(2), now)[0]
+            if d:
+                due = d
+                new = b.group(1).strip()
+        if not new:
+            return "Use: edit: <item> to <new name> [by <when>]"
+        row["what"] = new[:200]
+        row["last_activity"] = now.isoformat()
+        if due:
+            row["due"] = due
+            row["status"] = "open"
+            row["closure"] = "open"
+        save(ledger_path, rows)
+        return f"Edited: {new[:80]}" + (f" · due {due}" if due else "")
 
     if action == "drop":
         row, err = _pick(rows, body)
@@ -362,12 +510,28 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
     from slack_sdk.web import WebClient
 
     from .clients import load_clients
+    from .notify import send_dm
 
     MYT = timezone(timedelta(hours=8))
     clients = load_clients("clients.json")
     owner = env.get("SLACK_OWNER_ID", "")
     web = WebClient(token=env["SLACK_BOT_TOKEN"])
     client = SocketModeClient(app_token=env["SLACK_APP_TOKEN"], web_client=web)
+    try:
+        users = load_users(env["SLACK_BOT_TOKEN"])
+    except Exception as ex:  # noqa: BLE001 - names degrade to mentions only
+        print(f"user list unavailable: {type(ex).__name__}", flush=True)
+        users = {}
+
+    def post_reply(channel: str, text: str, notify: bool = True) -> None:
+        """Post in place; DM a copy when the command came from a channel."""
+        web.chat_postMessage(channel=channel, text=text)
+        if not notify or channel.startswith("D"):
+            return
+        try:
+            send_dm(env, text)
+        except Exception as ex:  # noqa: BLE001 - the channel reply already went out
+            print(f"  dm mirror failed: {type(ex).__name__}", flush=True)
 
     seen: set[tuple[str, str]] = set()
     STATE = "bot_state.json"
@@ -431,12 +595,47 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 reply = f"Could not answer: {type(ex).__name__}"
             if late:
                 reply = "_(answered late, I was offline)_\n" + reply
-            web.chat_postMessage(channel=channel, text=reply[:3900])
+            post_reply(channel, reply[:3900], notify=user == owner)
             _mark(ts)
             return
 
         print(f"[{datetime.now(MYT):%H:%M:%S}] {user} in {channel}: {text[:120]!r} -> {action}",
               flush=True)
+
+        target, rest = (split_target(body, users, user)
+                        if action in {"add", "remind"} else (None, body))
+        if should_schedule_reminder(action, user, owner, target):
+            fields, _ = parse_remind(rest, datetime.now(MYT))
+            if fields is None:
+                web.chat_postMessage(
+                    channel=channel,
+                    text="Use: remind <name> to <what> at 2pm (or add: <what> at 2pm)")
+                _mark(ts)
+                return
+            at = datetime.fromisoformat(fields["remind_at"])
+            if at <= datetime.now(MYT):
+                web.chat_postMessage(channel=channel, text="That time is in the past.")
+                _mark(ts)
+                return
+            recipient = target or user
+            try:
+                from .notify import schedule_dm
+
+                schedule_dm(env, recipient,
+                            f"*Reminder*\n{fields['what'][:300]}",
+                            int(at.timestamp()))
+            except Exception as ex:  # noqa: BLE001 - report, never retry blindly
+                print(f"  schedule failed: {type(ex).__name__}: {ex}", flush=True)
+                web.chat_postMessage(
+                    channel=channel,
+                    text=f"Could not schedule that: {type(ex).__name__}")
+                _mark(ts)
+                return
+            who = "you" if recipient == user else f"<@{recipient}>"
+            reply = f"Reminder set for {who} — {at:%a %d %b %H:%M}: {fields['what'][:80]}"
+            post_reply(channel, reply, notify=user == owner)
+            _mark(ts)
+            return
 
         if user != owner:
             if not late:
@@ -444,6 +643,10 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     web.reactions_add(channel=channel, timestamp=ts, name="white_check_mark")
                 except Exception as ex:  # noqa: BLE001
                     print(f"  react failed: {type(ex).__name__}: {ex}", flush=True)
+            if action == "help":
+                web.chat_postMessage(channel=channel, text=HELP)
+                _mark(ts)
+                return
             note = other_note(action, body, user)
             if note:
                 apply_command("note", note, datetime.now(MYT), clients, ledger_path)
@@ -464,19 +667,32 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         print(f"  reply: {reply[:120]!r}", flush=True)
         if late:
             reply = "_(answered late, I was offline)_\n" + reply
-        web.chat_postMessage(channel=channel, text=reply)
+        post_reply(channel, reply)
         _mark(ts)
 
     def handle(_socket_client, req):
         client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
         event = (req.payload or {}).get("event") or {}
-        if event.get("bot_id") or event.get("subtype"):
+        if event.get("bot_id"):
+            return
+        if event.get("subtype"):
+            ack = edit_ack_target(event, bot_user_id)
+            if ack:
+                try:
+                    web.reactions_add(channel=ack[0], timestamp=ack[1],
+                                      name="white_check_mark")
+                except Exception as ex:  # noqa: BLE001 - reaction is best effort
+                    print(f"  edit react failed: {type(ex).__name__}: {ex}", flush=True)
             return
         text = event.get("text") or ""
         user = event.get("user") or ""
         channel = event.get("channel") or ""
         ts = event.get("ts") or ""
         if not channel or not user:
+            return
+        # message.channels/message.groups deliver every channel message. Only
+        # act on ones that address the bot; DMs need no mention.
+        if not is_bot_addressed(event, bot_user_id):
             return
         process(channel, user, text, ts)
 
@@ -553,8 +769,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     client.socket_mode_request_listeners.append(handle)
-    client.connect()
     ident = web.auth_test()
+    bot_user_id = ident.get("user_id") or ""
+    client.connect()
     print(f"[{datetime.now(MYT):%H:%M:%S}] listening as @{ident.get('user')} "
           f"({ident.get('user_id')}) in {ident.get('team')}", flush=True)
     try:

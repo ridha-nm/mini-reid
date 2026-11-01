@@ -2,6 +2,67 @@
 
 Append-only. Newest first.
 
+## 2026-11-01 (source context everywhere)
+
+- Slack task lines show sender, channel, message time and link. When the model
+  rewrote the title, the original message is quoted underneath.
+- Email rows keep the full sender address: `Name (address)`, plus the Gmail link.
+- `list` shows sender, channel and link on every numbered row.
+- 147 tests passing.
+
+## 2026-11-01 (drafts and epics are not tasks)
+
+- Gmail drafts no longer become commitments. A draft is Ridha's own unsent
+  writing, not an ask; the `[Action Required] Descriptions…` row was an old reply
+  that already said the work was done.
+- Jira issues carry `issuetype`. Epics, initiatives and themes are containers,
+  not tasks, and are dropped. That removes `RIJ-Agent Tasks - Ridha` and
+  `Eupe Corporation Berhad`.
+- Dropped the three rows and recorded the corrections.
+- 143 tests passing.
+
+## 2026-11-01 (signal over noise)
+
+- Strict actionability gate: a message becomes a task only if it asks for
+  something ("can you", "please", "need the", an imperative opener), or is a
+  channel mention. Questions with no ask, status updates, and other people's
+  own plans are dropped. Channel mentions stay: they are the signal that matters.
+- `list` numbers items. `#N` works with `done`, `due`, `snooze`, `drop`, `waiting`,
+  `not`, and `edit` — so a rename does not depend on guessing the wording.
+- Every reminder, including Ridha's own, is now a Slack server-side scheduled
+  message. Watcher timing no longer delays a reminder.
+- Cleaned seven non-tasks out of the ledger and recorded them as `not:` corrections.
+- 140 tests passing.
+
+## 2026-10-31 (edit, late DM alerts)
+
+- `edit: <item> to <new name> [by <when>]` renames a task and, when a date is
+  given, re-dates and reopens it.
+- DM history is now paginated. Slack returns the oldest page first, so a busy DM
+  hid later messages until the sliding window surfaced them hours later. That is
+  why yesterday's DMs alerted this afternoon.
+- 124 tests passing.
+
+## 2026-10-31 (shared reminders)
+
+- Anyone who tags or DMs the bot can set a reminder for themselves or a teammate:
+  `remind me to … at 2pm`, `remind @Arman to … at 2pm`, `add: … at 2pm`.
+- Reminders are scheduled with Slack `chat.scheduleMessage`, so they fire on time even
+  when the Mac is asleep. The bot opens the DM with the recipient itself.
+- Other people's reminders are private: no ledger row, no digest entry, no note to Ridha.
+- Names resolve from the workspace user list; a mention is exact.
+- 121 tests passing.
+
+## 2026-10-31 (bot notifications, edit acks)
+
+- Bot command replies from a channel are mirrored to Ridha's DM, so `add:` raises a
+  notification immediately instead of waiting for the 08:30 digest.
+- Edited messages that still mention the bot get a ✅. Edits are acknowledged, never
+  replayed, so a command cannot be applied twice.
+- Slack app now subscribes `message.channels` and `message.groups`; other channel
+  messages are ignored unless they address the bot.
+- 118 tests passing.
+
 ## 2026-10-31 (docs)
 
 - README, SPEC and HANDOFF rewritten to match what is actually built.

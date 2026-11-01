@@ -10,10 +10,17 @@ BOT_AUTHOR = re.compile(
     r"(demo app|\[bot\]|^jira$|automation for jira|pantas-green-release|^mini-?reid$)",
     re.I)
 JIRA_NOTIFY = re.compile(r"atlassian\.net|\(jira\)|jira automation", re.I)
-ASK = re.compile(
-    r"\?|\b(please|pls|plz|can you|can u|could you|kindly|confirm|review|send|share|"
-    r"provide|update|follow up|action|need you|let us know|let me know|approve|"
-    r"join|huddle|call|check)\b", re.I)
+REQUEST_MODAL = re.compile(r"\b(?:can|could|would|will)\s+(?:you|u)\b", re.I)
+REQUEST_POLITE = re.compile(
+    r"\b(?:please|pls|plz|kindly|action required)\b", re.I)
+REQUEST_NEED = re.compile(
+    r"\b(?:we\s+need|need\s+(?:you|your|the|a|an|it|this|that|by))\b", re.I)
+IMPERATIVE = re.compile(
+    r"^(?:please\s+)?(?:send|share|provide|confirm|review|approve|update|check|"
+    r"prepare|draft|book|schedule|fix|add|remove|create|complete|finish|submit|"
+    r"sign|pay|call|join|reply|respond|get|start|do|make|write|build|test|read|"
+    r"open|close|look|take|follow|need)\b", re.I)
+STATUS_PREFIX = re.compile(r"^\s*(?:update|status|fyi)\s*:", re.I)
 MENTION = re.compile(r"<@[A-Z0-9]+>")
 CHATTER = re.compile(
     r"\b(lol|haha+|bahaha+|im tired|i'?m tired|no worries|working on it|"
@@ -64,17 +71,45 @@ def via_for(item: dict) -> str:
     if item.get("source") == "jira":
         return "Jira"
     if item.get("source") == "gmail":
-        to = (item.get("to") or "").lower()
-        return "direct" if "ridha" in to else "bd@pantas.com"
+        return "email"
     return "manual"
 
 
 def _asker(author: str) -> str | None:
-    raw = (author or "").split("<")[0].strip().strip('"').strip()
-    if raw and "@" not in raw:
-        return raw[:40]
-    m = re.search(r"([A-Za-z][A-Za-z.'-]+)@", author or "")
-    return m.group(1).replace(".", " ").title()[:40] if m else None
+    """Name and address for mail; name alone for Slack and Jira."""
+    email = re.search(r"[\w.+-]+@[\w.-]+", author or "")
+    name = (author or "").split("<")[0].strip().strip('"').strip()
+    if "@" in name:
+        name = ""
+    if name and email:
+        return f"{name} ({email.group(0)})"[:80]
+    if email:
+        return email.group(0)[:80]
+    return name[:40] if name else None
+
+
+EPIC_TYPES = {"epic", "initiative", "theme"}
+
+
+def looks_actionable(text: str, item: dict) -> bool:
+    """Strict gate: a request, an imperative, or a channel mention.
+
+    Questions with no ask ("do you have access?", "Den i ??") and status
+    updates are not commitments. Channel mentions are kept: they are
+    addressed to Ridha, and that is the signal that matters most. A draft is
+    Ridha's own unsent writing, not an ask; an Epic is a container, not a task.
+    """
+    if item.get("kind") == "draft":
+        return False
+    if item.get("source") == "jira":
+        return (item.get("issue_type") or "").lower() not in EPIC_TYPES
+    if STATUS_PREFIX.search(text):
+        return False
+    asked = bool(REQUEST_MODAL.search(text) or REQUEST_POLITE.search(text)
+                 or REQUEST_NEED.search(text) or IMPERATIVE.search(text))
+    if item.get("source") == "slack" and item.get("kind") == "mention":
+        return asked or not CHATTER.search(text)
+    return asked
 
 
 def _clean(text: str) -> str:
@@ -120,25 +155,14 @@ def extract(item: dict, client: dict | None, now: datetime) -> list[dict]:
         if len(text) < 12:
             return []
 
-    # A DM is a conversation. Only an actual ask, question or dated request counts.
-    # Search can also return a DM message as a "mention", so check the flag too.
-    if item.get("is_dm") or item.get("kind") == "dm":
-        if len(text) < 20 and "?" not in text:
-            return []
-        if CHATTER.search(text) and "?" not in text:
-            return []
-    # An inbox email only becomes a commitment when it actually asks for something.
-    if item.get("source") == "gmail" and item.get("kind") == "inbox" and not ASK.search(text):
+    gate_text = f"{item.get('subject') or ''} {text}".strip()
+    if not looks_actionable(gate_text, item):
         return []
 
     if item.get("due"):
         due, conf = item["due"], 0.95
     else:
         due, conf = parse_due(f"{item.get('subject') or ''} {text}", now)
-
-    # A DM only counts when it actually asks for something, or carries a date.
-    if (item.get("is_dm") or item.get("kind") == "dm") and not (ASK.search(text) or due):
-        return []
 
     # Shared-alias mail with no date and no direct address is not Ridha's work.
     if item.get("source") == "gmail" and item.get("kind") == "inbox" and due is None:

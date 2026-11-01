@@ -106,10 +106,10 @@ def test_dated_alias_mail_is_kept():
     assert len(extract(item, None, NOW)) == 1
 
 
-def test_draft_is_kept_even_without_an_ask():
+def test_draft_is_not_a_commitment():
     item = {"source": "gmail", "native_id": "d1", "kind": "draft", "author": "Ridha",
             "text": "Thanks, noted.", "link": "l", "created_at": "2026-10-29T08:00:00+08:00"}
-    assert len(extract(item, None, NOW)) == 1
+    assert extract(item, None, NOW) == []
 
 
 def test_evidence_is_capped_at_200_chars():
@@ -120,7 +120,83 @@ def test_evidence_is_capped_at_200_chars():
 
 
 def test_signature_is_stripped_from_what():
-    item = {"source": "gmail", "native_id": "5", "kind": "draft", "author": "Ridha",
-            "text": "Thanks, noted on the below. Best regards, Ridha Mohamed Sustainability Data Analyst",
-            "link": "l", "created_at": "2026-10-29T08:00:00+08:00"}
-    assert extract(item, None, NOW)[0]["what"] == "Thanks, noted on the below."
+    item = {"source": "gmail", "native_id": "5", "kind": "inbox",
+            "author": "x@eupe.com.my", "to": "Ridha <ridha@pantas.com>",
+            "text": "please review the attached. Best regards, Ridha Mohamed Sustainability Data Analyst",
+            "link": "l", "ts": "2026-10-30T08:00:00+08:00"}
+    assert extract(item, None, NOW)[0]["what"] == "please review the attached."
+
+
+@pytest.mark.parametrize("text", [
+    "Den i ??",
+    "Ridha do you have claude access to access artifact?",
+    "U need help with builindg?",
+    "Hows the builing building going and I try to get FSD today no promises",
+    "Update: #179 has merged and I've merged it into K1 locally. OK for me to start K2 now?",
+    "you speak mandarin?",
+])
+def test_dm_questions_and_updates_are_not_tasks(text):
+    item = {"source": "slack", "native_id": "q", "kind": "dm", "author": "Kasib",
+            "text": text, "link": "l", "ts": "2026-10-30T08:00:00+08:00"}
+    assert extract(item, None, NOW) == []
+
+
+@pytest.mark.parametrize("text", ["Get Gamuda file", "Start K2", "Send the FSD by Friday"])
+def test_short_imperative_dm_is_a_task(text):
+    item = {"source": "slack", "native_id": "i", "kind": "dm", "author": "Kasib",
+            "text": text, "link": "l", "ts": "2026-10-30T08:00:00+08:00"}
+    assert len(extract(item, None, NOW)) == 1
+
+
+def test_meeting_notes_mail_is_not_a_task():
+    item = {"source": "gmail", "native_id": "mt", "kind": "inbox",
+            "author": "Daniel <daniel@pantas.com>",
+            "subject": "Stock Take & Action Items: Pantas <> IOI Properties - 1 Oct",
+            "text": "Here are the notes from the meeting.", "link": "l",
+            "ts": "2026-10-30T08:00:00+08:00"}
+    assert extract(item, None, NOW) == []
+
+
+def test_channel_mention_is_kept_even_without_request_words():
+    item = {"source": "slack", "native_id": "m2", "kind": "mention", "author": "kasib",
+            "text": "<@U1> FSD today no promises", "link": "l",
+            "ts": "2026-10-30T08:00:00+08:00"}
+    assert len(extract(item, None, NOW)) == 1
+
+
+def test_thanks_mention_is_not_a_task():
+    item = {"source": "slack", "native_id": "m3", "kind": "mention", "author": "kasib",
+            "text": "<@U1> thanks", "link": "l",
+            "ts": "2026-10-30T08:00:00+08:00"}
+    assert extract(item, None, NOW) == []
+
+
+def test_dm_need_the_thing_by_date_is_a_task():
+    item = {"source": "slack", "native_id": "need", "kind": "dm", "author": "Kasib",
+            "text": "Ridha, need the FSD by Friday", "link": "l",
+            "ts": "2026-10-30T08:00:00+08:00"}
+    assert len(extract(item, None, NOW)) == 1
+
+
+def test_jira_epic_is_not_a_task():
+    item = {"source": "jira", "native_id": "1", "kind": "issue", "author": "BO board",
+            "text": "Eupe Corporation Berhad", "subject": "Eupe Corporation Berhad",
+            "issue_type": "Epic", "link": "l", "ts": "2026-10-30T08:00:00+08:00"}
+    assert extract(item, None, NOW) == []
+
+
+def test_jira_task_is_kept():
+    item = {"source": "jira", "native_id": "2", "kind": "issue", "author": "BO board",
+            "text": "[RIJ] Configure file mappings", "issue_type": "Task",
+            "subject": "[RIJ] Configure file mappings", "link": "l",
+            "ts": "2026-10-30T08:00:00+08:00"}
+    assert len(extract(item, None, NOW)) == 1
+
+
+def test_email_asker_keeps_the_full_address():
+    item = {"source": "gmail", "native_id": "e1", "kind": "inbox",
+            "author": "Quekjoelyn <bd@pantas.com>", "to": "Ridha <ridha@pantas.com>",
+            "text": "please confirm the activity item descriptions", "link": "l",
+            "ts": "2026-10-30T08:00:00+08:00"}
+    row = extract(item, None, NOW)[0]
+    assert row["asker"] == "Quekjoelyn (bd@pantas.com)"

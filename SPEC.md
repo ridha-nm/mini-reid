@@ -61,7 +61,7 @@ guessed.
 | Slack DMs | recent messages from other people to Ridha |
 | Gmail inbox | all inbox mail, read or unread |
 | Gmail sent | activity and closure proposals |
-| Gmail drafts | stalled work |
+| Gmail drafts | ignored; Ridha's own unsent writing is not an ask |
 | Jira | issues assigned to Ridha, excluding Done |
 | Manual | `@minireid add:` or `note:` |
 
@@ -86,19 +86,22 @@ calls.
 Rules:
 
 - Merge is idempotent; terminal statuses never reopen.
-- Stalled: draft older than a day, past due, or five working days without activity.
+- Stalled: past due, or five working days without activity.
 - Undated tasks stay on the list until closed. They do not expire.
 - A Jira row closes when the issue is no longer assigned. Skipped if the Jira fetch
   failed, so a network blip cannot close the board.
 
 ## Extraction
 
-Rules decide:
+Rules decide. A message needs a request signal: `can/could/would/will you`, `please`,
+`need you/the/…`, an imperative opener (`send`, `confirm`, `get`, `start`, …), or it is
+a channel mention. Channel mentions are always kept unless they are pure chatter.
 
-- Slack mention, or a DM that asks something or carries a date.
-- Gmail with a direct address, or a dated request; Jira assignment.
-- Rejected: bots, calendar responses, Jira notification mail, sent mail, chatter, Google
-  boilerplate, URLs, newsletter and marketing senders.
+- Kept: requests, first-person commitments, Gmail with a direct address or a dated
+  request, Jira assignments.
+- Rejected: bots, calendar responses, Jira notification mail, sent mail, chatter,
+  questions with no ask ("do you have access?"), status updates ("Update: …"), other
+  people's own plans ("I try to get … today"), Google boilerplate, URLs, newsletters.
 
 The model is optional and only rewrites `what`. Given filtering authority it deleted
 real asks and kept jokes.
@@ -112,16 +115,23 @@ overdue by client), then:
 Possibly done · Review**
 
 Each row: task, client name, relative due (`2d overdue`, `today`, `in 3d`), sender and
-channel, link. Nothing else.
+channel, source time, link. Email senders keep their full address. A Slack row quotes
+the original message when the task title was rewritten.
 
 ## Bot commands
 
-`add:`, `task:`, `todo:`, `note that`, `done:`, `due:`, `snooze:`, `waiting:`, `drop:`,
-`not:`, `remind` (absolute or `in 2 minutes`), `ask:`, `find:`, `list`, `help`.
+`add:`, `task:`, `todo:`, `note that`, `done:`, `due:`, `edit: <item> to <new name> [by
+<when>]`, `snooze:`, `waiting:`, `drop:`, `not:`, `remind` (absolute or `in 2 minutes`),
+`ask:`, `find:`, `list`, `help`.
 
 - Only Ridha mutates the ledger.
-- Anyone else gets a ✅ and, if they write something, a note plus an instant DM to
-  Ridha. No reply to them.
+- Anyone who tags or DMs the bot can set a reminder for themselves or a teammate:
+  `remind me …`, `remind @Arman …`, `add: … at 2pm`. All reminders are scheduled in
+  Slack (server-side), stay private, and never enter Ridha's ledger or digest.
+- `list` numbers open items; `#N` works with `done`, `due`, `snooze`, `drop`, `waiting`,
+  `not` and `edit`.
+- Any other message from someone else gets a ✅ and, if they write something, a note
+  plus an instant DM to Ridha. No reply to them.
 - Plain sentences from Ridha become notes; questions go to the knowledge base; due or
   status questions go to the list.
 - Catch-up on wake answers questions asked while the Mac slept, marked late. Old

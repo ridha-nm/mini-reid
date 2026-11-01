@@ -1,6 +1,7 @@
 """Forward-looking digest renderer."""
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 
 LABELS = [
@@ -49,6 +50,27 @@ def _client_name(slug: str | None) -> str | None:
     return (_CLIENTS.get(slug) or {}).get("name") or slug
 
 
+def _when(row: dict) -> str:
+    raw = row.get("created_at") or row.get("ts") or ""
+    try:
+        return datetime.fromisoformat(raw).strftime("%d %b %H:%M")
+    except (TypeError, ValueError):
+        return ""
+
+
+def _source_quote(row: dict) -> str:
+    """Quote the message when the task title no longer resembles it."""
+    evidence = (row.get("evidence") or "").strip()
+    what = (row.get("what") or "").strip()
+    if not evidence or not what:
+        return ""
+    norm = lambda s: re.sub(r"[^a-z0-9 ]+", " ", s.lower())
+    if norm(what) in norm(evidence):
+        return ""
+    quote = evidence[:120].rstrip()
+    return f"“{quote}{'…' if len(evidence) > 120 else ''}”"
+
+
 def _line(row: dict, slack: bool = False, now: datetime | None = None) -> str:
     what = (row.get("what") or "").strip()
     if len(what) > 140:
@@ -61,6 +83,9 @@ def _line(row: dict, slack: bool = False, now: datetime | None = None) -> str:
     who = f"from {asker}" if asker else ""
     if via:
         who = f"{who} ({via})" if who else via
+    when = _when(row)
+    quote = _source_quote(row) if row.get("source") == "slack" else ""
+
     if slack:
         tail = f" — <{link}|open>" if link else ""
         parts = [f"*{what}*"]
@@ -69,7 +94,10 @@ def _line(row: dict, slack: bool = False, now: datetime | None = None) -> str:
         parts.append(due)
         if who:
             parts.append(who)
-        return "• " + " — ".join(parts) + tail
+        if when:
+            parts.append(when)
+        line = "• " + " — ".join(parts) + tail
+        return f"{line}\n   {quote}" if quote else line
 
     tail = f"  \n  [open]({link})" if link else ""
     parts = [f"**{what}**"]
@@ -78,7 +106,10 @@ def _line(row: dict, slack: bool = False, now: datetime | None = None) -> str:
     parts.append(due)
     if who:
         parts.append(who)
-    return "- " + " — ".join(parts) + tail
+    if when:
+        parts.append(when)
+    line = "- " + " — ".join(parts) + tail
+    return f"{line}\n  {quote}" if quote else line
 
 
 def render(rows: list[dict], now: datetime, review: list[str] | None = None,

@@ -46,3 +46,14 @@ def send_dm(env: dict, text: str) -> str:
     if not d.get("ok"):
         raise RuntimeError(f"chat.postMessage: {d.get('error')}")
     return d["channel"]
+
+
+def schedule_dm(env: dict, user_id: str, text: str, post_at: int) -> str:
+    """Slack-side scheduled DM. Survives this Mac sleeping."""
+    token = env["SLACK_BOT_TOKEN"]
+    ch = dm_channel(token, user_id)
+    d = _post("chat.scheduleMessage", token, channel=ch, text=text[:39000],
+              post_at=post_at)
+    if not d.get("ok"):
+        raise RuntimeError(f"chat.scheduleMessage: {d.get('error')}")
+    return d.get("scheduled_message_id") or ""

@@ -135,6 +135,26 @@ def slack_user_name(token: str, user_id: str) -> str:
     return name
 
 
+def _dm_history(token: str, channel_id: str, oldest: float) -> list[dict]:
+    """Every message in the window. Slack pages oldest-first, so one page
+    hides later messages until the window slides forward and surfaces them
+    hours late."""
+    out: list[dict] = []
+    cursor = ""
+    while True:
+        params = {"channel": channel_id, "oldest": f"{oldest:.6f}", "limit": 200}
+        if cursor:
+            params["cursor"] = cursor
+        d = _get_json(
+            "https://slack.com/api/conversations.history?"
+            + urllib.parse.urlencode(params),
+            {"Authorization": f"Bearer {token}"})
+        out.extend(d.get("messages") or [])
+        cursor = (d.get("response_metadata") or {}).get("next_cursor") or ""
+        if not cursor:
+            return out
+
+
 def fetch_slack_dms(days: int, token: str, me: str) -> list[dict]:
     """Recent messages in Ridha's direct messages, from other people."""
     ims = _get_json(
@@ -147,10 +167,7 @@ def fetch_slack_dms(days: int, token: str, me: str) -> list[dict]:
         cid = ch.get("id")
         if not cid or ch.get("user") == me:
             continue
-        hist = _get_json(
-            "https://slack.com/api/conversations.history?"
-            + urllib.parse.urlencode({"channel": cid, "oldest": f"{oldest:.6f}", "limit": 20}),
-            {"Authorization": f"Bearer {token}"})
+        hist = {"messages": _dm_history(token, cid, oldest)}
         for item in parse_slack_dm_history(cid, hist, me):
             item["author"] = slack_user_name(token, item["author"])
             items.append(item)
@@ -175,6 +192,9 @@ def fetch_slack(days: int, token: str, me: str) -> list[dict]:
             break
         page += 1
         time.sleep(1.2)
+    for item in items:
+        # Search sometimes returns a bare user id; people read names.
+        item["author"] = slack_user_name(token, item["author"])
     return items
 
 
@@ -247,19 +267,6 @@ def fetch_gmail(days: int, env: dict[str, str]) -> list[dict]:
         msgs = [_gmail_message(access, i) for i in ids]
         out.extend(parse_gmail_messages(msgs, kind))
 
-    drafts = _get_json(
-        "https://gmail.googleapis.com/gmail/v1/users/me/drafts?" + urllib.parse.urlencode({"maxResults": 50}),
-        {"Authorization": f"Bearer {access}"})
-    cutoff = (datetime.now(MYT) - timedelta(days=30)).timestamp() * 1000
-    dmgs = []
-    for d in drafts.get("drafts") or []:
-        mid = (d.get("message") or {}).get("id")
-        if not mid:
-            continue
-        msg = _gmail_message(access, mid)
-        if int(msg.get("internalDate", 0)) >= cutoff:
-            dmgs.append(msg)
-    out.extend(parse_gmail_messages(dmgs, "draft"))
     return out
 
 
@@ -294,6 +301,7 @@ def parse_jira_issues(data: dict, base: str) -> list[dict]:
             "subject": f.get("summary", ""),
             "due": f.get("duedate"),
             "status": (f.get("status") or {}).get("name"),
+            "issue_type": (f.get("issuetype") or {}).get("name"),
             "link": f"{base.rstrip('/')}/browse/{key}",
             "is_dm": False,
             "direction": "owed_by_me",
@@ -314,6 +322,6 @@ def fetch_jira(days: int, env: dict[str, str]) -> list[dict]:
            "ORDER BY updated DESC")
     url = f"{base.rstrip('/')}/rest/api/3/search/jql?" + urllib.parse.urlencode(
         {"jql": jql, "maxResults": 50,
-         "fields": "summary,duedate,status,reporter,assignee,project,updated"})
+         "fields": "summary,duedate,status,reporter,assignee,project,updated,issuetype"})
     data = _get_json(url, {"Authorization": f"Basic {auth}", "Accept": "application/json"})
     return parse_jira_issues(data, base)

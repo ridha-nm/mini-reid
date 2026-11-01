@@ -41,6 +41,7 @@ task: ... / todo: ...             same as add
 note that ...                     remember it, no deadline
 done: send the deck               close it
 due: deck by Monday               change the date
+edit: deck to Send deck by Monday rename and re-date
 snooze: deck 3d                   push it out
 waiting: deck on Daniel           move to Waiting on others
 drop: deck                        remove quietly
@@ -48,18 +49,32 @@ not: anything not part c          wrong item; teaches it to ignore that kind
 remind me to send the deck in 2 minutes
 ask: what did we agree with Eupe  answer from your own writing, with sources
 find: eupe                        search the ledger
-list                              ten nearest open items
+list                              numbered open items; use #1 in later commands
 help                              the command list
 ```
 
+`#N` from `list` works with `done`, `due`, `snooze`, `drop`, `waiting`, `not` and
+`edit`, so a rename never depends on fuzzy wording.
+
 Plain sentences from Ridha become notes; questions go to the knowledge base; due or
 status questions go to the list.
+
+A command run in a channel is answered in the channel and mirrored to Ridha's DM, so it
+raises a Slack notification. Editing a message that still mentions the bot gets a ✅;
+edits are never replayed, so a command cannot be applied twice.
+
+Anyone who tags or DMs the bot can set a reminder for themselves or a teammate:
+`remind me to … at 2pm`, `remind @Arman to … at 2pm`, `add: … at 2pm`. Every reminder,
+including Ridha's own, is scheduled server-side with Slack, so it fires on time even when
+the Mac sleeps. Other people's reminders never touch Ridha's ledger or digest. Slack
+keeps the queue; there is no local copy yet, so there is no cancel or list.
 
 ## Digest layout
 
 Counts header, brief, then Overdue, Today and tomorrow, This week, Waiting on others,
 No date, Notes, Review. Each row: task, client name, relative due, sender and channel,
-link.
+source time, link. Email senders keep their address; a rewritten Slack title quotes the
+original message.
 
 ## Completion rules
 
@@ -68,7 +83,7 @@ Nothing closes by itself.
 - `done:` closes a row.
 - Reassigning a Jira issue closes it on the next run (`jira_reassigned`).
 - A sent email only marks `closure: proposed`; it stays open until confirmed.
-- An unsent draft becomes `stalled`, never done.
+- Email drafts are not commitments. Only an incoming ask becomes a row.
 
 ## Knowledge base
 

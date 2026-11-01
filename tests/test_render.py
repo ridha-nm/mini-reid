@@ -44,3 +44,15 @@ def test_markdown_render_still_uses_markdown():
     out = render([ROW], NOW, [], slack=False)
     assert out.startswith("# Mini-Reid")
     assert "[open](https://x/1)" in out
+
+
+def test_slack_line_shows_sender_time_and_source_quote():
+    row = dict(ROW, source="slack", asker="Kasib", via="DM",
+               what="Get Gamuda file",
+               evidence="Hi @Ridha, I'm starting K1 now (provider-neutral extractor).",
+               created_at="2026-11-01T02:14:48+08:00")
+    out = render([row], NOW, [], slack=True)
+    assert "from Kasib (DM)" in out
+    assert "01 Nov 02:14" in out
+    assert "starting K1 now" in out
+    assert "<https://x/1|open>" in out

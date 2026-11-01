@@ -218,3 +218,140 @@ def test_done_with_no_match_says_so(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     reply = apply_command("done", "nothing like this", NOW, {}, ledger)
     assert "No open item" in reply
+
+
+def test_edit_that_still_mentions_the_bot_is_acked():
+    from mini_reid.slack_bot import edit_ack_target
+
+    event = {
+        "type": "message", "subtype": "message_changed", "channel": "C1",
+        "message": {"type": "message", "user": "U1", "ts": "1793414394.221409",
+                    "text": "<@UBOT> add: take leave",
+                    "edited": {"ts": "1793414401.000000"}},
+    }
+    assert edit_ack_target(event, "UBOT") == ("C1", "1793414394.221409")
+
+
+def test_edit_that_drops_the_mention_or_is_a_bot_message_is_ignored():
+    from mini_reid.slack_bot import edit_ack_target
+
+    dropped = {
+        "subtype": "message_changed", "channel": "C1",
+        "message": {"user": "U1", "ts": "1", "text": "<@URIDHA> take note"},
+    }
+    assert edit_ack_target(dropped, "UBOT") is None
+    assert edit_ack_target({"subtype": "message_deleted", "channel": "C1"}, "UBOT") is None
+    bot = {
+        "subtype": "message_changed", "channel": "C1",
+        "message": {"bot_id": "B1", "user": "U1", "ts": "1", "text": "<@UBOT> hi"},
+    }
+    assert edit_ack_target(bot, "UBOT") is None
+
+
+def test_channel_messages_need_a_mention_but_dms_do_not():
+    from mini_reid.slack_bot import is_bot_addressed
+
+    assert is_bot_addressed({"channel": "D1", "text": "add: take leave"}, "UBOT")
+    assert is_bot_addressed({"channel": "C1", "text": "<@UBOT> add: take leave"}, "UBOT")
+    assert not is_bot_addressed({"channel": "C1", "text": "add: take leave"}, "UBOT")
+
+
+USERS = {"arman": "UARMAN", "ridha": "URIDHA"}
+
+
+def test_split_target_accepts_mention_me_for_and_bare_name():
+    from mini_reid.slack_bot import split_target
+
+    assert split_target("<@UARMAN> to submit timesheet at 2pm", USERS, "URIDHA") == (
+        "UARMAN", "submit timesheet at 2pm")
+    assert split_target("me to submit timesheet at 2pm", USERS, "UARMAN") == (
+        "UARMAN", "submit timesheet at 2pm")
+    assert split_target("for arman: submit timesheet at 2pm", USERS, "URIDHA") == (
+        "UARMAN", "submit timesheet at 2pm")
+    assert split_target("arman to submit timesheet at 2pm", USERS, "URIDHA") == (
+        "UARMAN", "submit timesheet at 2pm")
+
+
+def test_split_target_leaves_ordinary_text_alone():
+    from mini_reid.slack_bot import split_target
+
+    assert split_target("send the deck to Daniel at 2pm", USERS, "URIDHA") == (
+        None, "send the deck to Daniel at 2pm")
+    assert split_target("talk to Daniel at 2pm", USERS, "URIDHA") == (
+        None, "talk to Daniel at 2pm")
+
+
+def test_reminders_are_scheduled_for_others_and_non_owners():
+    from mini_reid.slack_bot import should_schedule_reminder
+
+    owner = "URIDHA"
+    assert should_schedule_reminder("remind", "UARMAN", owner, None)
+    assert should_schedule_reminder("add", "UARMAN", owner, None)
+    assert should_schedule_reminder("remind", owner, owner, "UARMAN")
+    assert should_schedule_reminder("add", owner, owner, "UARMAN")
+    assert should_schedule_reminder("remind", owner, owner, None)
+    assert not should_schedule_reminder("add", owner, owner, None)
+    assert not should_schedule_reminder("note", "UARMAN", owner, None)
+
+
+def test_edit_renames_and_sets_a_deadline(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Eupe dashboard item", NOW, clients, ledger)
+    reply = apply_command(
+        "edit", "dashboard item to Confirm Eupe dashboard by Friday", NOW, clients, ledger)
+    row = load(ledger)[0]
+    assert row["what"] == "Confirm Eupe dashboard"
+    assert row["due"] == "2026-10-30"
+    assert "Edited" in reply
+
+
+def test_edit_can_rename_without_a_date(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Eupe dashboard item", NOW, clients, ledger)
+    apply_command("edit", "dashboard item to Confirm Eupe dashboard", NOW, clients, ledger)
+    row = load(ledger)[0]
+    assert row["what"] == "Confirm Eupe dashboard"
+    assert row["due"] is None
+
+
+def test_list_numbers_items_and_edit_by_number(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Eupe dashboard item", NOW, clients, ledger)
+    apply_command("add", "Gamuda file", NOW, clients, ledger)
+    listing = apply_command("list", "", NOW, clients, ledger)
+    assert "1." in listing and "2." in listing
+    apply_command("edit", "#2 to Get Gamuda export by Friday", NOW, clients, ledger)
+    row = [r for r in load(ledger) if r["what"] == "Get Gamuda export"][0]
+    assert row["due"] == "2026-10-30"
+
+
+def test_done_accepts_a_list_number(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Eupe dashboard item", NOW, clients, ledger)
+    apply_command("add", "Gamuda file", NOW, clients, ledger)
+    apply_command("done", "#1", NOW, clients, ledger)
+    rows = load(ledger)
+    assert [r["status"] for r in rows if r["what"] == "Eupe dashboard item"] == ["done"]
+    assert [r["status"] for r in rows if r["what"] == "Gamuda file"] == ["open"]
+
+
+def test_owner_reminders_use_slack_scheduling_now():
+    from mini_reid.slack_bot import should_schedule_reminder
+
+    assert should_schedule_reminder("remind", "URIDHA", "URIDHA", None)
+
+
+def test_list_shows_sender_and_link(tmp_path):
+    from mini_reid.ledger import save
+
+    ledger = str(tmp_path / "ledger.json")
+    save(ledger, [{"id": "x", "what": "Send FSD", "status": "open", "kind": "mention",
+                   "due": None, "asker": "Kasib", "via": "#probies",
+                   "source_link": "https://x/1", "direction": "owed_by_me"}])
+    text = apply_command("list", "", NOW, {}, ledger)
+    assert "from Kasib (#probies)" in text
+    assert "https://x/1" in text

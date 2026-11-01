@@ -85,3 +85,15 @@ def test_alert_is_compact_and_has_a_link():
     text = format_alert(rows)
     assert "confirm the waste mapping" in text
     assert "https://x/1" in text
+
+
+def test_slack_alert_shows_sender_time_link_and_source_quote():
+    row = {"source": "slack", "what": "Get Gamuda file", "client": None, "due": None,
+           "asker": "Kasib", "via": "DM", "source_link": "https://x/slack",
+           "evidence": "Hi @Ridha, I'm starting K1 now (provider-neutral extractor).",
+           "created_at": "2026-11-01T02:14:48+08:00"}
+    text = format_alert([row])
+    assert "from Kasib (DM)" in text
+    assert "01 Nov 02:14" in text
+    assert "https://x/slack" in text
+    assert "starting K1 now" in text
