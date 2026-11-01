@@ -23,6 +23,9 @@ Everything runs locally on the Mac. Nothing is stored in the cloud.
 All run from `~/mini-reid`. `~/Desktop/Mini-Reid` is a symlink. Terminal does not need
 to stay open.
 
+Slack app subscriptions saved 2026-11-01: `app_mention`, `message.im`,
+`message.channels`, `message.groups`. Socket Mode; no public URL.
+
 ## Commands
 
 ```bash
@@ -115,6 +118,9 @@ It appends recall and missed items to `scorecard.md`.
 - WhatsApp and calls are manual capture only.
 - macOS sleep pauses everything; catch-up answers missed questions on wake.
 - Watcher takes about 40 s per cycle, hence the two-minute interval.
+- Edited-message ✅ depends on the app keeping `message.channels`/`message.groups`. A
+  reinstall can rotate the bot token; update `.env` and restart the bot if it stops.
+- Extraction is rules-first. A real ask the gate misses is captured with `add:`.
 
 ## Repo
 
@@ -122,7 +128,8 @@ It appends recall and missed items to `scorecard.md`.
 
 ## Next, agreed
 
-1. Use it for a week. Collect `not:` corrections and Friday's `expected.txt`.
+1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's
+   `expected.txt`.
 2. Tune from the scorecard: recall below 80% means extraction misses work; many `not:`
    corrections means it is too noisy.
 3. Only then consider thread indexing or comment-level Jira mentions.

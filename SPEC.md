@@ -137,6 +137,13 @@ the original message when the task title was rewritten.
 - Catch-up on wake answers questions asked while the Mac slept, marked late. Old
   commands are never replayed.
 
+### Slack app
+
+Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
+`message.groups`. Channel messages that do not mention the bot are ignored. An edit that
+still mentions the bot gets a ✅; commands are never replayed. A reply in a channel is
+mirrored to Ridha's DM so it raises a notification.
+
 ## Knowledge base
 
 Local index of Ridha's Slack messages, sent mail, received mail and local documents.

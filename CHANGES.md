@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-01 (ready for the week)
+
+- Slack app subscriptions saved: `app_mention`, `message.im`, `message.channels`,
+  `message.groups`. Edits can now be acked; no bot restart needed.
+- README, SPEC and HANDOFF record the subscriptions, the edit-ack dependency, and the
+  week-start plan.
+- 147 tests passing.
+
 ## 2026-11-01 (source context everywhere)
 
 - Slack task lines show sender, channel, message time and link. When the model

@@ -36,6 +36,13 @@ cd ~/mini-reid
 `./run.sh` is the digest job. `./run_bot.sh` is the listener. `./run_watcher.sh` is one
 watcher pass.
 
+## Slack app
+
+Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
+`message.groups` (manifest: `slack-app-manifest.yaml`). The two message subscriptions
+exist so an edited mention can be acknowledged with ✅; every other channel message is
+ignored unless it addresses the bot.
+
 ## Agents
 
 | launchd label | Cadence | Log |
