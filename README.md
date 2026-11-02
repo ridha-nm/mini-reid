@@ -1,11 +1,11 @@
 # Mini-Reid
 
-A personal commitment ledger. It reads Slack, Gmail and Jira, keeps what you owe in
-`ledger.json`, and puts it in front of you three ways: a morning to-do digest, alerts
-for new items, and a Slack bot you can talk to.
+A personal commitment ledger. It reads Slack, Gmail, Jira and Google Calendar, keeps
+what you owe in `ledger.json`, and puts it in front of you three ways: a morning to-do
+digest, alerts for new items, and a Slack bot you can talk to.
 
 It runs on this Mac only. No cloud. Nothing leaves the machine except calls to Slack,
-Gmail and Jira.
+Gmail, Jira and Google Calendar.
 
 ## What it does
 
@@ -32,6 +32,7 @@ cd ~/mini-reid
 .venv/bin/python -m mini_reid.cli --days 1            # digest, rules only
 .venv/bin/python -m mini_reid.cli --days 1 --deliver  # digest to Slack DM
 .venv/bin/python -m mini_reid.watcher                 # one watcher cycle
+.venv/bin/python -m mini_reid.google_auth             # one-time Calendar consent
 .venv/bin/python -m mini_reid.kb --build              # rebuild the knowledge index
 .venv/bin/python -m mini_reid.kb --ask "what did we agree with Eupe on waste"
 .venv/bin/python -m pytest tests/ -q                  # tests
@@ -45,7 +46,9 @@ watcher pass.
 Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
 `message.groups` (manifest: `slack-app-manifest.yaml`). The two message subscriptions
 exist so an edited mention can be acknowledged with ✅; every other channel message is
-ignored unless it addresses the bot.
+ignored unless it addresses the bot. Tags from `bd-triager-agent` are ignored. Slack
+sends no events from DMs the bot is not in, so the watcher polls them for `remind`
+commands with the user token.
 
 ## Agents
 
@@ -69,13 +72,16 @@ Check them with `launchctl list | grep minireid`.
 | `clients.json` | client names, domains, Slack channels |
 | `kb.json` | knowledge index, local only |
 | `corrections.json` | items you marked `not:` |
+| `meeting_reminders.json` | today's meeting reminders and attendance answers |
+| `dm_poll_state.json` | last DM command read by the watcher |
 | `expected.txt` | Friday's manual list for the scorecard |
 
 ## Credentials
 
-`.env` holds the Mini-Reid Slack app tokens (`xapp`, `xoxb`, `xoxp`), Gmail OAuth paths,
+`.env` holds the Mini-Reid Slack app tokens (`xapp`, `xoxb`, `xoxp`), Google OAuth paths,
 the Jira API token and `SLACK_OWNER_ID`. Rotate the Slack user token if it is ever
-exposed; it can read every DM.
+exposed; it can read every DM. The Google token carries Gmail scopes plus
+`calendar.readonly`; `mini_reid.google_auth` re-adds the Calendar scope.
 
 ## Known limits
 

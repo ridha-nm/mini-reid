@@ -2,6 +2,16 @@
 
 Append-only. Newest first.
 
+## 2026-11-02 (triager channel ignored)
+
+- Tags from `bd-triager-agent` (`C0B59LA0X5M`) no longer become ledger rows, and the
+  bot ignores events from that channel.
+- README, SPEC and HANDOFF record the current state, DM polling, meeting replies,
+  Calendar consent and the 09:15 digest.
+- Shared HTTP helper retries 5xx as well as 429, so a transient Calendar 503 does not
+  blank the Meetings section.
+- 166 tests passing.
+
 ## 2026-11-02 (task status)
 
 - `status: <item> in progress | blocked | open` updates a task. The digest and `list`

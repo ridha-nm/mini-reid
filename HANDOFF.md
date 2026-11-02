@@ -1,6 +1,7 @@
 # Handoff
 
-Current state of Mini-Reid. Update after every material change.
+Current state of Mini-Reid. Update after every material change. Last updated
+2026-11-02; next session can start here.
 
 ## What it is
 
@@ -9,6 +10,13 @@ owes in `ledger.json`, and surfaces it as a morning to-do digest plus two-minute
 A Slack bot (`@minireid`) accepts commands.
 
 Everything runs locally on the Mac. Nothing is stored in the cloud.
+
+## Resume here
+
+2026-11-02: 09:15 digest includes today's meetings; the watcher sends 10-minute meeting
+DMs (reply `yes` or `no <reason>`), polls DMs the bot is not in for `remind`, and ignores
+`bd-triager-agent`. Tasks carry `open` / `in progress` / `blocked`. 166 tests pass.
+Remaining work is the "Next, agreed" list below.
 
 ## Running now
 
@@ -26,10 +34,16 @@ to stay open.
 Slack app subscriptions saved 2026-11-01: `app_mention`, `message.im`,
 `message.channels`, `message.groups`. Socket Mode; no public URL.
 
-The watcher also polls Ridha's recently active DMs with the user token every two minutes,
-because Slack delivers no events from a DM the bot is not in. Only owner messages that
-address the bot are read, and only `remind` is executed; the confirmation goes to the bot
-DM. State: `dm_poll_state.json`.
+The watcher polls Ridha's DMs with the user token, because Slack delivers no events from
+a DM the bot is not in. It searches for owner messages addressed to the bot, executes
+only `remind`, and DMs the confirmation to Ridha's bot DM. State: `dm_poll_state.json`.
+Expect up to one 2-minute cycle of latency; the message must contain literal
+`@mini-reid` or a real `<@U…>` mention.
+
+Calendar access is a Google scope on the same token as Gmail: `calendar.readonly`,
+granted 2026-11-02. Re-run `mini_reid.google_auth` if it is revoked. Meetings come from
+every visible calendar but only include events Ridha is invited to, on calendars he does
+not own. Tags from `bd-triager-agent` are ignored in extraction and in the bot.
 
 ## Commands
 
@@ -63,8 +77,8 @@ list                              numbered open items; use #1 in later commands
 help                              the command list
 ```
 
-`#N` from `list` works with `done`, `due`, `snooze`, `drop`, `waiting`, `not` and
-`edit`, so a rename never depends on fuzzy wording.
+`#N` from `list` works with `status`, `done`, `due`, `snooze`, `drop`, `waiting`, `not`
+and `edit`, so a rename never depends on fuzzy wording.
 
 Plain sentences from Ridha become notes; questions go to the knowledge base; due or
 status questions go to the list.
@@ -89,7 +103,10 @@ client name, relative due, sender and channel, source time, link. Email senders 
 their address; a rewritten Slack title quotes the original message.
 
 The watcher schedules a DM 10 minutes before each meeting with the join link and "Are
-you attending?". Slack keeps the schedule; `meeting_reminders.json` dedupes by event id.
+you attending?". Reply `yes` or `no <reason>`; it is recorded in
+`meeting_reminders.json` and confirmed in the DM. Slack keeps the schedule, so the Mac
+can sleep. A single-instance lock (`.watcher.lock`) stops overlapping runs from
+scheduling duplicates.
 
 The daily overdue nudge (first watcher cycle after 09:00) uses the same row renderer as
 the digest, so it carries the same sender, time and link. Undated rows are not overdue;
@@ -137,10 +154,17 @@ It appends recall and missed items to `scorecard.md`.
 - Edited-message ✅ depends on the app keeping `message.channels`/`message.groups`. A
   reinstall can rotate the bot token; update `.env` and restart the bot if it stops.
 - Extraction is rules-first. A real ask the gate misses is captured with `add:`.
+- DMs the bot is not in only run `remind`, and only after a 2-minute poll. `add:`,
+  `status:` and the rest need the bot DM or a channel.
+- The DM poll uses Slack search, which is eventually consistent; a command can take one
+  extra cycle to appear.
+- Meetings only work for the Google account whose token is in `GMAIL_TOKEN`; Slack or
+  Outlook calendars are not read.
 
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
+166 tests passing as of 2026-11-02.
 
 ## Next, agreed
 

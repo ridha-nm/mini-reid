@@ -45,7 +45,7 @@ def _get_json(url: str, headers: dict, retries: int = 4) -> dict:
             with urllib.request.urlopen(req, timeout=60, context=SSL_CTX) as r:
                 return json.load(r)
         except urllib.error.HTTPError as ex:
-            if ex.code == 429:
+            if ex.code == 429 or ex.code >= 500:
                 time.sleep(int(ex.headers.get("Retry-After") or 0) or 2 ** attempt)
                 continue
             raise

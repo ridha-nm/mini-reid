@@ -64,6 +64,7 @@ guessed.
 | Gmail drafts | ignored; Ridha's own unsent writing is not an ask |
 | Jira | issues assigned to Ridha, excluding Done |
 | Google Calendar | timed events today, all visible calendars; declined and cancelled dropped |
+| Excluded | tags from `bd-triager-agent`; that bot tags people on every routed issue |
 | Manual | `@minireid add:` or `note:` |
 
 Not covered: untagged asks in channels, thread replies without a mention, WhatsApp,
@@ -100,7 +101,8 @@ a channel mention. Channel mentions are always kept unless they are pure chatter
 
 - Kept: requests, first-person commitments, Gmail with a direct address or a dated
   request, Jira assignments.
-- Rejected: bots, calendar responses, Jira notification mail, sent mail, chatter,
+- Rejected: bots, `bd-triager-agent` tags, calendar responses, Jira notification mail,
+  sent mail, chatter,
   questions with no ask ("do you have access?"), status updates ("Update: …"), other
   people's own plans ("I try to get … today"), Google boilerplate, URLs, newsletters.
 
@@ -115,13 +117,15 @@ overdue by client), then today's meetings with time, title and join link:
 **Meetings · Overdue · Today and tomorrow · This week · Waiting on others · No date ·
 Notes · Possibly done · Review**
 
-Each row: task, client name, relative due (`2d overdue`, `today`, `in 3d`), sender and
-channel, source time, link. Email senders keep their full address. A Slack row quotes
-the original message when the task title was rewritten.
+Each row: task, client name, relative due (`2d overdue`, `today`, `in 3d`), status when
+it is in progress or blocked, sender and channel, source time, link. Email senders keep
+their full address. A Slack row quotes the original message when the task title was
+rewritten.
 
 The watcher schedules a Slack DM 10 minutes before each meeting starts: time, title,
-join link, and "Are you attending?". Slack keeps the schedule, so a sleeping Mac does
-not lose it. Each meeting is reminded once, tracked in `meeting_reminders.json`.
+join link, and "Are you attending?". Reply `yes` or `no <reason>`; the answer is
+recorded in `meeting_reminders.json` and confirmed in the DM. Slack keeps the schedule,
+so a sleeping Mac does not lose it. Each meeting is reminded once.
 
 A separate overdue nudge runs once a day, on the first watcher cycle after 09:00, and
 uses the same row renderer as the digest, link included. Only a real past due date or a
