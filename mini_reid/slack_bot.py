@@ -19,6 +19,7 @@ COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
             "find", "list", "not", "remind", "edit", "status"}
 MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
             "remind", "edit", "status"}
+IGNORE_CHANNEL_IDS = {"C0B59LA0X5M"}  # bd-triager-agent
 STATUS_ALIASES = {
     "open": "open", "todo": "open", "pending": "open",
     "in progress": "in progress", "in-progress": "in progress",
@@ -635,7 +636,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             pass
 
     def process(channel: str, user: str, text: str, ts: str, late: bool = False) -> None:
-        if (channel, ts) in seen:
+        if (channel, ts) in seen or channel in IGNORE_CHANNEL_IDS:
             return
         seen.add((channel, ts))
 

@@ -30,6 +30,14 @@ def test_undated_ask_still_becomes_a_commitment():
     assert rows[0]["evidence"] == "can you look at the dashboard"
 
 
+def test_triager_channel_tags_are_ignored():
+    base = {"source": "slack", "native_id": "t1", "kind": "mention", "author": "triager",
+            "text": "can you review this issue", "link": "l",
+            "ts": "2026-10-30T08:00:00+08:00"}
+    assert extract(dict(base, channel="bd-triager-agent"), None, NOW) == []
+    assert extract(dict(base, channel="other", channel_id="C0B59LA0X5M"), None, NOW) == []
+
+
 def test_bot_message_is_not_a_commitment():
     item = {"source": "slack", "native_id": "2", "kind": "mention", "author": "demo app",
             "text": "<@U1> build finished", "link": "l",

@@ -10,6 +10,8 @@ BOT_AUTHOR = re.compile(
     r"(demo app|\[bot\]|^jira$|automation for jira|pantas-green-release|^mini-?reid$)",
     re.I)
 JIRA_NOTIFY = re.compile(r"atlassian\.net|\(jira\)|jira automation", re.I)
+# The triager bot tags people on every routed issue; those are not asks.
+IGNORE_CHANNELS = {"bd-triager-agent", "C0B59LA0X5M"}
 REQUEST_MODAL = re.compile(r"\b(?:can|could|would|will)\s+(?:you|u)\b", re.I)
 REQUEST_POLITE = re.compile(
     r"\b(?:please|pls|plz|kindly|action required)\b", re.I)
@@ -130,6 +132,9 @@ def extract(item: dict, client: dict | None, now: datetime) -> list[dict]:
     """One raw item may yield several commitments; rules yield at most one."""
     author = item.get("author") or ""
     if BOT_AUTHOR.search(author):
+        return []
+    if item.get("source") == "slack" and (item.get("channel") in IGNORE_CHANNELS
+                                          or item.get("channel_id") in IGNORE_CHANNELS):
         return []
     # Calendar responses are not work items. One invite can generate several.
     if item.get("source") == "gmail" and re.match(
