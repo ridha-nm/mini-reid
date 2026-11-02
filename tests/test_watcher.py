@@ -96,15 +96,12 @@ def test_poll_dm_commands_reads_a_dm_the_bot_is_not_in(tmp_path, monkeypatch):
 
     monkeypatch.setattr(sources, "slack_me", lambda token: "UBOT")
     monkeypatch.setattr(slack_bot, "load_users", lambda token: {"kasib": "UKASIB"})
+    monkeypatch.setattr("mini_reid.notify.dm_channel", lambda token, uid: "DBOT")
 
     def fake_json(url, headers, retries=4):
-        if "conversations.list" in url:
-            return {"channels": [
-                {"id": "D1", "user": "UKASIB", "updated": int(NOW.timestamp() * 1000)},
-                {"id": "DBOT", "user": "UBOT",
-                 "updated": int(NOW.timestamp() * 1000)}]}
-        return {"messages": [{"ts": "100.0", "user": "URIDHA",
-                              "text": "@mini-reid remind @Kasib on K3 at 2pm"}]}
+        return {"messages": {"matches": [{
+            "ts": "100.0", "user": "URIDHA", "channel": {"id": "D1"},
+            "text": "@mini-reid remind @Kasib on K3 at 2pm"}]}}
 
     monkeypatch.setattr(sources, "_get_json", fake_json)
     scheduled, sent = [], []

@@ -108,7 +108,7 @@ def poll_dm_commands(env: dict, now: datetime,
     """Slack never delivers events from a DM the bot is not in. Read Ridha's
     recent DMs with the user token and act on `remind` commands addressed to
     the bot. Confirmations go to the bot DM, never spoken as Ridha."""
-    from .notify import schedule_dm
+    from .notify import dm_channel, schedule_dm
     from .slack_bot import (load_users, parse_command, parse_remind, split_target,
                             unresolved_recipient)
     from .sources import _get_json, slack_me
@@ -119,72 +119,68 @@ def poll_dm_commands(env: dict, now: datetime,
     if not (user_token and bot_token and owner):
         return 0
     bot_id = slack_me(bot_token)
+    bot_dm = dm_channel(bot_token, owner)
     users = load_users(bot_token)
     state = json.loads(Path(state_path).read_text()) if Path(state_path).exists() else {}
-    last: dict[str, str] = state.get("channels") or {}
     try:
-        since = datetime.fromisoformat(state.get("polled_at", ""))
-    except ValueError:
-        since = now - timedelta(minutes=5)
-    ims = _get_json(
-        "https://slack.com/api/conversations.list?"
-        + urllib.parse.urlencode({"types": "im", "limit": 200}),
-        {"Authorization": f"Bearer {user_token}"})
-    handled = 0
-    for ch in ims.get("channels") or []:
-        cid = ch.get("id")
-        if not cid or ch.get("user") == bot_id or ch.get("is_archived"):
-            continue  # the bot's own DM already arrives as an event
-        # Only DMs touched since the last poll. 73 histories every two minutes
-        # would burn the user token's rate limit for no gain.
-        if (ch.get("updated") or 0) < since.timestamp() * 1000:
-            continue
-        oldest = last.get(cid) or f"{since.timestamp():.6f}"
+        last = float(state.get("last_ts") or 0)
+    except (TypeError, ValueError):
+        last = 0.0
+
+    # Search finds messages in DMs the bot is not in, in two calls. Reading
+    # 73 DM histories every cycle would burn the user token's rate limit.
+    # `after:` is exclusive and midnight is fuzzy; a one-day backstop plus
+    # last_ts dedupe misses nothing around midnight.
+    since = (now - timedelta(days=1)).date().isoformat()
+    matches: list[dict] = []
+    for query in (f"<@{bot_id}> from:me after:{since}",
+                  f"@mini-reid from:me after:{since}"):
         d = _get_json(
-            "https://slack.com/api/conversations.history?"
-            + urllib.parse.urlencode(
-                {"channel": cid, "oldest": oldest, "limit": 50}),
+            "https://slack.com/api/search.messages?"
+            + urllib.parse.urlencode({"query": query, "count": 100}),
             {"Authorization": f"Bearer {user_token}"})
-        for msg in sorted(d.get("messages") or [], key=lambda m: float(m.get("ts") or 0)):
-            ts = msg.get("ts") or ""
-            if float(ts or 0) <= float(last.get(cid) or 0):
+        matches.extend((d.get("messages") or {}).get("matches") or [])
+
+    handled = 0
+    for msg in sorted(matches, key=lambda m: float(m.get("ts") or 0)):
+        cid = (msg.get("channel") or {}).get("id") or ""
+        ts = float(msg.get("ts") or 0)
+        if ts <= last or not cid.startswith("D") or cid == bot_dm:
+            continue
+        last = ts
+        text = msg.get("text") or ""
+        if msg.get("user") != owner or not re.search(
+                rf"<@{bot_id}>|@mini-?reid\b", text, re.I):
+            continue
+        action, body = parse_command(text)
+        if action != "remind":
+            continue
+        target, rest = split_target(body, users, owner)
+        if target is None:
+            missing = unresolved_recipient(body, users)
+            if missing:
+                send_dm(env, f"I can't find {missing} in this Slack workspace. "
+                             "Reminders can only DM Pantas members.")
                 continue
-            last[cid] = ts
-            if msg.get("bot_id") or msg.get("subtype") or msg.get("user") != owner:
-                continue
-            text = msg.get("text") or ""
-            if not re.search(rf"<@{bot_id}>|@mini-?reid\b", text, re.I):
-                continue
-            action, body = parse_command(text)
-            if action != "remind":
-                continue
-            target, rest = split_target(body, users, owner)
-            if target is None:
-                missing = unresolved_recipient(body, users)
-                if missing:
-                    send_dm(env, f"I can't find {missing} in this Slack workspace. "
-                                 "Reminders can only DM Pantas members.")
-                    continue
-            fields, _ = parse_remind(rest, now)
-            if fields is None:
-                continue
-            recipient = target or owner
-            who = "you" if recipient == owner else f"<@{recipient}>"
-            try:
-                if fields.get("immediate"):
-                    send_dm(env, recipient, f"*Reminder*\n{fields['what'][:300]}")
-                    note = f"Reminder sent to {who}: {fields['what'][:80]}"
-                else:
-                    at = datetime.fromisoformat(fields["remind_at"])
-                    schedule_dm(env, recipient, f"*Reminder*\n{fields['what'][:300]}",
-                                int(at.timestamp()))
-                    note = f"Reminder set for {who} — {at:%a %d %b %H:%M}: {fields['what'][:80]}"
-                send_dm(env, note)
-                handled += 1
-            except Exception as ex:  # noqa: BLE001 - report in the DM, keep polling
-                print(f"  dm command failed: {type(ex).__name__}: {ex}", flush=True)
-    Path(state_path).write_text(json.dumps(
-        {"channels": last, "polled_at": now.isoformat()}))
+        fields, _ = parse_remind(rest, now)
+        if fields is None:
+            continue
+        recipient = target or owner
+        who = "you" if recipient == owner else f"<@{recipient}>"
+        try:
+            if fields.get("immediate"):
+                send_dm(env, recipient, f"*Reminder*\n{fields['what'][:300]}")
+                note = f"Reminder sent to {who}: {fields['what'][:80]}"
+            else:
+                at = datetime.fromisoformat(fields["remind_at"])
+                schedule_dm(env, recipient, f"*Reminder*\n{fields['what'][:300]}",
+                            int(at.timestamp()))
+                note = f"Reminder set for {who} — {at:%a %d %b %H:%M}: {fields['what'][:80]}"
+            send_dm(env, note)
+            handled += 1
+        except Exception as ex:  # noqa: BLE001 - report in the DM, keep polling
+            print(f"  dm command failed: {type(ex).__name__}: {ex}", flush=True)
+    Path(state_path).write_text(json.dumps({"last_ts": f"{last:.6f}"}))
     return handled
 
 
