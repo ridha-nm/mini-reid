@@ -55,6 +55,13 @@ def test_brief_appears_above_the_sections():
     assert out.index("*Brief*") < out.index("*Today and tomorrow")
 
 
+def test_row_shows_in_progress_or_blocked_status():
+    row = dict(ROW, status="in progress")
+    assert "in progress" in render([row], NOW, [], slack=True)
+    row["status"] = "blocked"
+    assert "blocked" in render([row], NOW, [], slack=True)
+
+
 def test_markdown_render_still_uses_markdown():
     out = render([ROW], NOW, [], slack=False)
     assert out.startswith("# Mini-Reid")

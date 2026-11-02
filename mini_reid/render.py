@@ -92,6 +92,8 @@ def _line(row: dict, slack: bool = False, now: datetime | None = None) -> str:
         if client:
             parts.append(client)
         parts.append(due)
+        if row.get("status") in {"in progress", "blocked"}:
+            parts.append(row["status"])
         if who:
             parts.append(who)
         if when:
@@ -104,6 +106,8 @@ def _line(row: dict, slack: bool = False, now: datetime | None = None) -> str:
     if client:
         parts.append(client)
     parts.append(due)
+    if row.get("status") in {"in progress", "blocked"}:
+        parts.append(row["status"])
     if who:
         parts.append(who)
     if when:

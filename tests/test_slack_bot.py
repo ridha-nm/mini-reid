@@ -66,6 +66,26 @@ def test_add_writes_to_ledger(tmp_path):
     assert "Added" in reply
 
 
+def test_status_sets_in_progress_blocked_and_open(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Eupe dashboard item by Friday", NOW, clients, ledger)
+    reply = apply_command("status", "dashboard item in progress", NOW, clients, ledger)
+    assert load(ledger)[0]["status"] == "in progress"
+    assert "in progress" in reply
+    apply_command("status", "dashboard item blocked", NOW, clients, ledger)
+    assert load(ledger)[0]["status"] == "blocked"
+    apply_command("status", "dashboard item open", NOW, clients, ledger)
+    row = load(ledger)[0]
+    assert row["status"] == "open"
+    assert "stalled_since" not in row
+
+
+def test_status_command_is_parsed():
+    assert parse_command("<@U123> status: Eupe item blocked") == (
+        "status", "Eupe item blocked")
+
+
 def test_done_closes_matching_item(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")

@@ -2,6 +2,12 @@
 
 Append-only. Newest first.
 
+## 2026-11-02 (task status)
+
+- `status: <item> in progress | blocked | open` updates a task. The digest and `list`
+  show the status on the row. `open` clears any stalled flags.
+- 165 tests passing.
+
 ## 2026-11-02 (today's meetings)
 
 - Digest gains a Meetings section: time, title and join link for today's timed events,

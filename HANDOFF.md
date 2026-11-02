@@ -49,6 +49,7 @@ add: send the deck by Friday      create a task
 task: ... / todo: ...             same as add
 note that ...                     remember it, no deadline
 done: send the deck               close it
+status: deck in progress          open, in progress, blocked
 due: deck by Monday               change the date
 edit: deck to Send deck by Monday rename and re-date
 snooze: deck 3d                   push it out

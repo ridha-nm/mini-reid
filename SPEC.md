@@ -79,7 +79,7 @@ calls.
 | `what` | task text: email subject for mail, message text for Slack |
 | `asker`, `via` | who sent it, and where it reached him (DM, #channel, direct, alias, Jira board) |
 | `client` | slug from the rule matcher only |
-| `due`, `status` | date; open, stalled, blocked, done, dropped |
+| `due`, `status` | date; open, in progress, blocked, stalled, done, dropped |
 | `kind` | mention, dm, inbox, draft, issue, note, reminder |
 | `closure` | open, proposed |
 | `remind_at` | when a reminder fires |
@@ -129,8 +129,9 @@ stalled status counts as overdue; undated rows stay in No date.
 
 ## Bot commands
 
-`add:`, `task:`, `todo:`, `note that`, `done:`, `due:`, `edit: <item> to <new name> [by
-<when>]`, `snooze:`, `waiting:`, `drop:` (also `remove:` / `delete:`), `not:`, `remind` (absolute or `in 2 minutes`),
+`add:`, `task:`, `todo:`, `note that`, `status: <item> in progress | blocked | open`,
+`done:`, `due:`, `edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,
+`drop:` (also `remove:` / `delete:`), `not:`, `remind` (absolute or `in 2 minutes`),
 `ask:`, `find:`, `list`, `help`.
 
 - Only Ridha mutates the ledger.

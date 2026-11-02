@@ -16,9 +16,15 @@ MENTION = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
 LEADING_MENTION = re.compile(
     r"^\s*(?:(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@mini-?reid)\s*)+", re.I)
 COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
-            "find", "list", "not", "remind", "edit"}
+            "find", "list", "not", "remind", "edit", "status"}
 MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
-            "remind", "edit"}
+            "remind", "edit", "status"}
+STATUS_ALIASES = {
+    "open": "open", "todo": "open", "pending": "open",
+    "in progress": "in progress", "in-progress": "in progress",
+    "inprogress": "in progress", "doing": "in progress", "active": "in progress",
+    "blocked": "blocked", "block": "blocked", "stuck": "blocked",
+}
 
 TIME_RE = re.compile(
     r"\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b"
@@ -134,6 +140,7 @@ HELP = """*Mini-Reid commands*
 • `edit: #1 to Confirm Eupe waste mapping by Monday` — rename and re-date
 • `snooze: Eupe waste 3d` — push it out (d days, w weeks)
 • `waiting: Eupe waste on Daniel` — waiting on someone else
+• `status: Eupe waste in progress` — or `blocked`, `open`
 • `drop: Eupe waste` — remove it quietly (`remove:` and `delete:` work too)
 • `not: anything that is not part c` — wrong item, teach it to ignore this kind
 • `remind me to send the deck tomorrow at 3pm` — a timed DM; no time means now
@@ -284,7 +291,7 @@ def parse_command(text: str) -> tuple[str, str]:
         return "help", ""
     m = re.match(
         r"^(add|task|todo|to-do|note|done|drop|remove|delete|due|snooze|waiting|"
-        r"find|not|remind|ask|edit)\s*:\s*(.+)$", body, re.I)
+        r"find|not|remind|ask|edit|status)\s*:\s*(.+)$", body, re.I)
     if m:
         act = m.group(1).lower()
         if act in {"task", "todo", "to-do"}:
@@ -414,6 +421,25 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
         save(ledger_path, merge(rows, [row]))
         return "Noted."
 
+    if action == "status":
+        m = re.match(
+            r"^(.*?)\s+(?:to\s+)?(in[ -]?progress|inprogress|doing|active|"
+            r"blocked|block|stuck|open|todo|pending)\s*$", body, re.I)
+        if not m:
+            return "Use: status: <item> in progress | blocked | open"
+        row, err = _pick(rows, m.group(1))
+        if err:
+            return err
+        status = STATUS_ALIASES[m.group(2).lower().replace("  ", " ")]
+        row["status"] = status
+        row["status_updated_at"] = now.isoformat()
+        row["last_activity"] = now.isoformat()
+        if status == "open":
+            row.pop("stalled_since", None)
+            row.pop("stalled_reason", None)
+        save(ledger_path, rows)
+        return f"Status: {row['what'][:80]} — {status}"
+
     if action == "done":
         best, err = _pick(rows, body)
         if err:
@@ -468,6 +494,8 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
             return "Nothing open."
         return "Open:\n" + "\n".join(
             f"{i}. {r['what'][:90]}" + (f" — {r['due']}" if r.get("due") else "")
+            + (f" — {r['status']}" if r.get("status") in {"in progress", "blocked"}
+               else "")
             + _ref(r)
             for i, r in enumerate(open_rows[:25], 1))
 
