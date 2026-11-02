@@ -182,6 +182,29 @@ def split_target(body: str, users: dict[str, str],
     return None, text
 
 
+def unresolved_recipient(body: str, users: dict[str, str]) -> str | None:
+    """Name the caller meant as recipient but that is not in this workspace."""
+    text = (body or "").strip()
+    m = re.match(r"^@([A-Za-z0-9._'-]+)", text)
+    if m:
+        return None if users.get(m.group(1).lower()) else m.group(1)
+    m = re.match(r"^([A-Za-z0-9._'-]+)\s+to\s+", text, re.I)
+    if m:
+        name = m.group(1)
+        if name.lower() == "me":
+            return None
+        return None if users.get(name.lower()) else name
+    # A capitalised full name before "to", e.g. "Daniel Hwang to send …".
+    m = re.match(r"^(.+?)\s+to\s+", text, re.I)
+    if m:
+        name = m.group(1).strip()
+        words = name.split()
+        if (1 <= len(words) <= 3 and all(w[:1].isupper() for w in words)
+                and name.lower() not in users):
+            return name
+    return None
+
+
 def should_schedule_reminder(action: str, requester: str, owner: str,
                              target: str | None) -> bool:
     """All reminders are Slack-scheduled. `add:` only leaves the owner's ledger
@@ -631,6 +654,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
 
         target, rest = (split_target(body, users, user)
                         if action in {"add", "remind"} else (None, body))
+        if action == "remind" and target is None:
+            missing = unresolved_recipient(body, users)
+            if missing:
+                web.chat_postMessage(
+                    channel=channel,
+                    text=f"I can't find {missing} in this Slack workspace. "
+                         "Reminders can only DM Pantas members.")
+                _mark(ts)
+                return
         if should_schedule_reminder(action, user, owner, target):
             fields, _ = parse_remind(rest, datetime.now(MYT))
             if fields is None:

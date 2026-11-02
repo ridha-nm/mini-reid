@@ -66,11 +66,12 @@ A command run in a channel is answered in the channel and mirrored to Ridha's DM
 raises a Slack notification. Editing a message that still mentions the bot gets a ✅;
 edits are never replayed, so a command cannot be applied twice.
 
-Anyone who tags or DMs the bot can set a reminder for themselves or any teammate:
-`remind me to … at 2pm`, `remind @Arman to … at 2pm`, `remind Daniel Hwang to …`,
-`add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed
-reminders, including Ridha's own, are scheduled server-side with Slack, so they fire on
-time even when the Mac sleeps. Other people's reminders never touch Ridha's ledger or
+Anyone who tags or DMs the bot can set a reminder for themselves or any teammate in the
+Pantas workspace: `remind me to … at 2pm`, `remind @Arman to … at 2pm`,
+`remind Arman Rahman to …`, `add: … at 2pm`. The time is optional; without one the DM is
+sent immediately. Timed reminders, including Ridha's own, are scheduled server-side with
+Slack, so they fire on time even when the Mac sleeps. An unknown name gets a reply, not a
+silent reminder to the sender. Other people's reminders never touch Ridha's ledger or
 digest. Slack keeps the queue; there is no local copy yet, so there is no cancel or list.
 
 ## Digest layout

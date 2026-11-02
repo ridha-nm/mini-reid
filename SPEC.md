@@ -129,10 +129,11 @@ stalled status counts as overdue; undated rows stay in No date.
 `ask:`, `find:`, `list`, `help`.
 
 - Only Ridha mutates the ledger.
-- Anyone who tags or DMs the bot can set a reminder for themselves or any teammate:
-  `remind me …`, `remind @Arman …`, `remind Daniel Hwang …`, `add: … at 2pm`. The time
-  is optional; without one the DM is sent immediately. Timed reminders are scheduled in
-  Slack (server-side), stay private, and never enter Ridha's ledger or digest.
+- Anyone who tags or DMs the bot can set a reminder for themselves or any teammate in
+  the Pantas workspace: `remind me …`, `remind @Arman …`, `remind Arman Rahman …`,
+  `add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed
+  reminders are scheduled in Slack (server-side), stay private, and never enter Ridha's
+  ledger or digest. An unknown name gets a reply, never a silent reminder to the sender.
 - `list` numbers open items; `#N` works with `done`, `due`, `snooze`, `drop`, `waiting`,
   `not` and `edit`.
 - Any other message from someone else gets a ✅ and, if they write something, a note

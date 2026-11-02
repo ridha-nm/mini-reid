@@ -271,16 +271,25 @@ def test_channel_messages_need_a_mention_but_dms_do_not():
     assert not is_bot_addressed({"channel": "C1", "text": "add: take leave"}, "UBOT")
 
 
-USERS = {"arman": "UARMAN", "ridha": "URIDHA", "daniel hwang": "UDANIEL"}
+USERS = {"arman": "UARMAN", "arman rahman": "UARMAN", "ridha": "URIDHA"}
 
 
 def test_split_target_accepts_a_full_name_with_a_space():
     from mini_reid.slack_bot import split_target
 
-    assert split_target("daniel hwang to submit timesheet at 2pm", USERS, "URIDHA") == (
-        "UDANIEL", "submit timesheet at 2pm")
-    assert split_target("Daniel Hwang: submit timesheet", USERS, "URIDHA") == (
-        "UDANIEL", "submit timesheet")
+    assert split_target("arman rahman to submit timesheet at 2pm", USERS, "URIDHA") == (
+        "UARMAN", "submit timesheet at 2pm")
+    assert split_target("Arman Rahman: submit timesheet", USERS, "URIDHA") == (
+        "UARMAN", "submit timesheet")
+
+
+def test_unresolved_recipient_is_named_not_silently_sent_to_sender():
+    from mini_reid.slack_bot import unresolved_recipient
+
+    assert unresolved_recipient("Daniel Hwang to send the file", USERS) == "Daniel Hwang"
+    assert unresolved_recipient("@XieYi to check the deck", USERS) == "XieYi"
+    assert unresolved_recipient("me to send the deck", USERS) is None
+    assert unresolved_recipient("send the deck to Daniel at 2pm", USERS) is None
 
 
 def test_split_target_accepts_mention_me_for_and_bare_name():

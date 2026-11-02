@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-02 (reminders only reach Pantas members)
+
+- A named recipient who is not in the workspace now gets a reply, instead of the
+  reminder silently going to the sender. Slack DMs cannot reach people outside Pantas.
+- Docs use workspace members in the examples; Daniel Hwang is an IOI contact.
+- 153 tests passing.
+
 ## 2026-11-02 (reminders for anyone, immediate by default)
 
 - A reminder recipient is no longer swallowed by mention stripping. `remind <@U…>`,
