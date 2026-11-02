@@ -13,7 +13,8 @@ from .ledger import commitment_id, load, merge, save
 MENTION = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
 # Strip only the mentions that address the bot at the start. A recipient
 # mention ("remind <@U123> to ...") must survive for split_target.
-LEADING_MENTION = re.compile(r"^\s*(?:<@[A-Z0-9]+(?:\|[^>]*)?>\s*)+")
+LEADING_MENTION = re.compile(
+    r"^\s*(?:(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@mini-?reid)\s*)+", re.I)
 COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
             "find", "list", "not", "remind", "edit"}
 MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
@@ -710,6 +711,19 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             post_reply(channel, reply, notify=user == owner)
             _mark(ts)
             return
+
+        if user == owner and channel.startswith("D"):
+            try:
+                from .watcher import record_meeting_reply
+
+                meeting_reply = record_meeting_reply(body, datetime.now(MYT))
+            except Exception as ex:  # noqa: BLE001 - a bad state file must not block the bot
+                print(f"  meeting reply failed: {type(ex).__name__}: {ex}", flush=True)
+                meeting_reply = None
+            if meeting_reply:
+                post_reply(channel, meeting_reply)
+                _mark(ts)
+                return
 
         if user != owner:
             if not late:

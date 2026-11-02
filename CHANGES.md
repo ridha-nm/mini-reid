@@ -2,6 +2,22 @@
 
 Append-only. Newest first.
 
+## 2026-11-02 (today's meetings)
+
+- Digest gains a Meetings section: time, title and join link for today's timed events,
+  across every visible Google Calendar. Declined, cancelled, all-day and focus-time
+  items are dropped.
+- Watcher schedules a Slack DM 10 minutes before each meeting with the join link and
+  "Are you attending?". Deduped in `meeting_reminders.json`; Slack keeps the schedule.
+- `mini_reid/google_auth` adds `calendar.readonly` to the existing Google token and
+  keeps every Gmail scope.
+- Meeting reminders say `yes` or `no <reason>`; the reply is recorded in
+  `meeting_reminders.json` and confirmed in the DM.
+- The watcher polls Ridha's recently active DMs with the user token, because Slack sends
+  no events from a DM the bot is not in. Only owner `remind` messages are executed, and
+  the confirmation goes to the bot DM.
+- 162 tests passing.
+
 ## 2026-11-02 (reminders only reach Pantas members)
 
 - A named recipient who is not in the workspace now gets a reply, instead of the

@@ -138,6 +138,15 @@ def main(argv: list[str] | None = None) -> int:
         ledger = propose_closures(ledger, sent)
     save(args.ledger, ledger)
 
+    meetings: list[dict] = []
+    if not args.offline:
+        try:
+            from .calendar import meetings_for_day
+
+            meetings = meetings_for_day(load_env(".env"), now)
+        except Exception as ex:  # noqa: BLE001 - calendar must not block the ledger
+            errors.append(f"Calendar: {type(ex).__name__}: {ex}")
+
     brief_text = None
     if not args.no_brief:
         try:
@@ -147,8 +156,9 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as ex:  # noqa: BLE001 - a missing summary must not block the digest
             errors.append(f"Brief: {type(ex).__name__}")
 
-    out = render(ledger, now, sorted(review), brief=brief_text)
-    slack_out = render(ledger, now, sorted(review), slack=True, brief=brief_text)
+    out = render(ledger, now, sorted(review), brief=brief_text, meetings=meetings)
+    slack_out = render(ledger, now, sorted(review), slack=True, brief=brief_text,
+                       meetings=meetings)
     if errors:
         out += "\n## Source errors\n\n" + "\n".join(f"- {e}" for e in errors) + "\n"
         slack_out += "\n\n*Source errors*\n" + "\n".join(f"• {e}" for e in errors)

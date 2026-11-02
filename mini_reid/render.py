@@ -112,8 +112,22 @@ def _line(row: dict, slack: bool = False, now: datetime | None = None) -> str:
     return f"{line}\n  {quote}" if quote else line
 
 
+def _meeting_line(meeting: dict, slack: bool) -> str:
+    from .calendar import span
+
+    title = meeting.get("title") or "Untitled meeting"
+    link = meeting.get("link") or ""
+    when = span(meeting)
+    if slack:
+        tail = f" — <{link}|join>" if link else ""
+        return f"• *{when} · {title}*{tail}"
+    tail = f" — [join]({link})" if link else ""
+    return f"- **{when} · {title}**{tail}"
+
+
 def render(rows: list[dict], now: datetime, review: list[str] | None = None,
-           slack: bool = False, brief: str | None = None) -> str:
+           slack: bool = False, brief: str | None = None,
+           meetings: list[dict] | None = None) -> str:
     today = now.date()
     week_end = today + timedelta(days=7)
     yesterday = now - timedelta(days=1)
@@ -172,6 +186,8 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
     counts = (f"{total} open · {len(buckets['overdue'])} overdue · "
               f"{len(buckets['today'])} due today · {len(buckets['week'])} this week · "
               f"{len(buckets['undated'])} no date · {len(buckets['waiting'])} waiting")
+    if meetings:
+        counts += f" · {len(meetings)} meetings"
     if slack:
         out = [f"*Mini-Reid — {title}*", counts]
         if brief:
@@ -180,6 +196,14 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
         out = [f"# Mini-Reid — {title}", "", counts, ""]
         if brief:
             out.extend([f"## Brief", "", brief, ""])
+
+    if meetings:
+        if slack:
+            out.extend(["", f"*Meetings ({len(meetings)})*"])
+            out.extend(_meeting_line(m, slack=True) for m in meetings)
+        else:
+            out.extend(["", f"## Meetings ({len(meetings)})", ""])
+            out.extend(_meeting_line(m, slack=False) for m in meetings)
 
     for key, label in LABELS:
         items = buckets[key]

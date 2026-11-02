@@ -89,6 +89,38 @@ def test_overdue_nudge_uses_same_row_as_digest(tmp_path, monkeypatch):
     assert "Undated thing" not in text
 
 
+def test_poll_dm_commands_reads_a_dm_the_bot_is_not_in(tmp_path, monkeypatch):
+    from mini_reid import slack_bot
+    from mini_reid import sources
+    from mini_reid import watcher as w
+
+    monkeypatch.setattr(sources, "slack_me", lambda token: "UBOT")
+    monkeypatch.setattr(slack_bot, "load_users", lambda token: {"kasib": "UKASIB"})
+
+    def fake_json(url, headers, retries=4):
+        if "conversations.list" in url:
+            return {"channels": [
+                {"id": "D1", "user": "UKASIB", "updated": int(NOW.timestamp() * 1000)},
+                {"id": "DBOT", "user": "UBOT",
+                 "updated": int(NOW.timestamp() * 1000)}]}
+        return {"messages": [{"ts": "100.0", "user": "URIDHA",
+                              "text": "@mini-reid remind @Kasib on K3 at 2pm"}]}
+
+    monkeypatch.setattr(sources, "_get_json", fake_json)
+    scheduled, sent = [], []
+    monkeypatch.setattr("mini_reid.notify.schedule_dm",
+                        lambda env, uid, text, at: scheduled.append((uid, text, at)))
+    monkeypatch.setattr(w, "send_dm", lambda env, text: sent.append(text))
+    env = {"SLACK_USER_TOKEN": "u", "SLACK_BOT_TOKEN": "b", "SLACK_OWNER_ID": "URIDHA"}
+    state = str(tmp_path / "dm_poll.json")
+
+    assert w.poll_dm_commands(env, NOW, state) == 1
+    assert scheduled[0][0] == "UKASIB"
+    assert "on K3" in scheduled[0][1]
+    assert "Reminder set for <@UKASIB>" in sent[0]
+    assert w.poll_dm_commands(env, NOW, state) == 0
+
+
 def test_fire_reminders_sends_once(tmp_path, monkeypatch):
     from mini_reid import watcher as w
     from mini_reid.ledger import save

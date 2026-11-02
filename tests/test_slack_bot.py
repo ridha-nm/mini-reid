@@ -20,6 +20,8 @@ def test_mention_with_label_is_stripped():
 def test_recipient_mention_survives_command_parsing():
     assert parse_command("<@UBOT> remind <@UARMAN> to submit the timesheet at 2pm") == (
         "remind", "<@UARMAN> to submit the timesheet at 2pm")
+    assert parse_command("@minireid remind @arman on K3 at 2pm") == (
+        "remind", "@arman on K3 at 2pm")
 
 
 def test_natural_add_phrasings():

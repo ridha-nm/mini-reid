@@ -9,12 +9,15 @@ Gmail and Jira.
 
 ## What it does
 
-- **Morning digest** (09:15, Slack DM): counts, a short brief, then Overdue, Today,
-  This week, Waiting on others, No date, Notes.
+- **Morning digest** (09:15, Slack DM): counts, a short brief, today's meetings with
+  join links, then Overdue, Today, This week, Waiting on others, No date, Notes.
 - **Watcher** (every 2 min): new Slack mentions, DMs to you, inbox mail including
   already-read mail, and Jira issues assigned to you. New items get a DM and, where the
   bot is in the channel, a ✅ on the source message. The first cycle after 09:00 also
-  DMs any overdue rows once a day.
+  DMs any overdue rows once a day. Each meeting gets a DM 10 minutes before it starts,
+  with the join link and "Are you attending?". Answer `yes` or `no <reason>` in the DM.
+  The watcher also polls Ridha's DMs for `remind` commands in conversations the bot is
+  not part of.
 - **Bot** (`@minireid`): add, note, done, due, edit, snooze, waiting, drop, not, remind,
   find, list, ask, help. Only you can change the ledger. Anyone can set a private reminder for
   themselves or a teammate — those never enter your ledger.

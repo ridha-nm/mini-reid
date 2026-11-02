@@ -9,6 +9,21 @@ ROW = {"id": "a", "what": "send the FSD", "due": "2026-10-30", "status": "open",
        "source_link": "https://x/1", "client": "gamuda", "direction": "owed_by_me"}
 
 
+def test_meetings_render_as_rows_with_join_links():
+    meetings = [{"id": "m1", "title": "Eupe catch-up",
+                 "start": "2026-10-30T09:30:00+08:00",
+                 "end": "2026-10-30T10:00:00+08:00",
+                 "link": "https://meet.google.com/abc"}]
+    slack = render([ROW], NOW, [], slack=True, meetings=meetings)
+    assert "*Meetings (1)*" in slack
+    assert "09:30–10:00 · Eupe catch-up" in slack
+    assert "<https://meet.google.com/abc|join>" in slack
+    assert slack.index("*Meetings") < slack.index("*Today and tomorrow")
+    md = render([ROW], NOW, [], meetings=meetings)
+    assert "## Meetings (1)" in md
+    assert "[join](https://meet.google.com/abc)" in md
+
+
 def test_slack_render_uses_slack_markup():
     out = render([ROW], NOW, ["unknown.example"], slack=True)
     assert out.startswith("*Mini-Reid")

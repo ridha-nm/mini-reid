@@ -63,6 +63,7 @@ guessed.
 | Gmail sent | activity and closure proposals |
 | Gmail drafts | ignored; Ridha's own unsent writing is not an ask |
 | Jira | issues assigned to Ridha, excluding Done |
+| Google Calendar | timed events today, all visible calendars; declined and cancelled dropped |
 | Manual | `@minireid add:` or `note:` |
 
 Not covered: untagged asks in channels, thread replies without a mention, WhatsApp,
@@ -109,14 +110,18 @@ real asks and kept jokes.
 ## Digest
 
 09:15 to Slack DM. Counts header, deterministic brief (counts, three most urgent,
-overdue by client), then:
+overdue by client), then today's meetings with time, title and join link:
 
-**Overdue · Today and tomorrow · This week · Waiting on others · No date · Notes ·
-Possibly done · Review**
+**Meetings · Overdue · Today and tomorrow · This week · Waiting on others · No date ·
+Notes · Possibly done · Review**
 
 Each row: task, client name, relative due (`2d overdue`, `today`, `in 3d`), sender and
 channel, source time, link. Email senders keep their full address. A Slack row quotes
 the original message when the task title was rewritten.
+
+The watcher schedules a Slack DM 10 minutes before each meeting starts: time, title,
+join link, and "Are you attending?". Slack keeps the schedule, so a sleeping Mac does
+not lose it. Each meeting is reminded once, tracked in `meeting_reminders.json`.
 
 A separate overdue nudge runs once a day, on the first watcher cycle after 09:00, and
 uses the same row renderer as the digest, link included. Only a real past due date or a
@@ -149,6 +154,11 @@ Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
 `message.groups`. Channel messages that do not mention the bot are ignored. An edit that
 still mentions the bot gets a ✅; commands are never replayed. A reply in a channel is
 mirrored to Ridha's DM so it raises a notification.
+
+Slack sends no events from a DM the bot is not in, so the watcher polls Ridha's recently
+active DMs with the user token every two minutes. Only owner-authored messages that
+address the bot are read, and only `remind` runs. The confirmation goes to the bot DM,
+because posting in the source DM would speak as Ridha.
 
 ## Knowledge base
 

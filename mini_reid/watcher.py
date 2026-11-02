@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import re
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -97,6 +99,166 @@ def fire_reminders(env: dict, ledger_path: str, now: datetime) -> int:
     return fired
 
 
+MEETINGS_STATE = "meeting_reminders.json"
+DM_POLL_STATE = "dm_poll_state.json"
+
+
+def poll_dm_commands(env: dict, now: datetime,
+                     state_path: str = DM_POLL_STATE) -> int:
+    """Slack never delivers events from a DM the bot is not in. Read Ridha's
+    recent DMs with the user token and act on `remind` commands addressed to
+    the bot. Confirmations go to the bot DM, never spoken as Ridha."""
+    from .notify import schedule_dm
+    from .slack_bot import (load_users, parse_command, parse_remind, split_target,
+                            unresolved_recipient)
+    from .sources import _get_json, slack_me
+
+    user_token = env.get("SLACK_USER_TOKEN")
+    bot_token = env.get("SLACK_BOT_TOKEN")
+    owner = env.get("SLACK_OWNER_ID")
+    if not (user_token and bot_token and owner):
+        return 0
+    bot_id = slack_me(bot_token)
+    users = load_users(bot_token)
+    state = json.loads(Path(state_path).read_text()) if Path(state_path).exists() else {}
+    last: dict[str, str] = state.get("channels") or {}
+    try:
+        since = datetime.fromisoformat(state.get("polled_at", ""))
+    except ValueError:
+        since = now - timedelta(minutes=5)
+    ims = _get_json(
+        "https://slack.com/api/conversations.list?"
+        + urllib.parse.urlencode({"types": "im", "limit": 200}),
+        {"Authorization": f"Bearer {user_token}"})
+    handled = 0
+    for ch in ims.get("channels") or []:
+        cid = ch.get("id")
+        if not cid or ch.get("user") == bot_id or ch.get("is_archived"):
+            continue  # the bot's own DM already arrives as an event
+        # Only DMs touched since the last poll. 73 histories every two minutes
+        # would burn the user token's rate limit for no gain.
+        if (ch.get("updated") or 0) < since.timestamp() * 1000:
+            continue
+        oldest = last.get(cid) or f"{since.timestamp():.6f}"
+        d = _get_json(
+            "https://slack.com/api/conversations.history?"
+            + urllib.parse.urlencode(
+                {"channel": cid, "oldest": oldest, "limit": 50}),
+            {"Authorization": f"Bearer {user_token}"})
+        for msg in sorted(d.get("messages") or [], key=lambda m: float(m.get("ts") or 0)):
+            ts = msg.get("ts") or ""
+            if float(ts or 0) <= float(last.get(cid) or 0):
+                continue
+            last[cid] = ts
+            if msg.get("bot_id") or msg.get("subtype") or msg.get("user") != owner:
+                continue
+            text = msg.get("text") or ""
+            if not re.search(rf"<@{bot_id}>|@mini-?reid\b", text, re.I):
+                continue
+            action, body = parse_command(text)
+            if action != "remind":
+                continue
+            target, rest = split_target(body, users, owner)
+            if target is None:
+                missing = unresolved_recipient(body, users)
+                if missing:
+                    send_dm(env, f"I can't find {missing} in this Slack workspace. "
+                                 "Reminders can only DM Pantas members.")
+                    continue
+            fields, _ = parse_remind(rest, now)
+            if fields is None:
+                continue
+            recipient = target or owner
+            who = "you" if recipient == owner else f"<@{recipient}>"
+            try:
+                if fields.get("immediate"):
+                    send_dm(env, recipient, f"*Reminder*\n{fields['what'][:300]}")
+                    note = f"Reminder sent to {who}: {fields['what'][:80]}"
+                else:
+                    at = datetime.fromisoformat(fields["remind_at"])
+                    schedule_dm(env, recipient, f"*Reminder*\n{fields['what'][:300]}",
+                                int(at.timestamp()))
+                    note = f"Reminder set for {who} — {at:%a %d %b %H:%M}: {fields['what'][:80]}"
+                send_dm(env, note)
+                handled += 1
+            except Exception as ex:  # noqa: BLE001 - report in the DM, keep polling
+                print(f"  dm command failed: {type(ex).__name__}: {ex}", flush=True)
+    Path(state_path).write_text(json.dumps(
+        {"channels": last, "polled_at": now.isoformat()}))
+    return handled
+
+
+def _load_meetings(state_path: str, today: str) -> dict:
+    state = json.loads(Path(state_path).read_text()) if Path(state_path).exists() else {}
+    if state.get("date") != today or "meetings" not in state:
+        return {"date": today, "meetings": {}}
+    return state
+
+
+def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE) -> int:
+    """Schedule each of today's meetings 10 minutes before it starts, once.
+    Slack keeps the schedule, so a sleeping Mac still gets the DM."""
+    from .calendar import meetings_for_day, span
+    from .notify import schedule_dm
+
+    today = now.date().isoformat()
+    state = _load_meetings(state_path, today)
+    sent = 0
+    for meeting in meetings_for_day(env, now):
+        mid = meeting.get("id")
+        rec = state["meetings"].get(mid) if mid else None
+        if not mid or rec:
+            continue
+        start = datetime.fromisoformat(meeting["start"])
+        if start <= now:
+            continue
+        text = (f"*Meeting in 10 minutes*\n{span(meeting)} · {meeting['title']}"
+                + (f"\n<{meeting['link']}|join>" if meeting.get("link") else "")
+                + "\n\nAre you attending? Reply `yes` or `no <reason>`.")
+        remind_at = start - timedelta(minutes=10)
+        if remind_at <= now:
+            send_dm(env, text)
+            status = "sent"
+        else:
+            schedule_dm(env, env["SLACK_OWNER_ID"], text, int(remind_at.timestamp()))
+            status = "scheduled"
+        state["meetings"][mid] = {"title": meeting["title"], "start": meeting["start"],
+                                  "status": status}
+        sent += 1
+    Path(state_path).write_text(json.dumps(state))
+    return sent
+
+
+def record_meeting_reply(text: str, now: datetime,
+                         state_path: str = MEETINGS_STATE) -> str | None:
+    """`yes` or `no <reason>` in a DM answers the nearest meeting reminder."""
+    today = now.date().isoformat()
+    state = _load_meetings(state_path, today)
+    raw = (text or "").strip()
+    yes = re.match(r"^(yes|y|attending|will attend)\b", raw, re.I)
+    no = re.match(r"^(no|n|not attending|can't|cannot|skip|decline)\b(.*)$", raw, re.I)
+    if not (yes or no):
+        return None
+    candidates = []
+    for mid, rec in state["meetings"].items():
+        if rec.get("status") not in {"scheduled", "sent"}:
+            continue
+        start = datetime.fromisoformat(rec["start"])
+        if now - timedelta(minutes=30) <= start <= now + timedelta(minutes=30):
+            candidates.append((start, mid, rec))
+    if not candidates:
+        return None
+    _, mid, rec = min(candidates, key=lambda c: abs(c[0] - now))
+    reason = (no.group(2) if no else "").strip(" ,:-")
+    rec["status"] = "attending" if yes else "declined"
+    if reason:
+        rec["reason"] = reason[:200]
+    Path(state_path).write_text(json.dumps(state))
+    if yes:
+        return f"Attending: {rec['title']}"
+    return f"Not attending: {rec['title']}" + (f" — {reason}" if reason else "")
+
+
 def overdue_today(rows: list[dict], now: datetime) -> list[dict]:
     today = now.date().isoformat()
     out = []
@@ -140,6 +302,18 @@ def main() -> int:
     fired = fire_reminders(env, ledger_path, now)
     if fired:
         print(f"[{now:%H:%M:%S}] fired {fired} reminder(s)", flush=True)
+    try:
+        reminded = remind_meetings(env, now)
+        if reminded:
+            print(f"[{now:%H:%M:%S}] scheduled {reminded} meeting reminder(s)", flush=True)
+    except Exception as ex:  # noqa: BLE001 - calendar must not stop the watcher
+        print(f"[{now:%H:%M:%S}] meeting reminders: {type(ex).__name__}: {ex}", flush=True)
+    try:
+        polled = poll_dm_commands(env, now)
+        if polled:
+            print(f"[{now:%H:%M:%S}] handled {polled} DM command(s)", flush=True)
+    except Exception as ex:  # noqa: BLE001 - DM polling must not stop the watcher
+        print(f"[{now:%H:%M:%S}] dm poll: {type(ex).__name__}: {ex}", flush=True)
     nudged = nudge_overdue(env, ledger_path, now)
     if nudged:
         print(f"[{now:%H:%M:%S}] overdue nudge: {nudged}", flush=True)

@@ -21,3 +21,6 @@ kb.json
 kb.log
 bot_state.json
 watcher_state.json
+meeting_reminders.json
+dm_poll_state.json
+auth.log

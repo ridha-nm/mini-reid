@@ -26,11 +26,17 @@ to stay open.
 Slack app subscriptions saved 2026-11-01: `app_mention`, `message.im`,
 `message.channels`, `message.groups`. Socket Mode; no public URL.
 
+The watcher also polls Ridha's recently active DMs with the user token every two minutes,
+because Slack delivers no events from a DM the bot is not in. Only owner messages that
+address the bot are read, and only `remind` is executed; the confirmation goes to the bot
+DM. State: `dm_poll_state.json`.
+
 ## Commands
 
 ```bash
 .venv/bin/python -m mini_reid.cli --days 1 [--deliver] [--model llama3.2:3b]
 .venv/bin/python -m mini_reid.watcher
+.venv/bin/python -m mini_reid.google_auth   # one-time Calendar consent
 .venv/bin/python -m mini_reid.kb --build | --ask "question"
 .venv/bin/python -m mini_reid.scorecard
 .venv/bin/python -m pytest tests/ -q
@@ -76,10 +82,13 @@ digest. Slack keeps the queue; there is no local copy yet, so there is no cancel
 
 ## Digest layout
 
-Counts header, brief, then Overdue, Today and tomorrow, This week, Waiting on others,
-No date, Notes, Review. Each row: task, client name, relative due, sender and channel,
-source time, link. Email senders keep their address; a rewritten Slack title quotes the
-original message.
+Counts header, brief, today's meetings (time, title, join link), then Overdue, Today and
+tomorrow, This week, Waiting on others, No date, Notes, Review. Each task row: task,
+client name, relative due, sender and channel, source time, link. Email senders keep
+their address; a rewritten Slack title quotes the original message.
+
+The watcher schedules a DM 10 minutes before each meeting with the join link and "Are
+you attending?". Slack keeps the schedule; `meeting_reminders.json` dedupes by event id.
 
 The daily overdue nudge (first watcher cycle after 09:00) uses the same row renderer as
 the digest, so it carries the same sender, time and link. Undated rows are not overdue;
