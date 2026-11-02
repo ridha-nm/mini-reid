@@ -57,6 +57,38 @@ def test_overdue_today_excludes_notes_and_done():
     assert [r["id"] for r in out] == ["a"]
 
 
+def test_overdue_today_ignores_undated_rows():
+    from mini_reid.watcher import overdue_today
+
+    rows = [
+        {"id": "a", "what": "no date", "due": None, "status": "open"},
+        {"id": "b", "what": "empty date", "due": "", "status": "open"},
+    ]
+    assert overdue_today(rows, NOW) == []
+
+
+def test_overdue_nudge_uses_same_row_as_digest(tmp_path, monkeypatch):
+    from mini_reid import watcher as w
+    from mini_reid.ledger import save
+
+    monkeypatch.chdir(tmp_path)
+    sent = []
+    monkeypatch.setattr(w, "send_dm", lambda env, text: sent.append(text))
+    save("ledger.json", [
+        {"id": "a", "what": "Send FSD", "client": "eupe", "due": "2026-10-28",
+         "status": "open", "asker": "Daniel", "via": "email",
+         "source_link": "https://x/1", "created_at": "2026-10-27T08:00:00+08:00"},
+        {"id": "b", "what": "Undated thing", "due": None, "status": "open",
+         "asker": "BO board", "via": "Jira", "source_link": "https://x/2"},
+    ])
+    assert w.nudge_overdue({}, "ledger.json", NOW) == 1
+    text = sent[0]
+    assert "Send FSD" in text
+    assert "from Daniel (email)" in text
+    assert "https://x/1" in text
+    assert "Undated thing" not in text
+
+
 def test_fire_reminders_sends_once(tmp_path, monkeypatch):
     from mini_reid import watcher as w
     from mini_reid.ledger import save

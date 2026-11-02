@@ -108,7 +108,7 @@ real asks and kept jokes.
 
 ## Digest
 
-08:30 to Slack DM. Counts header, deterministic brief (counts, three most urgent,
+09:15 to Slack DM. Counts header, deterministic brief (counts, three most urgent,
 overdue by client), then:
 
 **Overdue · Today and tomorrow · This week · Waiting on others · No date · Notes ·

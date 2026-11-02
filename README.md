@@ -9,7 +9,7 @@ Gmail and Jira.
 
 ## What it does
 
-- **Morning digest** (08:30, Slack DM): counts, a short brief, then Overdue, Today,
+- **Morning digest** (09:15, Slack DM): counts, a short brief, then Overdue, Today,
   This week, Waiting on others, No date, Notes.
 - **Watcher** (every 2 min): new Slack mentions, DMs to you, inbox mail including
   already-read mail, and Jira issues assigned to you. New items get a DM and, where the
@@ -49,7 +49,7 @@ ignored unless it addresses the bot.
 |---|---|---|
 | `com.minireid.bot` | always, KeepAlive | `bot.out.log`, `bot.err.log` |
 | `com.minireid.watcher` | every 120 s | `watcher.log` |
-| `com.minireid.daily` | 08:30 daily | `run.log` |
+| `com.minireid.daily` | 09:15 daily | `run.log` |
 | `com.minireid.model` | 06:00 daily | `model.log` |
 | `com.minireid.kb` | 02:00 daily | `kb.log` |
 

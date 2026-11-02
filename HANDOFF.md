@@ -16,7 +16,7 @@ Everything runs locally on the Mac. Nothing is stored in the cloud.
 |---|---|---|
 | `com.minireid.bot` | always (KeepAlive) | `bot.out.log`, `bot.err.log` |
 | `com.minireid.watcher` | every 120 s | `watcher.log` |
-| `com.minireid.daily` | 08:30 daily | `run.log` |
+| `com.minireid.daily` | 09:15 daily | `run.log` |
 | `com.minireid.model` | 06:00 daily | `model.log` |
 | `com.minireid.kb` | 02:00 daily | `kb.log` |
 

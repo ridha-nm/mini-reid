@@ -99,17 +99,23 @@ def fire_reminders(env: dict, ledger_path: str, now: datetime) -> int:
 
 def overdue_today(rows: list[dict], now: datetime) -> list[dict]:
     today = now.date().isoformat()
-    return [r for r in rows
-            if r.get("direction", "owed_by_me") == "owed_by_me"
-            and r.get("status") not in {"done", "dropped"}
-            and r.get("kind") not in {"note", "reminder"}
-            and ((r.get("due") or "") < today or r.get("status") == "stalled")]
+    out = []
+    for r in rows:
+        due = r.get("due") or ""
+        if (r.get("direction", "owed_by_me") != "owed_by_me"
+                or r.get("status") in {"done", "dropped"}
+                or r.get("kind") in {"note", "reminder"}
+                or r.get("closure") == "proposed"):
+            continue
+        # An empty due date is not "before today": undated work stays in No date.
+        if (due and due < today) or r.get("status") == "stalled":
+            out.append(r)
+    return out
 
 
 def nudge_overdue(env: dict, ledger_path: str, now: datetime) -> int:
     """Once a day after 09:00, restate what is overdue. Silence is how things rot."""
-    import json
-    from pathlib import Path
+    from .render import _line
 
     state = Path("watcher_state.json")
     today = now.date().isoformat()
@@ -118,10 +124,8 @@ def nudge_overdue(env: dict, ledger_path: str, now: datetime) -> int:
         return 0
     rows = overdue_today(load(ledger_path), now)
     if rows:
-        lines = "\n".join(
-            f"• *{r.get('what','')[:110]}* — {r.get('client') or 'unassigned'} — "
-            f"{r.get('due') or 'no date'}"
-            for r in rows[:10])
+        # Same row renderer as the digest: client name, due, sender, time, link.
+        lines = "\n".join(_line(r, slack=True, now=now) for r in rows[:10])
         send_dm(env, f"*Still overdue ({len(rows)})*\n{lines}")
     state.write_text(json.dumps({"overdue_date": today}))
     return len(rows)

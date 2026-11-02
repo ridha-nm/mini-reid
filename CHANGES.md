@@ -2,6 +2,15 @@
 
 Append-only. Newest first.
 
+## 2026-11-02 (overdue nudge follows the digest)
+
+- The daily overdue DM now uses the digest row renderer: client name, relative
+  due, sender with address, source time and an `open` link on every row.
+- Fixed undated rows being counted as overdue: an empty due date no longer
+  compares as before today. Those rows stay in No date.
+- Digest moved to 09:15, after Ridha reaches work.
+- 149 tests passing.
+
 ## 2026-11-01 (ready for the week)
 
 - Slack app subscriptions saved: `app_mention`, `message.im`, `message.channels`,
