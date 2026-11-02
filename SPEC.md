@@ -125,12 +125,13 @@ stalled status counts as overdue; undated rows stay in No date.
 ## Bot commands
 
 `add:`, `task:`, `todo:`, `note that`, `done:`, `due:`, `edit: <item> to <new name> [by
-<when>]`, `snooze:`, `waiting:`, `drop:`, `not:`, `remind` (absolute or `in 2 minutes`),
+<when>]`, `snooze:`, `waiting:`, `drop:` (also `remove:` / `delete:`), `not:`, `remind` (absolute or `in 2 minutes`),
 `ask:`, `find:`, `list`, `help`.
 
 - Only Ridha mutates the ledger.
-- Anyone who tags or DMs the bot can set a reminder for themselves or a teammate:
-  `remind me …`, `remind @Arman …`, `add: … at 2pm`. All reminders are scheduled in
+- Anyone who tags or DMs the bot can set a reminder for themselves or any teammate:
+  `remind me …`, `remind @Arman …`, `remind Daniel Hwang …`, `add: … at 2pm`. The time
+  is optional; without one the DM is sent immediately. Timed reminders are scheduled in
   Slack (server-side), stay private, and never enter Ridha's ledger or digest.
 - `list` numbers open items; `#N` works with `done`, `due`, `snooze`, `drop`, `waiting`,
   `not` and `edit`.

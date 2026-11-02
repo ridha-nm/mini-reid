@@ -17,6 +17,11 @@ def test_mention_with_label_is_stripped():
         "add", "send the deck")
 
 
+def test_recipient_mention_survives_command_parsing():
+    assert parse_command("<@UBOT> remind <@UARMAN> to submit the timesheet at 2pm") == (
+        "remind", "<@UARMAN> to submit the timesheet at 2pm")
+
+
 def test_natural_add_phrasings():
     assert parse_command("<@U1> add this to my todo: send the deck") == ("add", "send the deck")
     assert parse_command("<@U1> task: send the deck") == ("add", "send the deck")
@@ -32,6 +37,12 @@ def test_note_that_phrasing():
 def test_parses_note_and_done():
     assert parse_command("<@U123> note: Daniel wants the mapping redone")[0] == "note"
     assert parse_command("<@U123> done: Eupe item")[0] == "done"
+
+
+def test_remove_is_an_alias_for_drop():
+    assert parse_command("<@U123> remove: a note I no longer want") == (
+        "drop", "a note I no longer want")
+    assert parse_command("<@U123> delete: a note I no longer want")[0] == "drop"
 
 
 def test_parses_acknowledgement():
@@ -138,11 +149,15 @@ def test_remind_in_the_past_moves_to_tomorrow():
     assert fields["remind_at"].startswith("2026-10-31T08:00")
 
 
-def test_remind_without_a_date_needs_one():
+def test_remind_without_a_time_sends_now():
     from mini_reid.slack_bot import parse_remind
 
-    fields, _ = parse_remind("send the deck", NOW)
-    assert fields is None
+    fields, clean = parse_remind("send the deck", NOW)
+    assert fields is not None
+    assert fields["immediate"] is True
+    assert fields["remind_at"].startswith("2026-10-30T09:00")
+    assert fields["what"] == "send the deck"
+    assert clean == "send the deck"
 
 
 def test_owner_can_speak_plainly_but_questions_stay_questions():
@@ -256,13 +271,26 @@ def test_channel_messages_need_a_mention_but_dms_do_not():
     assert not is_bot_addressed({"channel": "C1", "text": "add: take leave"}, "UBOT")
 
 
-USERS = {"arman": "UARMAN", "ridha": "URIDHA"}
+USERS = {"arman": "UARMAN", "ridha": "URIDHA", "daniel hwang": "UDANIEL"}
+
+
+def test_split_target_accepts_a_full_name_with_a_space():
+    from mini_reid.slack_bot import split_target
+
+    assert split_target("daniel hwang to submit timesheet at 2pm", USERS, "URIDHA") == (
+        "UDANIEL", "submit timesheet at 2pm")
+    assert split_target("Daniel Hwang: submit timesheet", USERS, "URIDHA") == (
+        "UDANIEL", "submit timesheet")
 
 
 def test_split_target_accepts_mention_me_for_and_bare_name():
     from mini_reid.slack_bot import split_target
 
     assert split_target("<@UARMAN> to submit timesheet at 2pm", USERS, "URIDHA") == (
+        "UARMAN", "submit timesheet at 2pm")
+    assert split_target("@arman to submit timesheet at 2pm", USERS, "URIDHA") == (
+        "UARMAN", "submit timesheet at 2pm")
+    assert split_target("@Arman: submit timesheet at 2pm", USERS, "URIDHA") == (
         "UARMAN", "submit timesheet at 2pm")
     assert split_target("me to submit timesheet at 2pm", USERS, "UARMAN") == (
         "UARMAN", "submit timesheet at 2pm")

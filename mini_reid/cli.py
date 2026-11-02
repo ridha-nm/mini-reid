@@ -21,7 +21,8 @@ MYT = timezone(timedelta(hours=8))
 LEDGER = "ledger.json"
 DIGEST = "digest.md"
 IGNORE_DOMAINS = {"pantas.com", "gmail.com", "google.com", "googlegroups.com",
-                  "atlassian.net", "atlassian.com", "id.atlassian.com", "slack.com"}
+                  "atlassian.net", "atlassian.com", "id.atlassian.com", "slack.com",
+                  "github.com"}
 
 
 def _domain(sender: str) -> str | None:

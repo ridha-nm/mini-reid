@@ -11,6 +11,9 @@ from .ledger import commitment_id, load, merge, save
 
 # Slack sends mentions as <@U123> or <@U123|mini-reid>. Both must strip cleanly.
 MENTION = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
+# Strip only the mentions that address the bot at the start. A recipient
+# mention ("remind <@U123> to ...") must survive for split_target.
+LEADING_MENTION = re.compile(r"^\s*(?:<@[A-Z0-9]+(?:\|[^>]*)?>\s*)+")
 COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
             "find", "list", "not", "remind", "edit"}
 MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
@@ -72,6 +75,13 @@ def parse_remind(body: str, now) -> tuple[dict | None, str]:
     clean = DATE_TOKEN.sub(" ", clean)
     clean = re.sub(r"\s+", " ", clean).strip(" ,.")
 
+    # No time and no date: remind now. A reminder that needs a schedule is
+    # friction; "remind me to X" should just send it.
+    if date_iso is None and hour is None:
+        return ({"remind_at": now.replace(microsecond=0).isoformat(timespec="seconds"),
+                 "due": now.date().isoformat(), "what": clean or body,
+                 "immediate": True}, clean or body)
+
     if date_iso is None:
         return None, body
 
@@ -123,9 +133,9 @@ HELP = """*Mini-Reid commands*
 • `edit: #1 to Confirm Eupe waste mapping by Monday` — rename and re-date
 • `snooze: Eupe waste 3d` — push it out (d days, w weeks)
 • `waiting: Eupe waste on Daniel` — waiting on someone else
-• `drop: Eupe waste` — remove it quietly
+• `drop: Eupe waste` — remove it quietly (`remove:` and `delete:` work too)
 • `not: anything that is not part c` — wrong item, teach it to ignore this kind
-• `remind me to send the deck tomorrow at 3pm` — a timed DM
+• `remind me to send the deck tomorrow at 3pm` — a timed DM; no time means now
 • `remind @Arman to send the deck at 3pm` — DM someone else (anyone can set these)
 • `ask: what did we agree with Eupe on waste` — answer from your own writing, with sources
 • `find: eupe` — search the ledger
@@ -150,12 +160,25 @@ def split_target(body: str, users: dict[str, str],
     m = re.match(r"^me\s*:?\s*(?:to\s+)?", text, re.I)
     if m:
         return sender, text[m.end():].strip()
+    # A typed "@XieYi" that Slack did not turn into a <@U…> mention.
+    m = re.match(r"^@([A-Za-z0-9._'-]+)\s*:?\s*(?:to\s+)?", text, re.I)
+    if m and users.get(m.group(1).lower()):
+        return users[m.group(1).lower()], text[m.end():].strip()
     m = re.match(r"^for\s+([A-Za-z0-9._'-]+)\s*:?\s*(?:to\s+)?", text, re.I)
     if m and users.get(m.group(1).lower()):
         return users[m.group(1).lower()], text[m.end():].strip()
     m = re.match(r"^([A-Za-z0-9._'-]+)\s+to\s+", text, re.I)
     if m and users.get(m.group(1).lower()):
         return users[m.group(1).lower()], text[m.end():].strip()
+    # Full names with spaces: longest known name that starts the text.
+    low = text.lower()
+    for name in sorted(users, key=len, reverse=True):
+        if low.startswith(name):
+            rest = text[len(name):]
+            # Require "to" or a colon, so "add: <name> asked for X" stays a task.
+            m = re.match(r"^\s*(?::\s*|to\s+)", rest, re.I)
+            if m:
+                return users[name], rest[m.end():].strip()
     return None, text
 
 
@@ -228,7 +251,7 @@ def edit_ack_target(event: dict, bot_user_id: str) -> tuple[str, str] | None:
 
 def parse_command(text: str) -> tuple[str, str]:
     """Return (action, body). action is one of COMMANDS, or ack|unknown|list."""
-    body = MENTION.sub("", text or "").strip()
+    body = LEADING_MENTION.sub("", text or "").strip()
     if not body:
         return "unknown", ""
     if body.lower() in {"list", "ls", "today", "open"}:
@@ -236,11 +259,15 @@ def parse_command(text: str) -> tuple[str, str]:
     if body.lower() in {"help", "?", "commands"}:
         return "help", ""
     m = re.match(
-        r"^(add|task|todo|to-do|note|done|drop|due|snooze|waiting|find|not|remind|ask|edit)"
-        r"\s*:\s*(.+)$", body, re.I)
+        r"^(add|task|todo|to-do|note|done|drop|remove|delete|due|snooze|waiting|"
+        r"find|not|remind|ask|edit)\s*:\s*(.+)$", body, re.I)
     if m:
         act = m.group(1).lower()
-        return ("add" if act in {"task", "todo", "to-do"} else act), m.group(2).strip()
+        if act in {"task", "todo", "to-do"}:
+            act = "add"
+        elif act in {"remove", "delete"}:
+            act = "drop"
+        return act, m.group(2).strip()
     m = re.match(r"^(?:please\s+)?remind(?:\s+me)?(?:\s+to)?\s+(.+)$", body, re.I)
     if m:
         return "remind", m.group(1).strip()
@@ -612,12 +639,28 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     text="Use: remind <name> to <what> at 2pm (or add: <what> at 2pm)")
                 _mark(ts)
                 return
+            recipient = target or user
+            who = "you" if recipient == user else f"<@{recipient}>"
+            if fields.get("immediate"):
+                try:
+                    from .notify import send_dm
+
+                    send_dm(env, recipient, f"*Reminder*\n{fields['what'][:300]}")
+                except Exception as ex:  # noqa: BLE001 - report, never retry blindly
+                    print(f"  immediate remind failed: {type(ex).__name__}: {ex}", flush=True)
+                    web.chat_postMessage(
+                        channel=channel, text=f"Could not send that: {type(ex).__name__}")
+                    _mark(ts)
+                    return
+                reply = f"Reminder sent to {who}: {fields['what'][:80]}"
+                post_reply(channel, reply, notify=user == owner)
+                _mark(ts)
+                return
             at = datetime.fromisoformat(fields["remind_at"])
             if at <= datetime.now(MYT):
                 web.chat_postMessage(channel=channel, text="That time is in the past.")
                 _mark(ts)
                 return
-            recipient = target or user
             try:
                 from .notify import schedule_dm
 
@@ -631,7 +674,6 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     text=f"Could not schedule that: {type(ex).__name__}")
                 _mark(ts)
                 return
-            who = "you" if recipient == user else f"<@{recipient}>"
             reply = f"Reminder set for {who} — {at:%a %d %b %H:%M}: {fields['what'][:80]}"
             post_reply(channel, reply, notify=user == owner)
             _mark(ts)

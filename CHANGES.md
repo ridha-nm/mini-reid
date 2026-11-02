@@ -2,6 +2,17 @@
 
 Append-only. Newest first.
 
+## 2026-11-02 (reminders for anyone, immediate by default)
+
+- A reminder recipient is no longer swallowed by mention stripping. `remind <@U…>`,
+  typed `@handle`, and full names with spaces all resolve to the right person.
+- Time is optional: `remind me to send the deck` sends the DM immediately; a time
+  still schedules it in Slack.
+- `remove:` and `delete:` are aliases for `drop:`, so removing a note no longer
+  creates another note.
+- `github.com` sender domains are ignored; `exim.com.my` maps to EXIM Bank under GHB.
+- 152 tests passing.
+
 ## 2026-11-02 (overdue nudge follows the digest)
 
 - The daily overdue DM now uses the digest row renderer: client name, relative

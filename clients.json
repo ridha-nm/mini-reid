@@ -85,6 +85,13 @@
     "aliases": ["Maybank"],
     "slack_channels": []
   },
+  "exim": {
+    "name": "EXIM Bank",
+    "group": "ghb",
+    "domains": ["exim.com.my"],
+    "aliases": ["EXIM", "EXIM Bank"],
+    "slack_channels": []
+  },
   "kossan": {
     "name": "Kossan",
     "group": "gvc",

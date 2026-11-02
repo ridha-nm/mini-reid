@@ -47,7 +47,7 @@ due: deck by Monday               change the date
 edit: deck to Send deck by Monday rename and re-date
 snooze: deck 3d                   push it out
 waiting: deck on Daniel           move to Waiting on others
-drop: deck                        remove quietly
+drop: deck                        remove quietly (also remove: / delete:)
 not: anything not part c          wrong item; teaches it to ignore that kind
 remind me to send the deck in 2 minutes
 ask: what did we agree with Eupe  answer from your own writing, with sources
@@ -66,11 +66,12 @@ A command run in a channel is answered in the channel and mirrored to Ridha's DM
 raises a Slack notification. Editing a message that still mentions the bot gets a ✅;
 edits are never replayed, so a command cannot be applied twice.
 
-Anyone who tags or DMs the bot can set a reminder for themselves or a teammate:
-`remind me to … at 2pm`, `remind @Arman to … at 2pm`, `add: … at 2pm`. Every reminder,
-including Ridha's own, is scheduled server-side with Slack, so it fires on time even when
-the Mac sleeps. Other people's reminders never touch Ridha's ledger or digest. Slack
-keeps the queue; there is no local copy yet, so there is no cancel or list.
+Anyone who tags or DMs the bot can set a reminder for themselves or any teammate:
+`remind me to … at 2pm`, `remind @Arman to … at 2pm`, `remind Daniel Hwang to …`,
+`add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed
+reminders, including Ridha's own, are scheduled server-side with Slack, so they fire on
+time even when the Mac sleeps. Other people's reminders never touch Ridha's ledger or
+digest. Slack keeps the queue; there is no local copy yet, so there is no cancel or list.
 
 ## Digest layout
 
