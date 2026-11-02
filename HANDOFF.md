@@ -79,6 +79,10 @@ No date, Notes, Review. Each row: task, client name, relative due, sender and ch
 source time, link. Email senders keep their address; a rewritten Slack title quotes the
 original message.
 
+The daily overdue nudge (first watcher cycle after 09:00) uses the same row renderer as
+the digest, so it carries the same sender, time and link. Undated rows are not overdue;
+only a real past due date or a stalled status is.
+
 ## Completion rules
 
 Nothing closes by itself.

@@ -118,6 +118,10 @@ Each row: task, client name, relative due (`2d overdue`, `today`, `in 3d`), send
 channel, source time, link. Email senders keep their full address. A Slack row quotes
 the original message when the task title was rewritten.
 
+A separate overdue nudge runs once a day, on the first watcher cycle after 09:00, and
+uses the same row renderer as the digest, link included. Only a real past due date or a
+stalled status counts as overdue; undated rows stay in No date.
+
 ## Bot commands
 
 `add:`, `task:`, `todo:`, `note that`, `done:`, `due:`, `edit: <item> to <new name> [by

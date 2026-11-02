@@ -13,7 +13,8 @@ Gmail and Jira.
   This week, Waiting on others, No date, Notes.
 - **Watcher** (every 2 min): new Slack mentions, DMs to you, inbox mail including
   already-read mail, and Jira issues assigned to you. New items get a DM and, where the
-  bot is in the channel, a ✅ on the source message.
+  bot is in the channel, a ✅ on the source message. The first cycle after 09:00 also
+  DMs any overdue rows once a day.
 - **Bot** (`@minireid`): add, note, done, due, edit, snooze, waiting, drop, not, remind,
   find, list, ask, help. Only you can change the ledger. Anyone can set a private reminder for
   themselves or a teammate — those never enter your ledger.
