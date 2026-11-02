@@ -294,6 +294,17 @@ def nudge_overdue(env: dict, ledger_path: str, now: datetime) -> int:
 
 
 def main() -> int:
+    import fcntl
+
+    # Two overlapping runs (launchd + a manual one) both read old state and
+    # schedule the same reminder twice. One watcher at a time.
+    lock = open(".watcher.lock", "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print("another watcher is running", flush=True)
+        return 0
+
     env = load_env(".env")
     clients = load_clients("clients.json")
     now = datetime.now(MYT)

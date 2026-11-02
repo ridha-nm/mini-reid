@@ -23,4 +23,5 @@ bot_state.json
 watcher_state.json
 meeting_reminders.json
 dm_poll_state.json
+.watcher.lock
 auth.log
