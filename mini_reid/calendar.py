@@ -39,8 +39,12 @@ def parse_events(payload: dict, calendar_name: str, day: str,
         attendees = event.get("attendees") or []
         # `attendees[].self` marks the calendar's owner, not the reader: on
         # Kasib's shared calendar it is Kasib. Match Ridha by address instead.
-        mine = any((a.get("email") or "").lower() == OWNER_EMAIL for a in attendees)
-        if attendees and not mine and not owned:
+        # A shared calendar is someone else's diary: an event with no invite to
+        # Ridha is not his meeting, even when it has no attendees at all.
+        organizer = ((event.get("organizer") or {}).get("email") or "").lower()
+        mine = organizer == OWNER_EMAIL or any(
+            (a.get("email") or "").lower() == OWNER_EMAIL for a in attendees)
+        if not owned and not mine:
             continue
         declined = any(((a.get("email") or "").lower() == OWNER_EMAIL
                          and a.get("responseStatus") == "declined")

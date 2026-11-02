@@ -63,7 +63,7 @@ guessed.
 | Gmail sent | activity and closure proposals |
 | Gmail drafts | ignored; Ridha's own unsent writing is not an ask |
 | Jira | issues assigned to Ridha, excluding Done |
-| Google Calendar | timed events today, all visible calendars; declined and cancelled dropped |
+| Google Calendar | timed events today; on shared calendars only events Ridha is invited to or organises; declined and cancelled dropped |
 | Excluded | tags from `bd-triager-agent`; that bot tags people on every routed issue |
 | Manual | `@minireid add:` or `note:` |
 

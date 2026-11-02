@@ -2,6 +2,15 @@
 
 Append-only. Newest first.
 
+## 2026-11-02 (only Ridha's meetings)
+
+- Events with no attendees on a shared calendar are other people's diary entries.
+  They are dropped unless Ridha is an attendee or the organiser. Removes the
+  `Chiropractor` and `Personal block` rows.
+- Deleted the pending `Personal block` reminder; the `Chiropractor` reminder had
+  already fired.
+- 166 tests passing.
+
 ## 2026-11-02 (triager channel ignored)
 
 - Tags from `bd-triager-agent` (`C0B59LA0X5M`) no longer become ledger rows, and the

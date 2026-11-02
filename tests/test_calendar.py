@@ -20,7 +20,7 @@ def event(**kw):
 
 
 def test_parse_keeps_timed_meeting_and_join_link():
-    out = cal.parse_events({"items": [event()]}, "Work", "2026-11-02")
+    out = cal.parse_events({"items": [event()]}, "Work", "2026-11-02", owned=True)
     assert len(out) == 1
     assert out[0]["title"] == "Eupe catch-up"
     assert out[0]["link"] == "https://meet.google.com/abc"
@@ -32,10 +32,12 @@ def test_shared_calendar_keeps_only_events_ridha_is_invited_to():
         {"email": "arman@pantas.com", "self": True, "responseStatus": "accepted"}])
     mine = event(id="mine", attendees=[
         {"email": "ridha@pantas.com", "self": True, "responseStatus": "accepted"}])
-    out = cal.parse_events({"items": [theirs, mine]}, "Arman", "2026-11-02")
+    no_attendees = event(id="empty", attendees=[])
+    out = cal.parse_events({"items": [theirs, mine, no_attendees]}, "Arman", "2026-11-02")
     assert [e["id"] for e in out] == ["mine"]
-    owned = cal.parse_events({"items": [theirs]}, "Ridha", "2026-11-02", owned=True)
-    assert [e["id"] for e in owned] == ["theirs"]
+    owned = cal.parse_events({"items": [theirs, no_attendees]}, "Ridha", "2026-11-02",
+                             owned=True)
+    assert [e["id"] for e in owned] == ["theirs", "empty"]
 
 
 def test_parse_drops_all_day_cancelled_declined_and_focus_time():
@@ -51,10 +53,11 @@ def test_parse_drops_all_day_cancelled_declined_and_focus_time():
 def test_parse_falls_back_to_conference_video_then_html_link():
     conference = event(id="e2", hangoutLink=None, conferenceData={
         "entryPoints": [{"entryPointType": "video", "uri": "https://zoom/x"}]})
-    assert cal.parse_events({"items": [conference]}, "Work", "2026-11-02")[0]["link"] == (
-        "https://zoom/x")
+    assert cal.parse_events({"items": [conference]}, "Work", "2026-11-02",
+                            owned=True)[0]["link"] == "https://zoom/x"
     without = event(id="e3", hangoutLink=None, htmlLink="")
-    assert cal.parse_events({"items": [without]}, "Work", "2026-11-02")[0]["link"] == ""
+    assert cal.parse_events({"items": [without]}, "Work", "2026-11-02",
+                            owned=True)[0]["link"] == ""
 
 
 def test_meeting_reply_records_yes_and_no_with_reason(tmp_path):
