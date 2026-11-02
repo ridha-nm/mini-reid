@@ -1,10 +1,12 @@
 """Slack command parsing and the Socket Mode listener."""
 from __future__ import annotations
 
+import json
 import re
 import threading
 import urllib.parse
 from datetime import timedelta
+from pathlib import Path
 
 from .capture import parse_capture
 from .ledger import commitment_id, load, merge, save
@@ -474,6 +476,21 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
 
     if action == "not":
         from . import learning
+        from .calendar import ignore_title
+
+        # `not:` also dismisses a meeting reminder. No ledger row exists for a
+        # meeting, so match the title recorded in today's reminder state.
+        state_path = Path("meeting_reminders.json")
+        if state_path.exists():
+            meetings = json.loads(state_path.read_text())
+            target = (body or "").strip().lower()
+            for rec in (meetings.get("meetings") or {}).values():
+                title = (rec.get("title") or "").strip()
+                if target and (target in title.lower() or title.lower() in target):
+                    ignore_title(title)
+                    rec["status"] = "ignored"
+                    state_path.write_text(json.dumps(meetings))
+                    return f"Ignored meeting: {title[:80]}"
 
         row, err = _pick(rows, body)
         if row:

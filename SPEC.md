@@ -135,7 +135,8 @@ stalled status counts as overdue; undated rows stay in No date.
 
 `add:`, `task:`, `todo:`, `note that`, `status: <item> in progress | blocked | open`,
 `done:`, `due:`, `edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,
-`drop:` (also `remove:` / `delete:`), `not:`, `remind` (absolute or `in 2 minutes`),
+`drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
+ignores that title), `remind` (absolute or `in 2 minutes`),
 `ask:`, `find:`, `list`, `help`.
 
 - Only Ridha mutates the ledger.

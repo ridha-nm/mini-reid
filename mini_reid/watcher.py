@@ -221,6 +221,22 @@ def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE) 
         state["meetings"][mid] = {"title": meeting["title"], "start": meeting["start"],
                                   "status": status}
         sent += 1
+
+    from .calendar import ignored_titles
+    from .notify import _post
+
+    ignored = ignored_titles()
+    if ignored:
+        d = _post("chat.scheduledMessages.list", env["SLACK_BOT_TOKEN"])
+        for msg in d.get("scheduled_messages") or []:
+            text = msg.get("text") or ""
+            if not text.startswith("*Meeting in 10 minutes*"):
+                continue
+            line = text.split("\n")[1] if "\n" in text else ""
+            title = line.split(" · ", 1)[-1].strip().lower()
+            if title in ignored:
+                _post("chat.deleteScheduledMessage", env["SLACK_BOT_TOKEN"],
+                      channel=msg["channel_id"], scheduled_message_id=msg["id"])
     Path(state_path).write_text(json.dumps(state))
     return sent
 

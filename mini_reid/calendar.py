@@ -1,14 +1,28 @@
 """Google Calendar read: today's meetings, with a join link."""
 from __future__ import annotations
 
+import json
 import urllib.parse
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from .sources import _get_json, gmail_access
 
 MYT = timezone(timedelta(hours=8))
 SKIP_TYPES = {"workingLocation", "outOfOffice", "focusTime"}
 OWNER_EMAIL = "ridha@pantas.com"
+IGNORES = "calendar_ignores.json"
+
+
+def ignored_titles() -> set[str]:
+    """Meeting titles Ridha said `not:` to. Kept across days."""
+    p = Path(IGNORES)
+    return {t.lower() for t in json.loads(p.read_text())} if p.exists() else set()
+
+
+def ignore_title(title: str) -> None:
+    titles = sorted(ignored_titles() | {title.strip().lower()})
+    Path(IGNORES).write_text(json.dumps(titles, indent=1) + "\n")
 
 
 def _join_link(event: dict) -> str:
@@ -88,6 +102,7 @@ def meetings_for_day(env: dict, now: datetime) -> list[dict]:
     end = start + timedelta(days=1)
     day = start.date().isoformat()
     seen: set[str] = set()
+    ignored = ignored_titles()
     out: list[dict] = []
     for cal in _calendar_list(access):
         cid = cal.get("id")
@@ -98,6 +113,8 @@ def meetings_for_day(env: dict, now: datetime) -> list[dict]:
         for event in parse_events(payload, cal.get("summary") or cid, day, owned):
             # A meeting often appears on several calendars.
             if event["id"] and event["id"] in seen:
+                continue
+            if event["title"].strip().lower() in ignored:
                 continue
             seen.add(event["id"])
             out.append(event)

@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-02 (not: dismisses meetings)
+
+- `not: <meeting title>` cancels that meeting's pending reminder and persists the title
+  in `calendar_ignores.json`, so it stays out of the digest and future reminders.
+- Deleted the already-sent Chiropractor reminder DM.
+- 168 tests passing.
+
 ## 2026-11-02 (only Ridha's meetings)
 
 - Events with no attendees on a shared calendar are other people's diary entries.

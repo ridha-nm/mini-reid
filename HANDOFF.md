@@ -69,7 +69,7 @@ edit: deck to Send deck by Monday rename and re-date
 snooze: deck 3d                   push it out
 waiting: deck on Daniel           move to Waiting on others
 drop: deck                        remove quietly (also remove: / delete:)
-not: anything not part c          wrong item; teaches it to ignore that kind
+not: anything not part c          wrong item; a meeting title cancels its reminder
 remind me to send the deck in 2 minutes
 ask: what did we agree with Eupe  answer from your own writing, with sources
 find: eupe                        search the ledger

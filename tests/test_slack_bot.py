@@ -81,6 +81,22 @@ def test_status_sets_in_progress_blocked_and_open(tmp_path):
     assert "stalled_since" not in row
 
 
+def test_not_dismisses_a_meeting_reminder(tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+
+    from mini_reid.calendar import ignored_titles
+
+    monkeypatch.chdir(tmp_path)
+    Path("meeting_reminders.json").write_text(json.dumps({
+        "date": "2026-10-30",
+        "meetings": {"m1": {"title": "Chiropractor", "start": "2026-10-30T12:00:00+08:00",
+                            "status": "scheduled"}}}))
+    reply = apply_command("not", "Chiropractor", NOW, {}, "ledger.json")
+    assert reply == "Ignored meeting: Chiropractor"
+    assert "chiropractor" in ignored_titles()
+
+
 def test_status_command_is_parsed():
     assert parse_command("<@U123> status: Eupe item blocked") == (
         "status", "Eupe item blocked")

@@ -74,6 +74,7 @@ Check them with `launchctl list | grep minireid`.
 | `corrections.json` | items you marked `not:` |
 | `meeting_reminders.json` | today's meeting reminders and attendance answers |
 | `dm_poll_state.json` | last DM command read by the watcher |
+| `calendar_ignores.json` | meeting titles dismissed with `not:` |
 | `expected.txt` | Friday's manual list for the scorecard |
 
 ## Credentials

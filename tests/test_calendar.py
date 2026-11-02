@@ -19,6 +19,14 @@ def event(**kw):
     return base
 
 
+def test_ignore_title_persists(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    cal.ignore_title("Chiropractor")
+    assert "chiropractor" in cal.ignored_titles()
+    cal.ignore_title("Personal block")
+    assert cal.ignored_titles() == {"chiropractor", "personal block"}
+
+
 def test_parse_keeps_timed_meeting_and_join_link():
     out = cal.parse_events({"items": [event()]}, "Work", "2026-11-02", owned=True)
     assert len(out) == 1

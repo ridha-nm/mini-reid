@@ -23,5 +23,6 @@ bot_state.json
 watcher_state.json
 meeting_reminders.json
 dm_poll_state.json
+calendar_ignores.json
 .watcher.lock
 auth.log
