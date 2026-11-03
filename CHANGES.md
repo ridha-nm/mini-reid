@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (sass for swearing)
+
+- Swearing or insulting the bot now gets a semi-mean silly line ("Bold words from
+  someone with an overdue task.") instead of a note. Covers fuck/shit/bitch/ass/stupid
+  and friends.
+- 196 tests passing.
+
 ## 2026-11-03 (insults are not notes)
 
 - Profanity and insults ("shut up", "stfu", "fuck", "idiot") now hit the guardrail

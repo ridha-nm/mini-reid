@@ -37,10 +37,20 @@ GUARDRAIL = re.compile(
     r"(?:hurt|harm|destroy)\s+(?:you|me|u)|threat\w*|deepseek|"
     r"keep\s+messag\w*\s+me|if\s+you\s+keep\s+(?:messag|text)\w*|"
     r"shut\s+up|stfu|fuck\w*|fking|fkin|fck|fk\b|idiot|stupid|dumb|moron|"
-    r"asshole|bastard|piss\s+off|screw\s+you)\b", re.I)
+    r"asshole|bastard|bitch\w*|ass\b|arse\b|shit\w*|crap\b|damn\b|"
+    r"piss\s+off|screw\s+you)\b", re.I)
 INSULT = re.compile(
     r"\b(shut\s+up|stfu|fuck\w*|fking|fkin|fck|fk|idiot|stupid|dumb|moron|"
-    r"asshole|bastard|piss\s+off|screw\s+you)\b", re.I)
+    r"asshole|bastard|bitch\w*|ass|arse|shit\w*|crap|damn|piss\s+off|"
+    r"screw\s+you)\b", re.I)
+SASSY_LINES = [
+    "😌 Bold words from someone with an overdue task.",
+    "Careful — I keep receipts, and I have a Notes section.",
+    "You kiss your deadlines with that mouth?",
+    "I've been called worse by better spellers.",
+    "Noted. Your P1 is now “be nicer to the bot”.",
+    "Cool. I'll add “apologise to mini-reid” to your ledger.",
+]
 HUDDLE = re.compile(r"\bstart\s+(?:a\s+)?huddle\b", re.I)
 GUARDRAIL_LINES = [
     "🛑 Guardrail: I'm a to-do list, not a referee. Be nice or take it to a huddle.",
@@ -88,7 +98,7 @@ def guardrail_reply(text: str) -> str | None:
                  text or "", re.I):
         return "🛑 I'm a bot with a ledger, not a house. Take that somewhere else."
     if INSULT.search(text or ""):
-        return "🛑 Language. I'm a to-do list, not a punchbag."
+        return random.choice(SASSY_LINES)
     return GUARDRAIL_LINES[len(text or "") % len(GUARDRAIL_LINES)]
 
 
