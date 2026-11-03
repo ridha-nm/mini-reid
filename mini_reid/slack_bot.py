@@ -468,6 +468,23 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str)
         row = parse_capture(f"add: {body}", now, clients)
         if row is None:
             return "Could not read that. Use: add: <what> by <when>"
+        existing = next((r for r in rows if r["id"] == row["id"]), None)
+        if existing and existing.get("status") in {"done", "dropped"}:
+            # Adding the same wording again is an explicit "bring it back".
+            # `merge` never reopens terminal rows, so do it here.
+            existing.update(row)
+            existing["status"] = "open"
+            existing["closed_at"] = None
+            existing["closed_how"] = None
+            existing["closure"] = "open"
+            existing["last_activity"] = now.isoformat()
+            existing.pop("merged_into", None)
+            for other in rows:
+                if other is not existing and other.get("merged_from"):
+                    other["merged_from"] = [
+                        m for m in other["merged_from"] if m.get("id") != existing["id"]]
+            save(ledger_path, rows)
+            return f"Reopened. {existing['what']}"
         save(ledger_path, merge(rows, [row]))
         due = f" · due {row['due']}" if row["due"] else ""
         client = f"{row['client']} · " if row["client"] else ""

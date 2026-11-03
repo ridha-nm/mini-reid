@@ -125,7 +125,7 @@ only a real past due date or a stalled status is.
 
 Nothing closes by itself.
 
-- `done:` closes a row.
+- `done:` closes a row. Adding the same wording again reopens a closed or dropped row.
 - Reassigning a Jira issue closes it on the next run (`jira_reassigned`).
 - A sent email only marks `closure: proposed`; it stays open until confirmed.
 - Email drafts are not commitments. Only an incoming ask becomes a row.

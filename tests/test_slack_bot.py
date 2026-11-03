@@ -91,6 +91,21 @@ def test_combine_parses_with_numbers():
     assert parse_command("<@U123> combine: #9 into #7") == ("combine", "#9 into #7")
 
 
+def test_adding_a_dropped_task_again_reopens_it(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "let Boon Hee know of his access fixes", NOW, clients, ledger)
+    apply_command("drop", "Boon Hee", NOW, clients, ledger)
+    assert load(ledger)[0]["status"] == "dropped"
+    reply = apply_command("add", "let Boon Hee know of his access fixes", NOW,
+                          clients, ledger)
+    rows = load(ledger)
+    assert len(rows) == 1
+    assert rows[0]["status"] == "open"
+    assert rows[0]["closed_how"] is None
+    assert reply.startswith("Reopened.")
+
+
 def test_tonote_converts_a_task_and_keeps_it_reachable_by_id(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")

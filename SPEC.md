@@ -88,7 +88,8 @@ calls.
 
 Rules:
 
-- Merge is idempotent; terminal statuses never reopen.
+- Merge is idempotent; terminal statuses never reopen, except that `add:` with the same
+  wording explicitly reopens a done or dropped row.
 - Stalled: past due, or five working days without activity.
 - Undated tasks stay on the list until closed. They do not expire.
 - A Jira row closes when the issue is no longer assigned. Skipped if the Jira fetch

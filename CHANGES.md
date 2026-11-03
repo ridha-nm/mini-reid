@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (re-add reopens)
+
+- Adding a task whose exact wording was previously done or dropped now reopens that row.
+  Before, `merge` kept it terminal while the bot still replied "Added.", so the task
+  vanished from `list`.
+- 182 tests passing.
+
 ## 2026-11-03 (edited commands retry)
 
 - Editing a bot-addressed message now re-runs the command once when the text changed,
