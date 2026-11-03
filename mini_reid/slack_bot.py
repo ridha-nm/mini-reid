@@ -17,12 +17,12 @@ MENTION = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
 # mention ("remind <@U123> to ...") must survive for split_target.
 LEADING_MENTION = re.compile(
     r"^\s*(?:(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@mini-?reid)\s*)+", re.I)
-COMMANDS = {"add", "note", "notes", "assign", "done", "drop", "due", "snooze",
-            "waiting", "find", "list", "not", "remind", "edit", "status", "priority",
-            "prio", "combine", "uncombine", "convert", "tonote", "undo"}
-MUTATING = {"add", "note", "assign", "done", "drop", "due", "snooze", "waiting", "not",
-            "remind", "edit", "status", "priority", "prio", "combine", "uncombine",
-            "convert", "tonote"}
+COMMANDS = {"add", "note", "notes", "assign", "reassign", "done", "drop", "due",
+            "snooze", "waiting", "find", "list", "not", "remind", "edit", "status",
+            "priority", "prio", "combine", "uncombine", "convert", "tonote", "undo"}
+MUTATING = {"add", "note", "assign", "reassign", "done", "drop", "due", "snooze",
+            "waiting", "not", "remind", "edit", "status", "priority", "prio",
+            "combine", "uncombine", "convert", "tonote"}
 IGNORE_CHANNEL_IDS = {"C0B59LA0X5M"}  # bd-triager-agent
 # Successful writes acknowledged with a reaction instead of a reply.
 EMOJI_ACKS = {"add": "heavy_plus_sign", "note": "memo",
@@ -144,6 +144,7 @@ HELP = """*Mini-Reid commands*
 • `add: confirm Eupe waste by Friday` — new task
 • `note: Daniel wants the mapping redone` — remember it, no deadline
 • `assign: @Kasib send the deck by Friday` — something you are waiting on
+• `reassign: deck to Kasib` — move an existing task to Waiting on others
 • `done: Eupe waste` — close it
 • `due: Eupe waste by Monday` — change the date
 • `edit: #1 to Confirm Eupe waste mapping by Monday` — rename and re-date
@@ -308,7 +309,8 @@ def parse_command(text: str) -> tuple[str, str]:
     if body.lower() in {"help", "?", "commands"}:
         return "help", ""
     m = re.match(
-        r"^(add|task|todo|to-do|note|assign|done|drop|remove|delete|due|snooze|waiting|"
+        r"^(add|task|todo|to-do|note|assign|reassign|done|drop|remove|delete|due|"
+        r"snooze|waiting|"
         r"find|not|remind|ask|edit|status|priority|prio|combine|uncombine|"
         r"convert|tonote|undo)\s*:\s*(.*)$", body, re.I)
     if m:
@@ -361,6 +363,17 @@ def _candidates(rows: list[dict], target: str) -> list[dict]:
             scored.append((score, r))
     scored.sort(key=lambda x: -x[0])
     return [r for _, r in scored]
+
+
+def _person_name(text: str, users: dict[str, str] | None) -> str:
+    """`<@U123>`, `@Kasib` or `Kasib` -> a readable name."""
+    raw = (text or "").strip()
+    m = re.match(r"^<@([A-Z0-9]+)(?:\|[^>]*)?>$", raw)
+    uid = m.group(1) if m else (raw if re.fullmatch(r"[A-Z0-9]{6,}", raw) else "")
+    if uid:
+        name = next((k for k, v in (users or {}).items() if v == uid), None)
+        return name or f"<@{uid}>"
+    return raw.lstrip("@")
 
 
 def _ref(row: dict) -> str:
@@ -442,12 +455,13 @@ def _push_undo(ledger_path: str, before: str) -> None:
     path.write_text(json.dumps({"snapshots": stack[-UNDO_DEPTH:]}))
 
 
-def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) -> str:
+def apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
+                  users: dict[str, str] | None = None) -> str:
     """Run a command, and snapshot the ledger before any mutation so `undo:`
     can reverse it."""
     path = Path(ledger_path)
     before = path.read_text() if path.exists() else ""
-    reply = _apply_command(action, body, now, clients, ledger_path)
+    reply = _apply_command(action, body, now, clients, ledger_path, users)
     if action in MUTATING:
         after = path.read_text() if path.exists() else ""
         if after and after != before:
@@ -455,7 +469,8 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
     return reply
 
 
-def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str) -> str:
+def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
+                   users: dict[str, str] | None = None) -> str:
     """Mutate the ledger and return the reply text. Pure enough to test."""
     rows = load(ledger_path)
 
@@ -497,11 +512,14 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str)
     if action == "assign":
         from .extract import parse_due
 
-        m = (re.match(r"^@([^\s]+)\s+(.+)$", body or "")
+        m = (re.match(r"^<@([A-Z0-9]+)(?:\|[^>]*)?>\s*:?\s*(?:to\s+)?(.+)$",
+                      body or "")
+             or re.match(r"^@([^\s]+)\s+(.+)$", body or "")
              or re.match(r"^(.+?)\s+to\s+(.+)$", body or ""))
         if not m:
             return "Use: assign: @Kasib send the deck by Friday"
-        person, what = m.group(1).strip(), m.group(2).strip()
+        person = _person_name(m.group(1), users)
+        what = m.group(2).strip()
         due, confidence = parse_due(what, now)
         row = {
             "id": commitment_id("manual", f"assign:{body}".lower(), what),
@@ -530,6 +548,22 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str)
         }
         save(ledger_path, merge(rows, [row]))
         return "Noted."
+
+    if action == "reassign":
+        m = re.match(r"^(.*?)\s+to\s+(.+)$", body or "", re.I)
+        if not m:
+            return "Use: reassign: <item> to <person>"
+        row, err = _pick(rows, m.group(1))
+        if err:
+            return err
+        person = _person_name(m.group(2), users)
+        row["direction"] = "owed_to_me"
+        row["assigned_to"] = person[:40]
+        row["asker"] = person[:40]
+        row["via"] = "reassigned"
+        row["last_activity"] = now.isoformat()
+        save(ledger_path, rows)
+        return f"Reassigned to {person}: {row['what'][:80]}"
 
     if action in {"convert", "tonote"}:
         row, err = _pick(rows, body)
@@ -1003,7 +1037,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
 
         try:
-            reply = apply_command(action, body, datetime.now(MYT), clients, ledger_path)
+            reply = apply_command(action, body, datetime.now(MYT), clients,
+                                  ledger_path, users)
         except Exception as ex:  # noqa: BLE001 - never leave the user without a reply
             print(f"[error] {type(ex).__name__}: {ex}", flush=True)
             reply = f"Something broke: {type(ex).__name__}"

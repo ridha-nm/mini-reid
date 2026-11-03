@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (reassign and mention targets)
+
+- `reassign: <item> to <person>` moves an existing task to Waiting on others and records
+  `assigned_to`.
+- `assign:` now accepts a real `<@U…>` mention; `@XieYi` plain text already worked.
+- 188 tests passing.
+
 ## 2026-11-03 (assign tasks to others)
 
 - `assign: @Kasib send the deck by Friday` creates a row in Waiting on others with

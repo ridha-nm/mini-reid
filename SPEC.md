@@ -136,8 +136,8 @@ stalled status counts as overdue; undated rows stay in No date.
 
 ## Bot commands
 
-`add:`, `task:`, `todo:`, `assign: <person> <what>`, `note that`,
-`status: <item> in progress | blocked | open`,
+`add:`, `task:`, `todo:`, `assign: <person> <what>`, `reassign: <item> to <person>`,
+`note that`, `status: <item> in progress | blocked | open`,
 `priority: <item> 1-5 | high | medium | low | none`, `tonote: <item>` (or `convert:`),
 `combine: <duplicate> into <keep>`, `uncombine: <keep>`, `undo:`, `done:`, `due:`,
 `edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,

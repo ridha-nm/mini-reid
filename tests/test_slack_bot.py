@@ -107,6 +107,33 @@ def test_assign_creates_a_waiting_on_row(tmp_path):
 def test_assign_accepts_name_to_phrasing():
     assert parse_command("<@U123> assign: Kasib to send the deck") == (
         "assign", "Kasib to send the deck")
+    assert parse_command("<@U123> reassign: deck to Kasib") == (
+        "reassign", "deck to Kasib")
+
+
+def test_assign_accepts_a_slack_mention(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    reply = apply_command("assign", "<@U09CCJW1JL8> Stop HARASSING MINI REID", NOW,
+                          {}, ledger, {"kasib": "U09CCJW1JL8"})
+    row = load(ledger)[0]
+    assert row["assigned_to"] == "kasib"
+    assert reply.startswith("Assigned to kasib:")
+
+
+def test_reassign_moves_an_existing_task_to_waiting_on_others(tmp_path):
+    from mini_reid.render import render
+
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Send the deck by Friday", NOW, clients, ledger)
+    reply = apply_command("reassign", "deck to Kasib", NOW, clients, ledger)
+    row = load(ledger)[0]
+    assert row["direction"] == "owed_to_me"
+    assert row["assigned_to"] == "Kasib"
+    assert row["asker"] == "Kasib"
+    assert reply.startswith("Reassigned to Kasib:")
+    out = render([row], NOW, [], slack=True)
+    assert "*Waiting on others (1)*" in out
 
 
 def test_notes_lists_notes_not_tasks(tmp_path):
