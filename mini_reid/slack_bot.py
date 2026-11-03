@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 import threading
 import urllib.parse
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from .capture import parse_capture
@@ -41,6 +42,41 @@ def guardrail_reply(text: str) -> str | None:
     if not GUARDRAIL.search(text or ""):
         return None
     return GUARDRAIL_LINES[len(text or "") % len(GUARDRAIL_LINES)]
+
+
+BANTER_FILE = "banter.json"
+BANTER_LINES = [
+    "🍿 I have no horse in this race, but I do have a ledger.",
+    "Noted. Adding “be nice” as P1 for both of you.",
+    "This is above my pay grade and below my interest.",
+    "I'm a bot, not a therapist. But go on.",
+    "Raising a ticket: “Two humans, one chat, zero chill.”",
+    "My calendar says you two should take a walk.",
+    "I will neither confirm nor deny that Ridha started this.",
+    "Standup is at 9. Bring snacks, not this.",
+    "I'm putting this in the Notes section. Nobody reads that.",
+]
+
+
+def banter_reply(channel: str, user: str, text: str, bot_id: str) -> str | None:
+    """Temporary silly auto-replies, configured in banter.json."""
+    path = Path(BANTER_FILE)
+    if not path.exists():
+        return None
+    try:
+        cfg = json.loads(path.read_text())
+        until = datetime.fromisoformat(cfg["until"])
+    except (OSError, ValueError, KeyError):
+        return None
+    if until.tzinfo is None:
+        until = until.astimezone()
+    if until <= datetime.now().astimezone():
+        return None
+    if channel != cfg.get("channel") or user not in (cfg.get("users") or []):
+        return None
+    if f"<@{bot_id}>" in (text or ""):
+        return None
+    return random.choice(BANTER_LINES)
 # Successful writes acknowledged with a reaction instead of a reply.
 EMOJI_ACKS = {"add": "heavy_plus_sign", "note": "memo",
               "tonote": "memo", "convert": "memo"}
@@ -1120,6 +1156,18 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         channel = event.get("channel") or ""
         ts = event.get("ts") or ""
         if not channel or not user:
+            return
+        if user == env.get("SLACK_OWNER_ID") and text.strip().lower() in (
+                {"banter off", "stop banter"}):
+            Path(BANTER_FILE).unlink(missing_ok=True)
+            web.chat_postMessage(channel=channel, text="Banter off.")
+            return
+        line = banter_reply(channel, user, text, bot_user_id)
+        if line:
+            try:
+                web.chat_postMessage(channel=channel, text=line)
+            except Exception as ex:  # noqa: BLE001 - banter is best effort
+                print(f"  banter post failed: {type(ex).__name__}", flush=True)
             return
         # message.channels/message.groups deliver every channel message. Only
         # act on ones that address the bot; DMs need no mention.

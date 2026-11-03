@@ -164,6 +164,9 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 - Requests to police a personal fight ("tell X to stop harassing", "unblock me") get a
   silly guardrail reply in the channel and no ledger row. The bot is a to-do list, not
   a referee.
+- Temporary banter mode (`banter.json`: channel, user ids, expiry) answers every message
+  from those users in that channel with a canned line. Ridha ends it with `banter off`.
+  It expires automatically.
 - Any other message from someone else gets a ✅ and, if they write something, a note
   plus an instant DM to Ridha. No reply to them.
 - Plain sentences from Ridha become notes; questions go to the knowledge base; due or

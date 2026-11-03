@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (banter mode)
+
+- `banter.json` answers every message from listed users in one channel with a canned
+  silly line until its `until` timestamp; Ridha can say `banter off`.
+- Posted the guardrail line in the group chat and enabled one hour of banter for XieYi
+  and Raj.
+- 190 tests passing.
+
 ## 2026-11-03 (silly guardrail)
 
 - "Tell X to stop harassing", "unblock me", "block both" and similar get a wry

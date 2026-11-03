@@ -136,6 +136,26 @@ def test_reassign_moves_an_existing_task_to_waiting_on_others(tmp_path):
     assert "*Waiting on others (1)*" in out
 
 
+def test_banter_reply_respects_channel_user_expiry_and_mentions(tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+
+    from mini_reid.slack_bot import BANTER_LINES, banter_reply
+
+    monkeypatch.chdir(tmp_path)
+    Path("banter.json").write_text(json.dumps({
+        "channel": "C1", "users": ["U1"],
+        "until": "2099-01-01T00:00:00+08:00"}))
+    assert banter_reply("C1", "U1", "hello", "UBOT") in BANTER_LINES
+    assert banter_reply("C2", "U1", "hello", "UBOT") is None
+    assert banter_reply("C1", "U2", "hello", "UBOT") is None
+    assert banter_reply("C1", "U1", "<@UBOT> hello", "UBOT") is None
+    Path("banter.json").write_text(json.dumps({
+        "channel": "C1", "users": ["U1"],
+        "until": "2020-01-01T00:00:00+08:00"}))
+    assert banter_reply("C1", "U1", "hello", "UBOT") is None
+
+
 def test_guardrail_refuses_interpersonal_relay():
     from mini_reid.slack_bot import guardrail_reply
 

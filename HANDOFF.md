@@ -86,6 +86,11 @@ notes                             list notes; they also appear in the digest
 help                              the command list
 ```
 
+A request to referee a personal fight ("tell X to stop harassing", "unblock me") gets a
+silly guardrail line in the channel and no ledger row. `banter.json` turns on temporary
+canned replies for listed users in one channel; `banter off` ends it, and the `until`
+timestamp expires it anyway.
+
 `#N` from `list` works with `status`, `done`, `due`, `snooze`, `drop`, `waiting`, `not`
 and `edit`, so a rename never depends on fuzzy wording.
 
