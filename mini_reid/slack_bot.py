@@ -35,7 +35,12 @@ GUARDRAIL = re.compile(
     r"stop\s+fighting|calm\s+down|mediat\w+|"
     r"bomb\w*|kill\b|murder|shoot|stab|punch|beat\s+you|"
     r"(?:hurt|harm|destroy)\s+(?:you|me|u)|threat\w*|deepseek|"
-    r"keep\s+messag\w*\s+me|if\s+you\s+keep\s+(?:messag|text)\w*)\b", re.I)
+    r"keep\s+messag\w*\s+me|if\s+you\s+keep\s+(?:messag|text)\w*|"
+    r"shut\s+up|stfu|fuck\w*|fking|fkin|fck|fk\b|idiot|stupid|dumb|moron|"
+    r"asshole|bastard|piss\s+off|screw\s+you)\b", re.I)
+INSULT = re.compile(
+    r"\b(shut\s+up|stfu|fuck\w*|fking|fkin|fck|fk|idiot|stupid|dumb|moron|"
+    r"asshole|bastard|piss\s+off|screw\s+you)\b", re.I)
 HUDDLE = re.compile(r"\bstart\s+(?:a\s+)?huddle\b", re.I)
 GUARDRAIL_LINES = [
     "🛑 Guardrail: I'm a to-do list, not a referee. Be nice or take it to a huddle.",
@@ -82,6 +87,8 @@ def guardrail_reply(text: str) -> str | None:
     if re.search(r"\b(?:bomb\w*|kill|murder|shoot|stab|punch|deepseek)\b",
                  text or "", re.I):
         return "🛑 I'm a bot with a ledger, not a house. Take that somewhere else."
+    if INSULT.search(text or ""):
+        return "🛑 Language. I'm a to-do list, not a punchbag."
     return GUARDRAIL_LINES[len(text or "") % len(GUARDRAIL_LINES)]
 
 

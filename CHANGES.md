@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (insults are not notes)
+
+- Profanity and insults ("shut up", "stfu", "fuck", "idiot") now hit the guardrail
+  ("Language. I'm a to-do list, not a punchbag.") instead of becoming notes.
+- Dropped the insult note from the ledger.
+- 196 tests passing.
+
 ## 2026-11-03 (no double replies)
 
 - Every Slack message id is claimed in `bot_state.json` before a response, so duplicate

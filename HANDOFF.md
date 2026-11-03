@@ -92,8 +92,8 @@ help                              the command list
 
 Bot-addressed small talk ("hi", "you there?", "thanks") gets the default reply naming
 `add:`, `note:` and `ask:`; praise gets a short kind reply. Nothing is stored. A request to referee a personal fight
-("tell X to stop harassing", "unblock me", "treat X nicely") gets a silly guardrail
-line and no ledger row; "start huddle" gets a specific refusal. `banter.json` turns on temporary
+("tell X to stop harassing", "unblock me", "treat X nicely"), threats and insults gets a
+silly guardrail line and no ledger row; "start huddle" gets a specific refusal. `banter.json` turns on temporary
 canned replies for listed users in one channel; `banter off` ends it, and the `until`
 timestamp expires it anyway.
 

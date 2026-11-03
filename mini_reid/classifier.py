@@ -68,6 +68,9 @@ NEGATIVE_SEED = [
     "good bot",
     "nice bot",
     "you are great",
+    "shut up mini-reid",
+    "shut the fuck up",
+    "you are stupid",
 ]
 
 

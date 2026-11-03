@@ -167,9 +167,9 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 - Successful `add:` gets ➕ and `note:` / `tonote:` gets 📝 as a reaction instead of a
   text reply. Failures still reply with the reason. Other commands reply as before.
 - Requests to police a personal fight ("tell X to stop harassing", "unblock me",
-  "treat X nicely", "make peace") get a silly guardrail reply in the channel and no
-  ledger row. The bot is a to-do list, not a referee. "Start huddle" gets "I can't
-  start huddles."
+  "treat X nicely", "make peace", threats, insults and profanity) get a silly guardrail
+  reply in the channel and no ledger row. The bot is a to-do list, not a referee.
+  "Start huddle" gets "I can't start huddles."
 - Bot-addressed small talk ("hi", "you there?", "thanks") gets a default reply naming
   `add:`, `note:` and `ask:`; it is not stored.
 - Praise or kindness ("good bot", "loving mini-reid") gets a short kind reply back.
