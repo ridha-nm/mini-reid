@@ -142,7 +142,7 @@ stalled status counts as overdue; undated rows stay in No date.
 `edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
 ignores that title), `remind` (absolute or `in 2 minutes`),
-`ask:`, `find:`, `list`, `help`.
+`ask:`, `find:`, `list`, `notes`, `help`.
 
 - Only Ridha mutates the ledger.
 - Anyone who tags or DMs the bot can set a reminder for themselves or any teammate in

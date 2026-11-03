@@ -80,6 +80,7 @@ remind me to send the deck in 2 minutes
 ask: what did we agree with Eupe  answer from your own writing, with sources
 find: eupe                        search the ledger
 list                              numbered open items; use #1 in later commands
+notes                             list notes; they also appear in the digest
 help                              the command list
 ```
 

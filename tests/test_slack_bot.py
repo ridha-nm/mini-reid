@@ -91,6 +91,20 @@ def test_combine_parses_with_numbers():
     assert parse_command("<@U123> combine: #9 into #7") == ("combine", "#9 into #7")
 
 
+def test_notes_lists_notes_not_tasks(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "A real task", NOW, clients, ledger)
+    apply_command("note", "a remembered fact", NOW, clients, ledger)
+    apply_command("add", "A second task", NOW, clients, ledger)
+    apply_command("tonote", "A second task", NOW, clients, ledger)
+    out = apply_command("notes", "", NOW, clients, ledger)
+    assert "a remembered fact" in out
+    assert "A second task" in out
+    assert "A real task" not in out
+    assert parse_command("notes") == ("notes", "")
+
+
 def test_adding_a_dropped_task_again_reopens_it(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")

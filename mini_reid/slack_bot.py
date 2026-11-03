@@ -17,8 +17,8 @@ MENTION = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
 # mention ("remind <@U123> to ...") must survive for split_target.
 LEADING_MENTION = re.compile(
     r"^\s*(?:(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@mini-?reid)\s*)+", re.I)
-COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting", "find",
-            "list", "not", "remind", "edit", "status", "priority", "prio",
+COMMANDS = {"add", "note", "notes", "done", "drop", "due", "snooze", "waiting",
+            "find", "list", "not", "remind", "edit", "status", "priority", "prio",
             "combine", "uncombine", "convert", "tonote", "undo"}
 MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
             "remind", "edit", "status", "priority", "prio", "combine", "uncombine",
@@ -151,6 +151,7 @@ HELP = """*Mini-Reid commands*
 • `status: Eupe waste in progress` — or `blocked`, `open`
 • `priority: Eupe waste 1` — P1 first; `high`, `medium`, `low`, `none` also work
 • `tonote: Eupe waste` — keep the text, drop it from tasks into Notes
+• `notes` — list your notes (they are also in the morning digest)
 • `combine: #9 into #7` — merge duplicate task #9 into #7
 • `uncombine: #7` — restore everything merged into #7
 • `undo:` — reverse the last ledger change (10 deep)
@@ -301,6 +302,8 @@ def parse_command(text: str) -> tuple[str, str]:
         return "unknown", ""
     if body.lower() in {"list", "ls", "today", "open"}:
         return "list", ""
+    if body.lower() in {"notes", "note list", "mynotes"}:
+        return "notes", ""
     if body.lower() in {"help", "?", "commands"}:
         return "help", ""
     m = re.match(
@@ -667,6 +670,15 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str)
             return err
         learning.add(body, reason="manual correction", source="manual")
         return "Recorded. I will ignore similar messages from now on."
+
+    if action == "notes":
+        notes = [r for r in rows if r.get("kind") == "note"
+                 and r.get("status") not in {"done", "dropped"}]
+        if not notes:
+            return "No notes."
+        notes.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+        return "Notes:\n" + "\n".join(
+            f"• [{r['id'][:6]}] {r.get('what', '')[:140]}" for r in notes[:25])
 
     if action == "list":
         open_rows = _open_sorted(rows)

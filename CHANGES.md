@@ -2,6 +2,12 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (notes command)
+
+- `notes` lists notes on demand. They remain out of `list` task numbering and appear in
+  the digest Notes section.
+- 183 tests passing.
+
 ## 2026-11-03 (re-add reopens)
 
 - Adding a task whose exact wording was previously done or dropped now reopens that row.
