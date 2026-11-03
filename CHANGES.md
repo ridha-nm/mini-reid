@@ -2,6 +2,15 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (remind emoji ack)
+
+- A successful `remind` now gets an ⏰ reaction on the command message instead of a text
+  reply; a failed reaction still falls back to the reply.
+- Backfilled the ⏰ on the 15:22 remind message, which had run before the change.
+- Corrected Raj's DM from that command: stripped the trailing meta instruction and
+  deleted the duplicate resend, leaving one clean reminder.
+- 199 tests passing.
+
 ## 2026-11-03 (banter auto-arms for five minutes)
 
 - Banter is off by default. A mean or hostile message opens a five-minute window for

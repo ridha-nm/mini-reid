@@ -19,7 +19,7 @@ DMs (reply `yes` or `no <reason>`), polls DMs the bot is not in for `remind`, an
 ids, combine/uncombine and 10-deep undo. Notes have their own list; `assign:` and
 `reassign:` track what others owe. Banter is off by default and auto-arms for five
 minutes on meanness. A small Naive Bayes classifier separates tasks from chatter.
-198 tests pass. Remaining work is the "Next, agreed" list below.
+199 tests pass. Remaining work is the "Next, agreed" list below.
 
 ## Running now
 
@@ -111,9 +111,9 @@ Plain sentences from Ridha become notes; questions go to the knowledge base; due
 status questions go to the list.
 
 Ridha's command replies go to his DM, never to the channel, so a command does not ping
-everyone. Successful `add:` is acknowledged in the channel with ➕ and `note:` /
-`tonote:` with 📝; failures go to his DM. Other people's commands still answer in the
-channel. Editing a message that still mentions the bot gets a ✅; when the text changed,
+everyone. Successful `add:` is acknowledged in the channel with ➕, `note:` / `tonote:`
+with 📝, and `remind:` with ⏰; failures go to his DM. Other people's commands still
+answer in the channel. Editing a message that still mentions the bot gets a ✅; when the text changed,
 the command is re-run once, except `remind` and `undo`. Repeated edits of the same text
 are ignored, so a command is not applied twice.
 
@@ -203,7 +203,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-198 tests passing as of 2026-11-03.
+199 tests passing as of 2026-11-03.
 
 ## Next, agreed
 

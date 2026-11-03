@@ -277,7 +277,19 @@ def banter_command(text: str, channel: str, users: dict[str, str],
     return "on", f"🍿 Banter on for {who} until {until:%H:%M}."
 # Successful writes acknowledged with a reaction instead of a reply.
 EMOJI_ACKS = {"add": "heavy_plus_sign", "note": "memo",
-              "tonote": "memo", "convert": "memo"}
+              "tonote": "memo", "convert": "memo", "remind": "alarm_clock"}
+
+
+def react_ack(web, channel: str, ts: str, name: str) -> bool:
+    """Best-effort emoji ack. False means the caller should reply instead."""
+    try:
+        web.reactions_add(channel=channel, timestamp=ts, name=name)
+        return True
+    except Exception as ex:  # noqa: BLE001 - reaction is best effort
+        print(f"  ack react failed: {type(ex).__name__}: {ex}", flush=True)
+        return False
+
+
 STATUS_ALIASES = {
     "open": "open", "todo": "open", "pending": "open",
     "in progress": "in progress", "in-progress": "in progress",
@@ -1276,6 +1288,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                                notify=False, private=user == owner)
                     _mark(ts)
                     return
+                if react_ack(web, channel, ts, EMOJI_ACKS["remind"]):
+                    _mark(ts)
+                    return
                 reply = f"Reminder sent to {who}: {fields['what'][:80]}"
                 post_reply(channel, reply, notify=user == owner, private=user == owner)
                 _mark(ts)
@@ -1296,6 +1311,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 print(f"  schedule failed: {type(ex).__name__}: {ex}", flush=True)
                 post_reply(channel, f"Could not schedule that: {type(ex).__name__}",
                            notify=False, private=user == owner)
+                _mark(ts)
+                return
+            if react_ack(web, channel, ts, EMOJI_ACKS["remind"]):
                 _mark(ts)
                 return
             reply = f"Reminder set for {who} — {at:%a %d %b %H:%M}: {fields['what'][:80]}"

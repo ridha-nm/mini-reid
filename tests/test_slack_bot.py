@@ -748,6 +748,26 @@ def test_owner_reminders_use_slack_scheduling_now():
     assert should_schedule_reminder("remind", "URIDHA", "URIDHA", None)
 
 
+def test_remind_ack_reacts_and_falls_back_to_a_reply():
+    from mini_reid.slack_bot import EMOJI_ACKS, react_ack
+
+    class Web:
+        def __init__(self, fail=False):
+            self.calls = []
+            self.fail = fail
+
+        def reactions_add(self, **kwargs):
+            if self.fail:
+                raise RuntimeError("missing_scope")
+            self.calls.append(kwargs)
+
+    web = Web()
+    assert react_ack(web, "C1", "123.4", EMOJI_ACKS["remind"])
+    assert web.calls == [{"channel": "C1", "timestamp": "123.4",
+                          "name": "alarm_clock"}]
+    assert not react_ack(Web(fail=True), "C1", "123.4", EMOJI_ACKS["remind"])
+
+
 def test_list_shows_sender_and_link(tmp_path):
     from mini_reid.ledger import save
 

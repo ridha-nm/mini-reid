@@ -23,8 +23,9 @@ Gmail, Jira and Google Calendar.
   list, notes, ask, help. `banter on/off/status` controls temporary silly replies.
   `list` prints a stable short id per row; `185045` or `id:185045` works in every
   command; `undo:` reverses the last change. Priority 1-5 sorts the digest and list.
-  Successful `add:` reacts ➕; `note:` / `tonote:` react 📝. Your command replies go to
-  your DM, not the channel. Only you can change the ledger. Anyone can set a private
+  Successful `add:` reacts ➕; `note:` / `tonote:` react 📝; `remind:` reacts ⏰.
+  Your command replies go to your DM, not the channel. Only you can change the ledger.
+  Anyone can set a private
   reminder for themselves or a teammate — those never enter your ledger.
 - **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
   local documents. `ask:` returns passages from your own writing, with sources.

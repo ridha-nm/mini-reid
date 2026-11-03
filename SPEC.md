@@ -156,6 +156,7 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
   `add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed
   reminders are scheduled in Slack (server-side), stay private, and never enter Ridha's
   ledger or digest. An unknown name gets a reply, never a silent reminder to the sender.
+  A successful reminder is acknowledged with a ⏰ reaction on the command message.
 - `list` numbers open items; `#N` works with `combine`, `done`, `due`, `snooze`, `drop`,
   `waiting`, `not`, `status` and `edit`. Each row also carries a stable short id
   (`[185045]`); `185045` or `id:185045` resolves regardless of numbering changes.
@@ -164,8 +165,9 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
   automatic dedupe: related asks can describe different deliverables.
 - `undo:` reverses the last mutating command. Ten snapshots are kept in
   `ledger_undo.json`; background watcher merges are not snapshots.
-- Successful `add:` gets ➕ and `note:` / `tonote:` gets 📝 as a reaction instead of a
-  text reply. Failures still reply with the reason. Other commands reply as before.
+- Successful `add:` gets ➕, `note:` / `tonote:` gets 📝, and `remind:` gets ⏰ as a
+  reaction instead of a text reply. Failures still reply with the reason. Other
+  commands reply as before.
 - Requests to police a personal fight ("tell X to stop harassing", "unblock me",
   "treat X nicely", "make peace", threats, insults and profanity) get a silly or
   semi-mean guardrail reply in the channel and no ledger row. The bot is a to-do list,
@@ -196,7 +198,7 @@ the corrected text can run. Channel messages that do not mention the bot are ign
 still mentions the bot gets a ✅; if Ridha changed the text, the command is re-run once
 (except `remind` and `undo`, which would duplicate). Commands are otherwise never
 replayed. Replies to Ridha's own commands go to his DM, never to the channel, so a
-command does not ping everyone. The channel only gets the ➕ / 📝 reaction where
+command does not ping everyone. The channel only gets the ➕ / 📝 / ⏰ reaction where
 applicable.
 
 Slack sends no events from a DM the bot is not in, so the watcher polls Ridha's recently
