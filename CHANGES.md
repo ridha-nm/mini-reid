@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (silly guardrail)
+
+- "Tell X to stop harassing", "unblock me", "block both" and similar get a wry
+  guardrail line in the channel instead of a ledger row. The bot does not referee
+  personal fights.
+- 189 tests passing.
+
 ## 2026-11-03 (reassign and mention targets)
 
 - `reassign: <item> to <person>` moves an existing task to Waiting on others and records

@@ -161,6 +161,9 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
   `ledger_undo.json`; background watcher merges are not snapshots.
 - Successful `add:` gets ➕ and `note:` / `tonote:` gets 📝 as a reaction instead of a
   text reply. Failures still reply with the reason. Other commands reply as before.
+- Requests to police a personal fight ("tell X to stop harassing", "unblock me") get a
+  silly guardrail reply in the channel and no ledger row. The bot is a to-do list, not
+  a referee.
 - Any other message from someone else gets a ✅ and, if they write something, a note
   plus an instant DM to Ridha. No reply to them.
 - Plain sentences from Ridha become notes; questions go to the knowledge base; due or

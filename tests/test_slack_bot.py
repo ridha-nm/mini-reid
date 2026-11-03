@@ -136,6 +136,16 @@ def test_reassign_moves_an_existing_task_to_waiting_on_others(tmp_path):
     assert "*Waiting on others (1)*" in out
 
 
+def test_guardrail_refuses_interpersonal_relay():
+    from mini_reid.slack_bot import guardrail_reply
+
+    assert guardrail_reply("please tell xie yi to stop harassing his colleagues")
+    assert guardrail_reply("@mini-reid pls stop raj to stop harassing me")
+    assert guardrail_reply("ok @mini-reid unblock me")
+    assert guardrail_reply("remind @XieYi to send the deck") is None
+    assert guardrail_reply("add: stop the deployment by Friday") is None
+
+
 def test_notes_lists_notes_not_tasks(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")

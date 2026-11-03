@@ -24,6 +24,23 @@ MUTATING = {"add", "note", "assign", "reassign", "done", "drop", "due", "snooze"
             "waiting", "not", "remind", "edit", "status", "priority", "prio",
             "combine", "uncombine", "convert", "tonote"}
 IGNORE_CHANNEL_IDS = {"C0B59LA0X5M"}  # bd-triager-agent
+# Interpersonal fights are not to-dos. Refuse the relay with a silly line.
+GUARDRAIL = re.compile(
+    r"\b(harass\w*|bully\w*|unblock me|tell .{0,40} to stop|"
+    r"stop (?:texting|messaging|bothering)\s+(?:me|him|her|them)|"
+    r"block\s+(?:him|her|them|both|each other))\b", re.I)
+GUARDRAIL_LINES = [
+    "🛑 Guardrail: I'm a to-do list, not a referee. Be nice or take it to a huddle.",
+    "🛑 I track deadlines, not drama. Sort it out between yourselves — politely.",
+    "🛑 My only authority is over overdue tasks. This one is on you two.",
+    "🛑 Not in my ledger. Be nice, or mute each other and move on.",
+]
+
+
+def guardrail_reply(text: str) -> str | None:
+    if not GUARDRAIL.search(text or ""):
+        return None
+    return GUARDRAIL_LINES[len(text or "") % len(GUARDRAIL_LINES)]
 # Successful writes acknowledged with a reaction instead of a reply.
 EMOJI_ACKS = {"add": "heavy_plus_sign", "note": "memo",
               "tonote": "memo", "convert": "memo"}
@@ -899,6 +916,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if (channel, ts) in seen or channel in IGNORE_CHANNEL_IDS:
             return
         seen.add((channel, ts))
+
+        guard = guardrail_reply(text)
+        if guard:
+            try:
+                web.chat_postMessage(channel=channel, text=guard)
+            except Exception as ex:  # noqa: BLE001 - guardrail is best effort
+                print(f"  guardrail post failed: {type(ex).__name__}", flush=True)
+            _mark(ts)
+            return
 
         action, body = parse_command(text)
         allow = {u.strip() for u in env.get("KB_ALLOWLIST", "").split(",") if u.strip()}
