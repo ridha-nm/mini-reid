@@ -381,7 +381,8 @@ def _open_sorted(rows: list[dict]) -> list[dict]:
 def _pick(rows: list[dict], target: str) -> tuple[dict | None, str | None]:
     """Return (row, error). `#N` picks from the numbered list; `id:abc123`
     is stable across edits and reordering."""
-    t = (target or "").strip()
+    # People copy ids straight from `list`, brackets and all.
+    t = (target or "").strip().strip("[]").strip()
     m = re.fullmatch(r"(?:id:)?([0-9a-f]{4,40})", t, re.I)
     if m:
         prefix = m.group(1).lower()
@@ -981,6 +982,24 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                                       name="white_check_mark")
                 except Exception as ex:  # noqa: BLE001 - reaction is best effort
                     print(f"  edit react failed: {type(ex).__name__}: {ex}", flush=True)
+                msg = event.get("message") or {}
+                text, user = msg.get("text") or "", msg.get("user") or ""
+                action, _ = parse_command(text)
+                if user == owner:
+                    action = owner_action(action, text)
+                key = f"{ack[0]}:{ack[1]}"
+                state = _state()
+                edits = state.setdefault("edits", {})
+                # Re-run an edited command once, but never a reminder (would
+                # schedule twice) or undo (would step back twice).
+                if (user == owner and text and action not in {"remind", "undo"}
+                        and edits.get(key) != text):
+                    edits[key] = text
+                    if len(edits) > 200:
+                        state["edits"] = dict(list(edits.items())[-200:])
+                    Path(STATE).write_text(json.dumps(state))
+                    seen.discard((ack[0], ack[1]))
+                    process(ack[0], user, text, ack[1])
             return
         text = event.get("text") or ""
         user = event.get("user") or ""

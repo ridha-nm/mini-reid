@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (edited commands retry)
+
+- Editing a bot-addressed message now re-runs the command once when the text changed,
+  so a fixed typo takes effect. `remind` and `undo` are skipped to avoid duplicates.
+- Row ids copied from `list` with brackets (`[2a308c]`) are accepted.
+- 181 tests passing.
+
 ## 2026-11-03 (no channel pings)
 
 - Replies to Ridha's own commands now go only to his DM; the channel gets just the

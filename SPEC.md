@@ -170,9 +170,11 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 
 Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
 `message.groups`. Channel messages that do not mention the bot are ignored. An edit that
-still mentions the bot gets a ✅; commands are never replayed. Replies to Ridha's own
-commands go to his DM, never to the channel, so a command does not ping everyone. The
-channel only gets the ➕ / 📝 reaction where applicable.
+still mentions the bot gets a ✅; if Ridha changed the text, the command is re-run once
+(except `remind` and `undo`, which would duplicate). Commands are otherwise never
+replayed. Replies to Ridha's own commands go to his DM, never to the channel, so a
+command does not ping everyone. The channel only gets the ➕ / 📝 reaction where
+applicable.
 
 Slack sends no events from a DM the bot is not in, so the watcher polls Ridha's recently
 active DMs with the user token every two minutes. Only owner-authored messages that

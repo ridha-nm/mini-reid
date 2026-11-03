@@ -92,8 +92,9 @@ status questions go to the list.
 Ridha's command replies go to his DM, never to the channel, so a command does not ping
 everyone. Successful `add:` is acknowledged in the channel with ➕ and `note:` /
 `tonote:` with 📝; failures go to his DM. Other people's commands still answer in the
-channel. Editing a message that still mentions the bot gets a ✅; edits are never
-replayed, so a command cannot be applied twice.
+channel. Editing a message that still mentions the bot gets a ✅; when the text changed,
+the command is re-run once, except `remind` and `undo`. Repeated edits of the same text
+are ignored, so a command is not applied twice.
 
 Anyone who tags or DMs the bot can set a reminder for themselves or any teammate in the
 Pantas workspace: `remind me to … at 2pm`, `remind @Arman to … at 2pm`,

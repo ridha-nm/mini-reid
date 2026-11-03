@@ -181,6 +181,15 @@ def test_stable_id_resolves_after_reordering(tmp_path):
     assert load(ledger)[0]["status"] == "done"
 
 
+def test_bracketed_id_from_list_is_accepted(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Bracket task", NOW, clients, ledger)
+    row_id = load(ledger)[0]["id"]
+    reply = apply_command("done", f"[{row_id[:6]}]", NOW, clients, ledger)
+    assert reply == "Closed: Bracket task"
+
+
 def test_bare_short_id_works_without_the_prefix(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")
