@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (wider guardrail)
+
+- Guardrail now catches "treat X nicely", "be nice to", "make peace with", "apologise",
+  "say sorry", "stop fighting", "calm down", "mediate".
+- "start huddle" gets a specific "I can't start huddles" reply instead of a note.
+- Removed the stray huddle note from the ledger.
+- 191 tests passing.
+
 ## 2026-11-03 (default reply for small talk)
 
 - Bot-addressed greetings, "you there?", "test", thanks and similar get a default reply

@@ -29,7 +29,11 @@ IGNORE_CHANNEL_IDS = {"C0B59LA0X5M"}  # bd-triager-agent
 GUARDRAIL = re.compile(
     r"\b(harass\w*|bully\w*|unblock me|tell .{0,40} to stop|"
     r"stop (?:texting|messaging|bothering)\s+(?:me|him|her|them)|"
-    r"block\s+(?:him|her|them|both|each other))\b", re.I)
+    r"block\s+(?:him|her|them|both|each other)|"
+    r"treat\s+.{0,40}\s+(?:nicely|kindly|well)|be\s+(?:nice|kind)\s+to|"
+    r"make\s+(?:up|peace)\s+with|apolog\w*\s+to|say\s+sorry|"
+    r"stop\s+fighting|calm\s+down|mediat\w+)\b", re.I)
+HUDDLE = re.compile(r"\bstart\s+(?:a\s+)?huddle\b", re.I)
 GUARDRAIL_LINES = [
     "🛑 Guardrail: I'm a to-do list, not a referee. Be nice or take it to a huddle.",
     "🛑 I track deadlines, not drama. Sort it out between yourselves — politely.",
@@ -53,6 +57,8 @@ def chatter_reply(text: str) -> str | None:
 
 
 def guardrail_reply(text: str) -> str | None:
+    if HUDDLE.search(text or ""):
+        return "🛑 I can't start huddles. I track tasks, notes and reminders."
     if not GUARDRAIL.search(text or ""):
         return None
     return GUARDRAIL_LINES[len(text or "") % len(GUARDRAIL_LINES)]
