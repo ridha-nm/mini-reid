@@ -1,7 +1,7 @@
 # Handoff
 
 Current state of Mini-Reid. Update after every material change. Last updated
-2026-11-02; next session can start here.
+2026-11-03; next session can start here.
 
 ## What it is
 
@@ -13,10 +13,13 @@ Everything runs locally on the Mac. Nothing is stored in the cloud.
 
 ## Resume here
 
-2026-11-02: 09:15 digest includes today's meetings; the watcher sends 10-minute meeting
+2026-11-03: 09:15 digest includes today's meetings; the watcher sends 10-minute meeting
 DMs (reply `yes` or `no <reason>`), polls DMs the bot is not in for `remind`, and ignores
-`bd-triager-agent`. Tasks carry `open` / `in progress` / `blocked`. 166 tests pass.
-Remaining work is the "Next, agreed" list below.
+`bd-triager-agent`. Tasks carry `open` / `in progress` / `blocked`, priority 1-5, stable
+ids, combine/uncombine and 10-deep undo. Notes have their own list; `assign:` and
+`reassign:` track what others owe. Banter is off by default and auto-arms for five
+minutes on meanness. A small Naive Bayes classifier separates tasks from chatter.
+198 tests pass. Remaining work is the "Next, agreed" list below.
 
 ## Running now
 
@@ -75,7 +78,8 @@ undo:                             reverse the last ledger change (10 deep)
 done: send the deck               close it
 status: deck in progress          open, in progress, blocked
 priority: deck 1                  P1 first; high/medium/low/none
-tonote: deck                      keep as a note; dropped from the task list
+tonote: deck                      keep as a note (also convert:)
+banter on 2h [@person|all]        temporary silly replies; off/status too
 due: deck by Monday               change the date
 edit: deck to Send deck by Monday rename and re-date
 snooze: deck 3d                   push it out
@@ -199,7 +203,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-166 tests passing as of 2026-11-02.
+198 tests passing as of 2026-11-03.
 
 ## Next, agreed
 

@@ -18,14 +18,14 @@ Gmail, Jira and Google Calendar.
   with the join link and "Are you attending?". Answer `yes` or `no <reason>` in the DM.
   The watcher also polls Ridha's DMs for `remind` commands in conversations the bot is
   not part of.
-- **Bot** (`@minireid`): add, assign, reassign, note, tonote, status, priority, combine,
-  uncombine, undo,
-  done, due, edit, snooze, waiting, drop, not, remind, find, list, notes, ask, help. `list` prints a
-  stable short id per row; `185045` or `id:185045` works in every command; `undo:`
-  reverses the last change. Priority 1-5 sorts the digest and list. Successful `add:`
-  reacts ➕; `note:` / `tonote:` react 📝. Your command replies go to your DM, not the
-  channel. Only you can change the ledger. Anyone can set a private reminder for
-  themselves or a teammate — those never enter your ledger.
+- **Bot** (`@minireid`): add, assign, reassign, note, tonote/convert, status, priority,
+  combine, uncombine, undo, done, due, edit, snooze, waiting, drop, not, remind, find,
+  list, notes, ask, help. `banter on/off/status` controls temporary silly replies.
+  `list` prints a stable short id per row; `185045` or `id:185045` works in every
+  command; `undo:` reverses the last change. Priority 1-5 sorts the digest and list.
+  Successful `add:` reacts ➕; `note:` / `tonote:` react 📝. Your command replies go to
+  your DM, not the channel. Only you can change the ledger. Anyone can set a private
+  reminder for themselves or a teammate — those never enter your ledger.
 - **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
   local documents. `ask:` returns passages from your own writing, with sources.
 
