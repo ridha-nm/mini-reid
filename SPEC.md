@@ -134,7 +134,8 @@ stalled status counts as overdue; undated rows stay in No date.
 ## Bot commands
 
 `add:`, `task:`, `todo:`, `note that`, `status: <item> in progress | blocked | open`,
-`done:`, `due:`, `edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,
+`combine: <duplicate> into <keep>`, `done:`, `due:`, `edit: <item> to <new name> [by
+<when>]`, `snooze:`, `waiting:`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
 ignores that title), `remind` (absolute or `in 2 minutes`),
 `ask:`, `find:`, `list`, `help`.
@@ -145,8 +146,11 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
   `add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed
   reminders are scheduled in Slack (server-side), stay private, and never enter Ridha's
   ledger or digest. An unknown name gets a reply, never a silent reminder to the sender.
-- `list` numbers open items; `#N` works with `done`, `due`, `snooze`, `drop`, `waiting`,
-  `not` and `edit`.
+- `list` numbers open items; `#N` works with `combine`, `done`, `due`, `snooze`, `drop`,
+  `waiting`, `not`, `status` and `edit`.
+- `combine: <duplicate> into <keep>` drops the duplicate with `closed_how: merged` and
+  records it under `merged_from` on the kept row. No automatic dedupe: related asks can
+  describe different deliverables.
 - Any other message from someone else gets a ✅ and, if they write something, a note
   plus an instant DM to Ridha. No reply to them.
 - Plain sentences from Ridha become notes; questions go to the knowledge base; due or

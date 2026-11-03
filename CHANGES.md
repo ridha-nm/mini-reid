@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (combine related tasks)
+
+- `combine: <duplicate> into <keep>` merges two related rows. The duplicate is dropped
+  with `closed_how: merged` and recorded in `merged_from` on the kept row. `#N` works
+  for both sides.
+- 170 tests passing.
+
 ## 2026-11-02 (not: dismisses meetings)
 
 - `not: <meeting title>` cancels that meeting's pending reminder and persists the title

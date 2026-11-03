@@ -66,6 +66,31 @@ def test_add_writes_to_ledger(tmp_path):
     assert "Added" in reply
 
 
+def test_combine_merges_duplicate_into_kept_row(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Boon Hee generic activity data for concrete", NOW, clients, ledger)
+    apply_command("add", "Suggest suitable activity item for project usage", NOW,
+                  clients, ledger)
+    reply = apply_command("combine",
+                          "generic activity data into suitable activity item",
+                          NOW, clients, ledger)
+    rows = load(ledger)
+    assert len(rows) == 2
+    duplicate = next(r for r in rows if "generic activity data" in r["what"])
+    keep = next(r for r in rows if "suitable activity item" in r["what"])
+    assert duplicate["status"] == "dropped"
+    assert duplicate["closed_how"] == "merged"
+    assert duplicate["merged_into"] == keep["id"]
+    assert keep["status"] == "open"
+    assert keep["merged_from"][0]["what"].startswith("Boon Hee")
+    assert reply.startswith("Combined:")
+
+
+def test_combine_parses_with_numbers():
+    assert parse_command("<@U123> combine: #9 into #7") == ("combine", "#9 into #7")
+
+
 def test_status_sets_in_progress_blocked_and_open(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")

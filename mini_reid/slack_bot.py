@@ -18,9 +18,9 @@ MENTION = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
 LEADING_MENTION = re.compile(
     r"^\s*(?:(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@mini-?reid)\s*)+", re.I)
 COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
-            "find", "list", "not", "remind", "edit", "status"}
+            "find", "list", "not", "remind", "edit", "status", "combine"}
 MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
-            "remind", "edit", "status"}
+            "remind", "edit", "status", "combine"}
 IGNORE_CHANNEL_IDS = {"C0B59LA0X5M"}  # bd-triager-agent
 STATUS_ALIASES = {
     "open": "open", "todo": "open", "pending": "open",
@@ -144,6 +144,7 @@ HELP = """*Mini-Reid commands*
 • `snooze: Eupe waste 3d` — push it out (d days, w weeks)
 • `waiting: Eupe waste on Daniel` — waiting on someone else
 • `status: Eupe waste in progress` — or `blocked`, `open`
+• `combine: #9 into #7` — merge duplicate task #9 into #7
 • `drop: Eupe waste` — remove it quietly (`remove:` and `delete:` work too)
 • `not: anything that is not part c` — wrong item, teach it to ignore this kind
 • `remind me to send the deck tomorrow at 3pm` — a timed DM; no time means now
@@ -294,7 +295,7 @@ def parse_command(text: str) -> tuple[str, str]:
         return "help", ""
     m = re.match(
         r"^(add|task|todo|to-do|note|done|drop|remove|delete|due|snooze|waiting|"
-        r"find|not|remind|ask|edit|status)\s*:\s*(.+)$", body, re.I)
+        r"find|not|remind|ask|edit|status|combine)\s*:\s*(.+)$", body, re.I)
     if m:
         act = m.group(1).lower()
         if act in {"task", "todo", "to-do"}:
@@ -423,6 +424,30 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
         }
         save(ledger_path, merge(rows, [row]))
         return "Noted."
+
+    if action == "combine":
+        m = re.match(r"^(.*?)\s+(?:into|with|\+)\s+(.*)$", body or "", re.I)
+        if not m:
+            return "Use: combine: <duplicate> into <keep>   e.g. combine: #9 into #7"
+        duplicate, err = _pick(rows, m.group(1))
+        if err:
+            return err
+        keep, err = _pick(rows, m.group(2))
+        if err:
+            return err
+        if duplicate["id"] == keep["id"]:
+            return "Those are the same item."
+        duplicate["status"] = "dropped"
+        duplicate["closed_at"] = now.isoformat()
+        duplicate["closed_how"] = "merged"
+        duplicate["merged_into"] = keep["id"]
+        keep.setdefault("merged_from", []).append({
+            "id": duplicate["id"], "what": duplicate.get("what"),
+            "source_link": duplicate.get("source_link")})
+        keep["last_activity"] = now.isoformat()
+        save(ledger_path, rows)
+        return (f"Combined: {duplicate['what'][:70]} → {keep['what'][:70]}\n"
+                f"Kept #{_open_sorted(rows).index(keep) + 1}: {keep['what'][:80]}")
 
     if action == "status":
         m = re.match(

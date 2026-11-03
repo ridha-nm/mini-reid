@@ -18,8 +18,8 @@ Gmail, Jira and Google Calendar.
   with the join link and "Are you attending?". Answer `yes` or `no <reason>` in the DM.
   The watcher also polls Ridha's DMs for `remind` commands in conversations the bot is
   not part of.
-- **Bot** (`@minireid`): add, note, status, done, due, edit, snooze, waiting, drop,
-  not, remind, find, list, ask, help. Only you can change the ledger. Anyone can set a private reminder for
+- **Bot** (`@minireid`): add, note, status, combine, done, due, edit, snooze, waiting,
+  drop, not, remind, find, list, ask, help. Only you can change the ledger. Anyone can set a private reminder for
   themselves or a teammate — those never enter your ledger.
 - **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
   local documents. `ask:` returns passages from your own writing, with sources.
