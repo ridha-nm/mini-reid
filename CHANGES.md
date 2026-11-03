@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (banter upgrade)
+
+- `banter on 2h [@person|all]`, `banter off`, `banter status` from Slack; no file editing.
+- Replies are context-aware (question, greeting, praise, generic) and never repeat the
+  previous line in that channel.
+- Enabling is announced immediately; the watcher announces expiry.
+- 197 tests passing.
+
 ## 2026-11-03 (banter for everyone until 2pm)
 
 - `users: ["*"]` enables banter for everyone in a channel. On in `C0B0STVFTD2` until

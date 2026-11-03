@@ -144,6 +144,36 @@ BANTER_LINES = [
     "Standup is at 9. Bring snacks, not this.",
     "I'm putting this in the Notes section. Nobody reads that.",
 ]
+BANTER_QUESTIONS = [
+    "I only know two answers: add it as a task, or ask me later.",
+    "Ask me after standup. My calendar is fuller than my patience.",
+    "That sounds like a huddle question.",
+]
+BANTER_GREETINGS = [
+    "Hello. Still a to-do list.",
+    "Hey. I have 10 open items and no time for small talk.",
+    "Hi. Make it a task or make it quick.",
+]
+_LAST_BANTER: dict[str, str] = {}
+
+
+def _pick_banter(channel: str, lines: list[str]) -> str:
+    last = _LAST_BANTER.get(channel)
+    choices = [line for line in lines if line != last] or lines
+    line = random.choice(choices)
+    _LAST_BANTER[channel] = line
+    return line
+
+
+def banter_line(channel: str, text: str) -> str:
+    nice = nice_reply(text)
+    if nice:
+        return nice
+    if "?" in (text or ""):
+        return _pick_banter(channel, BANTER_QUESTIONS)
+    if re.match(r"^\s*(?:hi|hello|hey|yo)\b", text or "", re.I):
+        return _pick_banter(channel, BANTER_GREETINGS)
+    return _pick_banter(channel, BANTER_LINES)
 
 
 def banter_active(channel: str, user: str) -> bool:
@@ -170,7 +200,51 @@ def banter_reply(channel: str, user: str, text: str, bot_id: str) -> str | None:
     if (f"<@{bot_id}>" in (text or "") or re.search(r"@mini-?reid\b", text or "", re.I)
             or guardrail_reply(text)):
         return None
-    return random.choice(BANTER_LINES)
+    return banter_line(channel, text)
+
+
+def banter_command(text: str, channel: str, users: dict[str, str],
+                   now: datetime) -> tuple[str, str] | None:
+    """Owner control: banter on 2h [@person|all] · banter off · banter status."""
+    m = re.match(r"^banter\s+(on|off|status)\b\s*(.*)$", (text or "").strip(), re.I)
+    if not m:
+        return None
+    action, rest = m.group(1).lower(), m.group(2).strip()
+    path = Path(BANTER_FILE)
+    if action == "status":
+        if not path.exists():
+            return "status", "Banter is off."
+        cfg = json.loads(path.read_text())
+        return "status", f"Banter on in <#{cfg.get('channel')}> until {cfg.get('until')[11:16]}."
+    if action == "off":
+        path.unlink(missing_ok=True)
+        return "off", "🍿 Banter off."
+    if channel.startswith("D"):
+        return "error", "Run `banter on` in the channel, not a DM."
+    duration = timedelta(hours=1)
+    m = re.search(r"(\d+)\s*(m|min|h|hr|d)\b", rest, re.I)
+    if m:
+        n, unit = int(m.group(1)), m.group(2).lower()
+        duration = (timedelta(minutes=n) if unit.startswith("m")
+                    else timedelta(days=n) if unit.startswith("d")
+                    else timedelta(hours=n))
+    else:
+        m = re.search(r"until\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b", rest, re.I)
+        if m:
+            hour, minute = int(m.group(1)), int(m.group(2) or 0)
+            if m.group(3).lower() == "pm" and hour < 12:
+                hour += 12
+            until = now.replace(hour=hour % 24, minute=minute, second=0, microsecond=0)
+            if until <= now:
+                until += timedelta(days=1)
+            duration = until - now
+    mentions = re.findall(r"<@([A-Z0-9]+)(?:\|[^>]*)?>", rest)
+    scope = mentions or ["*"]
+    until = (now + duration).replace(microsecond=0)
+    path.write_text(json.dumps({"channel": channel, "users": scope,
+                                "until": until.isoformat(timespec="seconds")}))
+    who = "everyone" if "*" in scope else ", ".join(f"<@{u}>" for u in scope)
+    return "on", f"🍿 Banter on for {who} until {until:%H:%M}."
 # Successful writes acknowledged with a reaction instead of a reply.
 EMOJI_ACKS = {"add": "heavy_plus_sign", "note": "memo",
               "tonote": "memo", "convert": "memo"}
@@ -1052,6 +1126,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
         seen.add((channel, ts))
 
+        if user == owner:
+            control = banter_command(text, channel, users, datetime.now(MYT))
+            if control:
+                _, reply = control
+                web.chat_postMessage(channel=channel, text=reply)
+                _mark(ts)
+                return
+
         raw_action, _ = parse_command(text)
         nice = nice_reply(text) if raw_action in {"unknown", "ack"} else None
         if nice:
@@ -1286,15 +1368,17 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         ts = event.get("ts") or ""
         if not channel or not user:
             return
-        if user == env.get("SLACK_OWNER_ID") and text.strip().lower() in (
-                {"banter off", "stop banter"}):
+        if user == env.get("SLACK_OWNER_ID") and re.match(
+                r"^banter\b", text.strip(), re.I):
             if not claim_message(STATE, channel, ts):
                 return
-            Path(BANTER_FILE).unlink(missing_ok=True)
-            web.chat_postMessage(channel=channel, text="Banter off.")
-            return
+            control = banter_command(text, channel, users, datetime.now(MYT))
+            if control:
+                _, reply = control
+                web.chat_postMessage(channel=channel, text=reply)
+                return
         addressed = is_bot_addressed(event, bot_user_id)
-        if not addressed:
+        if not addressed and banter_active(channel, user):
             line = banter_reply(channel, user, text, bot_user_id)
             if line:
                 if not claim_message(STATE, channel, ts):
@@ -1304,25 +1388,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 except Exception as ex:  # noqa: BLE001 - banter is best effort
                     print(f"  banter post failed: {type(ex).__name__}", flush=True)
                 return
-            if banter_active(channel, user):
-                kind = nice_reply(text)
-                if kind:
-                    if not claim_message(STATE, channel, ts):
-                        return
-                    try:
-                        web.chat_postMessage(channel=channel, text=kind)
-                    except Exception as ex:  # noqa: BLE001 - best effort
-                        print(f"  nice post failed: {type(ex).__name__}", flush=True)
+            guard = guardrail_reply(text)
+            if guard:
+                if not claim_message(STATE, channel, ts):
                     return
-                guard = guardrail_reply(text)
-                if guard:
-                    if not claim_message(STATE, channel, ts):
-                        return
-                    try:
-                        web.chat_postMessage(channel=channel, text=guard)
-                    except Exception as ex:  # noqa: BLE001 - best effort
-                        print(f"  guardrail post failed: {type(ex).__name__}", flush=True)
-                    return
+                try:
+                    web.chat_postMessage(channel=channel, text=guard)
+                except Exception as ex:  # noqa: BLE001 - best effort
+                    print(f"  guardrail post failed: {type(ex).__name__}", flush=True)
+                return
         # message.channels/message.groups deliver every channel message. Only
         # act on ones that address the bot; DMs need no mention.
         if not is_bot_addressed(event, bot_user_id):

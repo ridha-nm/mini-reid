@@ -186,6 +186,29 @@ def poll_dm_commands(env: dict, now: datetime,
     return handled
 
 
+def expire_banter(env: dict, now: datetime) -> bool:
+    """Announce and clear banter.json when its time is up."""
+    from .notify import _post
+
+    path = Path("banter.json")
+    if not path.exists():
+        return False
+    try:
+        cfg = json.loads(path.read_text())
+        until = datetime.fromisoformat(cfg["until"])
+    except (OSError, ValueError, KeyError):
+        path.unlink(missing_ok=True)
+        return False
+    if until.tzinfo is None:
+        until = until.astimezone()
+    if until > now:
+        return False
+    _post("chat.postMessage", env["SLACK_BOT_TOKEN"], channel=cfg.get("channel"),
+          text="🍿 Banter off.")
+    path.unlink(missing_ok=True)
+    return True
+
+
 def _load_meetings(state_path: str, today: str) -> dict:
     state = json.loads(Path(state_path).read_text()) if Path(state_path).exists() else {}
     if state.get("date") != today or "meetings" not in state:
@@ -333,6 +356,11 @@ def main() -> int:
             print(f"[{now:%H:%M:%S}] scheduled {reminded} meeting reminder(s)", flush=True)
     except Exception as ex:  # noqa: BLE001 - calendar must not stop the watcher
         print(f"[{now:%H:%M:%S}] meeting reminders: {type(ex).__name__}: {ex}", flush=True)
+    try:
+        if expire_banter(env, now):
+            print(f"[{now:%H:%M:%S}] banter expired", flush=True)
+    except Exception as ex:  # noqa: BLE001
+        print(f"[{now:%H:%M:%S}] banter expiry: {type(ex).__name__}: {ex}", flush=True)
     try:
         polled = poll_dm_commands(env, now)
         if polled:

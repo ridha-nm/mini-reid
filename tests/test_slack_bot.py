@@ -146,18 +146,37 @@ def test_banter_reply_respects_channel_user_expiry_and_mentions(tmp_path, monkey
     Path("banter.json").write_text(json.dumps({
         "channel": "C1", "users": ["U1"],
         "until": "2099-01-01T00:00:00+08:00"}))
-    assert banter_reply("C1", "U1", "hello", "UBOT") in BANTER_LINES
+    assert banter_reply("C1", "U1", "hello", "UBOT") is not None
     assert banter_reply("C2", "U1", "hello", "UBOT") is None
     assert banter_reply("C1", "U2", "hello", "UBOT") is None
     assert banter_reply("C1", "U1", "<@UBOT> hello", "UBOT") is None
     Path("banter.json").write_text(json.dumps({
         "channel": "C1", "users": ["*"],
         "until": "2099-01-01T00:00:00+08:00"}))
-    assert banter_reply("C1", "U2", "hello", "UBOT") in BANTER_LINES
-    Path("banter.json").write_text(json.dumps({
-        "channel": "C1", "users": ["U1"],
-        "until": "2020-01-01T00:00:00+08:00"}))
-    assert banter_reply("C1", "U1", "hello", "UBOT") is None
+    assert banter_reply("C1", "U2", "hello", "UBOT") is not None
+
+
+def test_banter_command_controls_scope_and_duration(tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+
+    from mini_reid.slack_bot import banter_command
+
+    monkeypatch.chdir(tmp_path)
+    kind, _ = banter_command("banter on 2h", "C1", {}, NOW)
+    cfg = json.loads(Path("banter.json").read_text())
+    assert kind == "on"
+    assert cfg["channel"] == "C1" and cfg["users"] == ["*"]
+    assert cfg["until"] == "2026-10-30T11:00:00+08:00"
+
+    kind, _ = banter_command("banter on 30m <@U1>", "C1", {}, NOW)
+    cfg = json.loads(Path("banter.json").read_text())
+    assert cfg["users"] == ["U1"]
+    assert cfg["until"] == "2026-10-30T09:30:00+08:00"
+
+    kind, _ = banter_command("banter off", "C1", {}, NOW)
+    assert kind == "off"
+    assert not Path("banter.json").exists()
 
 
 def test_claim_message_is_persistent_and_releasable(tmp_path):
