@@ -161,6 +161,12 @@ on Friday. Then:
 
 It appends recall and missed items to `scorecard.md`.
 
+The weekly review is also the classifier's training loop: the Naive Bayes model
+rebuilds from `ledger.json` and `corrections.json` on every call, so new `not:`
+corrections and fixed rows improve it without a separate train step. Use
+`python -m mini_reid.classifier "phrase"` to inspect scores when a social message was
+kept or a real ask was missed.
+
 ## Known limits
 
 - 3B model only rewords tasks; it is not trusted to filter.

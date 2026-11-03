@@ -10,6 +10,8 @@ Append-only. Newest first.
 - Guardrail now catches threats ("bomb", "kill", "deepseek", "if you keep messaging me")
   and hostile messages bypass banter mode.
 - Dropped the threat note from the ledger.
+- Weekly review doubles as the training loop: the model rebuilds from the ledger and
+  `not:` corrections on every call, so no separate train step.
 - 193 tests passing.
 
 ## 2026-11-03 (wider guardrail)
