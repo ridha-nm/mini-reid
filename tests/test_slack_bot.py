@@ -91,6 +91,24 @@ def test_combine_parses_with_numbers():
     assert parse_command("<@U123> combine: #9 into #7") == ("combine", "#9 into #7")
 
 
+def test_priority_sets_ranks_and_clears(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Focus task", NOW, clients, ledger)
+    assert apply_command("priority", "Focus task 1", NOW, clients, ledger).startswith("P1:")
+    assert load(ledger)[0]["priority"] == 1
+    apply_command("priority", "Focus task low", NOW, clients, ledger)
+    assert load(ledger)[0]["priority"] == 5
+    assert apply_command("priority", "Focus task none", NOW, clients, ledger).startswith(
+        "Priority cleared:")
+    assert "priority" not in load(ledger)[0]
+
+
+def test_priority_command_is_parsed():
+    assert parse_command("<@U123> priority: #3 1") == ("priority", "#3 1")
+    assert parse_command("<@U123> prio: Eupe item high")[0] == "prio"
+
+
 def test_undo_reverses_mutations_and_stops_when_empty(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")

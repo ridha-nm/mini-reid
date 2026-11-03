@@ -81,6 +81,7 @@ calls.
 | `asker`, `via` | who sent it, and where it reached him (DM, #channel, direct, alias, Jira board) |
 | `client` | slug from the rule matcher only |
 | `due`, `status` | date; open, in progress, blocked, stalled, done, dropped |
+| `priority` | 1-5, absent when unranked; 1 is first |
 | `kind` | mention, dm, inbox, draft, issue, note, reminder |
 | `closure` | open, proposed |
 | `remind_at` | when a reminder fires |
@@ -117,10 +118,11 @@ overdue by client), then today's meetings with time, title and join link:
 **Meetings · Overdue · Today and tomorrow · This week · Waiting on others · No date ·
 Notes · Possibly done · Review**
 
-Each row: task, client name, relative due (`2d overdue`, `today`, `in 3d`), status when
-it is in progress or blocked, sender and channel, source time, link. Email senders keep
-their full address. A Slack row quotes the original message when the task title was
-rewritten.
+Each row: task, client name, relative due (`2d overdue`, `today`, `in 3d`), priority
+when set (`[P1]`), status when it is in progress or blocked, sender and channel, source
+time, link. Priority sorts before due date inside every section; `list` uses the same
+order. Email senders keep their full address. A Slack row quotes the original message
+when the task title was rewritten.
 
 The watcher schedules a Slack DM 10 minutes before each meeting starts: time, title,
 join link, and "Are you attending?". Reply `yes` or `no <reason>`; the answer is
@@ -134,6 +136,7 @@ stalled status counts as overdue; undated rows stay in No date.
 ## Bot commands
 
 `add:`, `task:`, `todo:`, `note that`, `status: <item> in progress | blocked | open`,
+`priority: <item> 1-5 | high | medium | low | none`,
 `combine: <duplicate> into <keep>`, `uncombine: <keep>`, `undo:`, `done:`, `due:`,
 `edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and

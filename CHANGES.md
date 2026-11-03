@@ -2,6 +2,12 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (task priority)
+
+- `priority: <item> 1-5` ranks a task; `high` / `medium` / `low` / `none` alias 1 / 3 /
+  5 / clear. `[P1]` shows on the row and the digest/list sort priority before due date.
+- 178 tests passing.
+
 ## 2026-11-03 (undo)
 
 - `undo:` reverses the last mutating bot command. The ledger is snapshotted before each

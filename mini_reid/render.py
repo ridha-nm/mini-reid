@@ -75,6 +75,9 @@ def _line(row: dict, slack: bool = False, now: datetime | None = None) -> str:
     what = (row.get("what") or "").strip()
     if len(what) > 140:
         what = what[:137].rstrip() + "…"
+    priority = row.get("priority")
+    if isinstance(priority, int):
+        what = f"[P{priority}] {what}"
     client = _client_name(row.get("client"))
     due = _due_label(row, now) if now else (_due(row) or "no date")
     link = row.get("source_link") or ""
@@ -173,7 +176,9 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
 
     # Everything open that has no deadline still belongs on the list. It used to
     # vanish after one day, which is how undated work gets lost.
-    for row in sorted(rows, key=lambda r: r.get("created_at") or "", reverse=True):
+    undated_order = sorted(rows, key=lambda r: r.get("created_at") or "", reverse=True)
+    undated_order.sort(key=lambda r: r.get("priority") or 99)
+    for row in undated_order:
         if row["id"] in used or row.get("status") in {"done", "dropped"}:
             continue
         if (row.get("direction") == "owed_to_me" or row.get("closure") == "proposed"
@@ -181,9 +186,10 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
             continue
         take("undated", row)
 
-    buckets["overdue"].sort(key=lambda r: r.get("due") or "9999")
-    buckets["today"].sort(key=lambda r: r.get("due") or "9999")
-    buckets["week"].sort(key=lambda r: r.get("due") or "9999")
+    priority_due = lambda r: (r.get("priority") or 99, r.get("due") or "9999")
+    buckets["overdue"].sort(key=priority_due)
+    buckets["today"].sort(key=priority_due)
+    buckets["week"].sort(key=priority_due)
 
     title = now.strftime("%a %d %b %Y")
     total = sum(len(v) for v in buckets.values())

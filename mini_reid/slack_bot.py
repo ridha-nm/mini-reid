@@ -18,9 +18,10 @@ MENTION = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
 LEADING_MENTION = re.compile(
     r"^\s*(?:(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@mini-?reid)\s*)+", re.I)
 COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting", "find",
-            "list", "not", "remind", "edit", "status", "combine", "uncombine", "undo"}
+            "list", "not", "remind", "edit", "status", "priority", "prio",
+            "combine", "uncombine", "undo"}
 MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
-            "remind", "edit", "status", "combine", "uncombine"}
+            "remind", "edit", "status", "priority", "prio", "combine", "uncombine"}
 IGNORE_CHANNEL_IDS = {"C0B59LA0X5M"}  # bd-triager-agent
 STATUS_ALIASES = {
     "open": "open", "todo": "open", "pending": "open",
@@ -144,6 +145,7 @@ HELP = """*Mini-Reid commands*
 • `snooze: Eupe waste 3d` — push it out (d days, w weeks)
 • `waiting: Eupe waste on Daniel` — waiting on someone else
 • `status: Eupe waste in progress` — or `blocked`, `open`
+• `priority: Eupe waste 1` — P1 first; `high`, `medium`, `low`, `none` also work
 • `combine: #9 into #7` — merge duplicate task #9 into #7
 • `uncombine: #7` — restore everything merged into #7
 • `undo:` — reverse the last ledger change (10 deep)
@@ -298,7 +300,8 @@ def parse_command(text: str) -> tuple[str, str]:
         return "help", ""
     m = re.match(
         r"^(add|task|todo|to-do|note|done|drop|remove|delete|due|snooze|waiting|"
-        r"find|not|remind|ask|edit|status|combine|uncombine|undo)\s*:\s*(.*)$", body, re.I)
+        r"find|not|remind|ask|edit|status|priority|prio|combine|uncombine|undo)"
+        r"\s*:\s*(.*)$", body, re.I)
     if m:
         act = m.group(1).lower()
         if act in {"task", "todo", "to-do"}:
@@ -366,7 +369,7 @@ def _open_sorted(rows: list[dict]) -> list[dict]:
     """The order `list` prints; numbers stay stable across commands."""
     open_rows = [r for r in rows if r.get("status") not in {"done", "dropped"}
                  and r.get("kind") != "note"]
-    open_rows.sort(key=lambda r: r.get("due") or "9999")
+    open_rows.sort(key=lambda r: (r.get("priority") or 99, r.get("due") or "9999"))
     return open_rows
 
 
@@ -476,6 +479,29 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str)
         }
         save(ledger_path, merge(rows, [row]))
         return "Noted."
+
+    if action in {"priority", "prio"}:
+        m = re.match(r"^(.*?)\s+(?:to\s+)?(p?[1-5]|high|medium|med|low|none|clear)$",
+                     body or "", re.I)
+        if not m:
+            return "Use: priority: <item> 1-5 | high | medium | low | none"
+        row, err = _pick(rows, m.group(1))
+        if err:
+            return err
+        word = m.group(2).lower().lstrip("p")
+        value = {"high": 1, "medium": 3, "med": 3, "low": 5,
+                 "none": None, "clear": None}.get(word, None)
+        if value is None and word not in {"none", "clear"}:
+            value = int(word)
+        if value is None:
+            row.pop("priority", None)
+        else:
+            row["priority"] = value
+        row["last_activity"] = now.isoformat()
+        save(ledger_path, rows)
+        if value is None:
+            return f"Priority cleared: {row['what'][:80]}"
+        return f"P{value}: {row['what'][:80]}"
 
     if action == "combine":
         m = re.match(r"^(.*?)\s+(?:into|with|\+)\s+(.*)$", body or "", re.I)
@@ -610,7 +636,9 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str)
         if not open_rows:
             return "Nothing open."
         return "Open:\n" + "\n".join(
-            f"{i}. [{r['id'][:6]}] {r['what'][:90]}"
+            f"{i}. [{r['id'][:6]}]"
+            + (f" [P{r['priority']}]" if isinstance(r.get("priority"), int) else "")
+            + f" {r['what'][:90]}"
             + (f" — {r['due']}" if r.get("due") else "")
             + (f" — {r['status']}" if r.get("status") in {"in progress", "blocked"}
                else "")

@@ -55,6 +55,15 @@ def test_brief_appears_above_the_sections():
     assert out.index("*Brief*") < out.index("*Today and tomorrow")
 
 
+def test_priority_is_shown_and_sorts_first():
+    low = dict(ROW, id="low", what="low focus", due="2026-10-30", priority=3)
+    high = dict(ROW, id="high", what="high focus", due="2026-10-30", priority=1)
+    out = render([low, high], NOW, [], slack=True)
+    assert "[P1] high focus" in out
+    assert "[P3] low focus" in out
+    assert out.index("[P1] high focus") < out.index("[P3] low focus")
+
+
 def test_row_shows_in_progress_or_blocked_status():
     row = dict(ROW, status="in progress")
     assert "in progress" in render([row], NOW, [], slack=True)

@@ -68,6 +68,7 @@ undo:                             reverse the last ledger change (10 deep)
 185045 / id:185045                stable row reference, survives renumbering
 done: send the deck               close it
 status: deck in progress          open, in progress, blocked
+priority: deck 1                  P1 first; high/medium/low/none
 due: deck by Monday               change the date
 edit: deck to Send deck by Monday rename and re-date
 snooze: deck 3d                   push it out
