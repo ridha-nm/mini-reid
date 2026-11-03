@@ -63,6 +63,11 @@ NEGATIVE_SEED = [
     "say sorry",
     "den i",
     "you speak mandarin",
+    "loving mini-reid",
+    "love you",
+    "good bot",
+    "nice bot",
+    "you are great",
 ]
 
 

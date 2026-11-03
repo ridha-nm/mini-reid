@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (literal handle, hostile banter)
+
+- Channel messages with a literal `@mini-reid` now count as addressed; Slack does not
+  always autocomplete the bot handle.
+- Banter-listed users get the guardrail on hostile messages even without a mention.
+- Classifier seeds cover praise ("loving mini-reid") so it gets the default reply.
+- 194 tests passing.
+
 ## 2026-11-03 (learned task classifier, threat guardrail)
 
 - Added `mini_reid/classifier.py`: pure-Python Naive Bayes over words and word pairs,

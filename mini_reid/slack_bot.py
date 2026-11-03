@@ -84,21 +84,25 @@ BANTER_LINES = [
 ]
 
 
-def banter_reply(channel: str, user: str, text: str, bot_id: str) -> str | None:
-    """Temporary silly auto-replies, configured in banter.json."""
+def banter_active(channel: str, user: str) -> bool:
     path = Path(BANTER_FILE)
     if not path.exists():
-        return None
+        return False
     try:
         cfg = json.loads(path.read_text())
         until = datetime.fromisoformat(cfg["until"])
     except (OSError, ValueError, KeyError):
-        return None
+        return False
     if until.tzinfo is None:
         until = until.astimezone()
-    if until <= datetime.now().astimezone():
-        return None
-    if channel != cfg.get("channel") or user not in (cfg.get("users") or []):
+    return (until > datetime.now().astimezone()
+            and channel == cfg.get("channel")
+            and user in (cfg.get("users") or []))
+
+
+def banter_reply(channel: str, user: str, text: str, bot_id: str) -> str | None:
+    """Temporary silly auto-replies, configured in banter.json."""
+    if not banter_active(channel, user):
         return None
     if f"<@{bot_id}>" in (text or "") or guardrail_reply(text):
         return None
@@ -351,11 +355,14 @@ def load_users(token: str) -> dict[str, str]:
 
 
 def is_bot_addressed(event: dict, bot_user_id: str) -> bool:
-    """DMs reach the bot directly; channel messages must mention it."""
+    """DMs reach the bot directly; channel messages need a real mention or
+    the literal @mini-reid handle (Slack does not always autocomplete)."""
     channel = event.get("channel") or ""
     if channel.startswith("D"):
         return True
-    return bool(bot_user_id) and f"<@{bot_user_id}>" in (event.get("text") or "")
+    text = event.get("text") or ""
+    return bool(bot_user_id) and (
+        f"<@{bot_user_id}>" in text or bool(re.search(r"@mini-?reid\b", text, re.I)))
 
 
 def edit_ack_target(event: dict, bot_user_id: str) -> tuple[str, str] | None:
@@ -1216,6 +1223,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             except Exception as ex:  # noqa: BLE001 - banter is best effort
                 print(f"  banter post failed: {type(ex).__name__}", flush=True)
             return
+        if banter_active(channel, user):
+            guard = guardrail_reply(text)
+            if guard:
+                try:
+                    web.chat_postMessage(channel=channel, text=guard)
+                except Exception as ex:  # noqa: BLE001 - best effort
+                    print(f"  guardrail post failed: {type(ex).__name__}", flush=True)
+                return
         # message.channels/message.groups deliver every channel message. Only
         # act on ones that address the bot; DMs need no mention.
         if not is_bot_addressed(event, bot_user_id):

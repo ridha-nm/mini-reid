@@ -167,6 +167,14 @@ def test_default_reply_for_smalltalk_only():
     assert chatter_reply("remind @Kasib to call at 2pm") is None
 
 
+def test_literal_handle_counts_as_addressed_in_a_channel():
+    from mini_reid.slack_bot import is_bot_addressed
+
+    assert is_bot_addressed({"channel": "C1", "text": "@mini-reid hi"}, "UBOT")
+    assert is_bot_addressed({"channel": "C1", "text": "@minireid hi"}, "UBOT")
+    assert not is_bot_addressed({"channel": "C1", "text": "mini-reid hi"}, "UBOT")
+
+
 def test_guardrail_refuses_interpersonal_relay():
     from mini_reid.slack_bot import guardrail_reply
 
