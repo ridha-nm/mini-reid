@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (immediate reminders fixed)
+
+- An immediate reminder to someone else called `send_dm` with a recipient it does not
+  accept, raising `TypeError`; nothing was sent. Added `send_dm_to` and used it in both
+  the bot and the DM poll.
+- 184 tests passing.
+
 ## 2026-11-03 (notes command)
 
 - `notes` lists notes on demand. They remain out of `list` task numbering and appear in

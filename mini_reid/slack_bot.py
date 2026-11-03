@@ -907,9 +907,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             who = "you" if recipient == user else f"<@{recipient}>"
             if fields.get("immediate"):
                 try:
-                    from .notify import send_dm
+                    from .notify import send_dm_to
 
-                    send_dm(env, recipient, f"*Reminder*\n{fields['what'][:300]}")
+                    send_dm_to(env, recipient, f"*Reminder*\n{fields['what'][:300]}")
                 except Exception as ex:  # noqa: BLE001 - report, never retry blindly
                     print(f"  immediate remind failed: {type(ex).__name__}: {ex}", flush=True)
                     post_reply(channel, f"Could not send that: {type(ex).__name__}",

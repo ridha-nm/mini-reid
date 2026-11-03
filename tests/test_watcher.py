@@ -118,6 +118,34 @@ def test_poll_dm_commands_reads_a_dm_the_bot_is_not_in(tmp_path, monkeypatch):
     assert w.poll_dm_commands(env, NOW, state) == 0
 
 
+def test_poll_dm_immediate_reminder_reaches_the_recipient(tmp_path, monkeypatch):
+    from mini_reid import slack_bot
+    from mini_reid import sources
+    from mini_reid import watcher as w
+
+    monkeypatch.setattr(sources, "slack_me", lambda token: "UBOT")
+    monkeypatch.setattr(slack_bot, "load_users", lambda token: {"kasib": "UKASIB"})
+    monkeypatch.setattr("mini_reid.notify.dm_channel", lambda token, uid: "DBOT")
+
+    def fake_json(url, headers, retries=4):
+        return {"messages": {"matches": [{
+            "ts": "200.0", "user": "URIDHA", "channel": {"id": "D1"},
+            "text": "@mini-reid remind @Kasib to send the file"}]}}
+
+    monkeypatch.setattr(sources, "_get_json", fake_json)
+    to_user, sent = [], []
+    monkeypatch.setattr("mini_reid.notify.send_dm_to",
+                        lambda env, uid, text: to_user.append((uid, text)))
+    monkeypatch.setattr(w, "send_dm", lambda env, text: sent.append(text))
+    env = {"SLACK_USER_TOKEN": "u", "SLACK_BOT_TOKEN": "b", "SLACK_OWNER_ID": "URIDHA"}
+    state = str(tmp_path / "dm_poll.json")
+
+    assert w.poll_dm_commands(env, NOW, state) == 1
+    assert to_user[0][0] == "UKASIB"
+    assert "send the file" in to_user[0][1]
+    assert "Reminder sent to <@UKASIB>" in sent[0]
+
+
 def test_fire_reminders_sends_once(tmp_path, monkeypatch):
     from mini_reid import watcher as w
     from mini_reid.ledger import save

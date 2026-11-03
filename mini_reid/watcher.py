@@ -169,7 +169,9 @@ def poll_dm_commands(env: dict, now: datetime,
         who = "you" if recipient == owner else f"<@{recipient}>"
         try:
             if fields.get("immediate"):
-                send_dm(env, recipient, f"*Reminder*\n{fields['what'][:300]}")
+                from .notify import send_dm_to
+
+                send_dm_to(env, recipient, f"*Reminder*\n{fields['what'][:300]}")
                 note = f"Reminder sent to {who}: {fields['what'][:80]}"
             else:
                 at = datetime.fromisoformat(fields["remind_at"])
