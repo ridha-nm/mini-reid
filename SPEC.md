@@ -108,8 +108,13 @@ a channel mention. Channel mentions are always kept unless they are pure chatter
   questions with no ask ("do you have access?"), status updates ("Update: …"), other
   people's own plans ("I try to get … today"), Google boilerplate, URLs, newsletters.
 
-The model is optional and only rewrites `what`. Given filtering authority it deleted
+The optional local model only rewrites `what`. Given filtering authority it deleted
 real asks and kept jokes.
+
+A tiny Naive Bayes classifier (`mini_reid/classifier.py`) gives a second opinion on
+bot-addressed social text, trained from the ledger, `not:` corrections and seed
+phrases. It can suppress a social note or send the default reply; it never filters
+extracted commitments.
 
 ## Digest
 

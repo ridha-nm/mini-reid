@@ -32,7 +32,10 @@ GUARDRAIL = re.compile(
     r"block\s+(?:him|her|them|both|each other)|"
     r"treat\s+.{0,40}\s+(?:nicely|kindly|well)|be\s+(?:nice|kind)\s+to|"
     r"make\s+(?:up|peace)\s+with|apolog\w*\s+to|say\s+sorry|"
-    r"stop\s+fighting|calm\s+down|mediat\w+)\b", re.I)
+    r"stop\s+fighting|calm\s+down|mediat\w+|"
+    r"bomb\w*|kill\b|murder|shoot|stab|punch|beat\s+you|"
+    r"(?:hurt|harm|destroy)\s+(?:you|me|u)|threat\w*|deepseek|"
+    r"keep\s+messag\w*\s+me|if\s+you\s+keep\s+(?:messag|text)\w*)\b", re.I)
 HUDDLE = re.compile(r"\bstart\s+(?:a\s+)?huddle\b", re.I)
 GUARDRAIL_LINES = [
     "🛑 Guardrail: I'm a to-do list, not a referee. Be nice or take it to a huddle.",
@@ -61,6 +64,9 @@ def guardrail_reply(text: str) -> str | None:
         return "🛑 I can't start huddles. I track tasks, notes and reminders."
     if not GUARDRAIL.search(text or ""):
         return None
+    if re.search(r"\b(?:bomb\w*|kill|murder|shoot|stab|punch|deepseek)\b",
+                 text or "", re.I):
+        return "🛑 I'm a bot with a ledger, not a house. Take that somewhere else."
     return GUARDRAIL_LINES[len(text or "") % len(GUARDRAIL_LINES)]
 
 
@@ -94,7 +100,7 @@ def banter_reply(channel: str, user: str, text: str, bot_id: str) -> str | None:
         return None
     if channel != cfg.get("channel") or user not in (cfg.get("users") or []):
         return None
-    if f"<@{bot_id}>" in (text or ""):
+    if f"<@{bot_id}>" in (text or "") or guardrail_reply(text):
         return None
     return random.choice(BANTER_LINES)
 # Successful writes acknowledged with a reaction instead of a reply.
@@ -991,6 +997,17 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 print(f"  guardrail post failed: {type(ex).__name__}", flush=True)
             _mark(ts)
             return
+
+        if raw_action == "unknown" and user != owner:
+            from .classifier import task_score
+
+            if task_score(text) < 0.3:
+                try:
+                    web.chat_postMessage(channel=channel, text=DEFAULT_REPLY)
+                except Exception as ex:  # noqa: BLE001 - best effort
+                    print(f"  classifier reply failed: {type(ex).__name__}", flush=True)
+                _mark(ts)
+                return
 
         action, body = parse_command(text)
         allow = {u.strip() for u in env.get("KB_ALLOWLIST", "").split(",") if u.strip()}

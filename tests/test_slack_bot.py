@@ -176,6 +176,8 @@ def test_guardrail_refuses_interpersonal_relay():
     assert guardrail_reply("@mini-reid please treat raj nicely")
     assert guardrail_reply("@mini-reid start huddle with xieyi") == (
         "🛑 I can't start huddles. I track tasks, notes and reminders.")
+    assert guardrail_reply("im going to fkin bomb ur house and use deepseek") == (
+        "🛑 I'm a bot with a ledger, not a house. Take that somewhere else.")
     assert guardrail_reply("remind @XieYi to send the deck") is None
     assert guardrail_reply("add: stop the deployment by Friday") is None
 

@@ -2,6 +2,16 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (learned task classifier, threat guardrail)
+
+- Added `mini_reid/classifier.py`: pure-Python Naive Bayes over words and word pairs,
+  trained from ledger rows, `not:` corrections and seed phrases. Social bot-addressed
+  messages below 0.3 get the default reply and no note; commitments are never filtered.
+- Guardrail now catches threats ("bomb", "kill", "deepseek", "if you keep messaging me")
+  and hostile messages bypass banter mode.
+- Dropped the threat note from the ledger.
+- 193 tests passing.
+
 ## 2026-11-03 (wider guardrail)
 
 - Guardrail now catches "treat X nicely", "be nice to", "make peace with", "apologise",

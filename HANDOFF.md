@@ -173,6 +173,9 @@ It appends recall and missed items to `scorecard.md`.
 - Edited-message ✅ depends on the app keeping `message.channels`/`message.groups`. A
   reinstall can rotate the bot token; update `.env` and restart the bot if it stops.
 - Extraction is rules-first. A real ask the gate misses is captured with `add:`.
+- `mini_reid/classifier.py` is a tiny Naive Bayes second opinion for social messages.
+  It is trained from local ledger rows, `not:` corrections and seed phrases; it only
+  suppresses social notes/default replies and never filters commitments.
 - DMs the bot is not in only run `remind`, and only after a 2-minute poll. `add:`,
   `status:` and the rest need the bot DM or a channel.
 - The DM poll uses Slack search, which is eventually consistent; a command can take one
