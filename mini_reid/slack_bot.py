@@ -64,7 +64,6 @@ NICE = re.compile(
     r"appreciate|thanks|thank\s+you|well\s+done|good\s+bot|proud)\b", re.I)
 NICE_LINES = [
     "Thanks — right back at you. 🫡",
-    "Appreciate it. Now go close a task.",
     "😊 Likewise. One task at a time.",
 ]
 
