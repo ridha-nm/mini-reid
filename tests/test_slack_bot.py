@@ -91,6 +91,28 @@ def test_combine_parses_with_numbers():
     assert parse_command("<@U123> combine: #9 into #7") == ("combine", "#9 into #7")
 
 
+def test_tonote_converts_a_task_and_keeps_it_reachable_by_id(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "GHB invoicing cycle complete", NOW, clients, ledger)
+    task_id = load(ledger)[0]["id"]
+    apply_command("priority", "GHB invoicing cycle complete 1", NOW, clients, ledger)
+    reply = apply_command("tonote", task_id[:6], NOW, clients, ledger)
+    row = load(ledger)[0]
+    assert reply.startswith("Converted to note:")
+    assert row["kind"] == "note"
+    assert row["due"] is None
+    assert "priority" not in row
+    # A note is not in the numbered list, but its stable id still resolves.
+    apply_command("drop", task_id[:6], NOW, clients, ledger)
+    assert load(ledger)[0]["status"] == "dropped"
+
+
+def test_tonote_is_parsed():
+    assert parse_command("<@U123> tonote: #4") == ("tonote", "#4")
+    assert parse_command("<@U123> convert: GHB invoicing")[0] == "convert"
+
+
 def test_priority_sets_ranks_and_clears(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")

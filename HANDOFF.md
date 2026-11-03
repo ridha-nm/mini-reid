@@ -69,6 +69,7 @@ undo:                             reverse the last ledger change (10 deep)
 done: send the deck               close it
 status: deck in progress          open, in progress, blocked
 priority: deck 1                  P1 first; high/medium/low/none
+tonote: deck                      keep as a note; dropped from the task list
 due: deck by Monday               change the date
 edit: deck to Send deck by Monday rename and re-date
 snooze: deck 3d                   push it out

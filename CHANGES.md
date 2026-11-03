@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (task to note)
+
+- `tonote: <item>` (alias `convert:`) turns an open task into a note: keeps the text and
+  source, clears due date and priority, moves it to the Notes section. Stable ids still
+  resolve it afterwards.
+- 180 tests passing.
+
 ## 2026-11-03 (task priority)
 
 - `priority: <item> 1-5` ranks a task; `high` / `medium` / `low` / `none` alias 1 / 3 /

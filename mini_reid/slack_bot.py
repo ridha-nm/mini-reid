@@ -19,9 +19,10 @@ LEADING_MENTION = re.compile(
     r"^\s*(?:(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@mini-?reid)\s*)+", re.I)
 COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting", "find",
             "list", "not", "remind", "edit", "status", "priority", "prio",
-            "combine", "uncombine", "undo"}
+            "combine", "uncombine", "convert", "tonote", "undo"}
 MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
-            "remind", "edit", "status", "priority", "prio", "combine", "uncombine"}
+            "remind", "edit", "status", "priority", "prio", "combine", "uncombine",
+            "convert", "tonote"}
 IGNORE_CHANNEL_IDS = {"C0B59LA0X5M"}  # bd-triager-agent
 STATUS_ALIASES = {
     "open": "open", "todo": "open", "pending": "open",
@@ -146,6 +147,7 @@ HELP = """*Mini-Reid commands*
 • `waiting: Eupe waste on Daniel` — waiting on someone else
 • `status: Eupe waste in progress` — or `blocked`, `open`
 • `priority: Eupe waste 1` — P1 first; `high`, `medium`, `low`, `none` also work
+• `tonote: Eupe waste` — keep the text, drop it from tasks into Notes
 • `combine: #9 into #7` — merge duplicate task #9 into #7
 • `uncombine: #7` — restore everything merged into #7
 • `undo:` — reverse the last ledger change (10 deep)
@@ -300,8 +302,8 @@ def parse_command(text: str) -> tuple[str, str]:
         return "help", ""
     m = re.match(
         r"^(add|task|todo|to-do|note|done|drop|remove|delete|due|snooze|waiting|"
-        r"find|not|remind|ask|edit|status|priority|prio|combine|uncombine|undo)"
-        r"\s*:\s*(.*)$", body, re.I)
+        r"find|not|remind|ask|edit|status|priority|prio|combine|uncombine|"
+        r"convert|tonote|undo)\s*:\s*(.*)$", body, re.I)
     if m:
         act = m.group(1).lower()
         if act in {"task", "todo", "to-do"}:
@@ -380,7 +382,8 @@ def _pick(rows: list[dict], target: str) -> tuple[dict | None, str | None]:
     m = re.fullmatch(r"(?:id:)?([0-9a-f]{4,40})", t, re.I)
     if m:
         prefix = m.group(1).lower()
-        hits = [r for r in _open_sorted(rows) if r["id"].startswith(prefix)]
+        hits = [r for r in rows if r.get("status") not in {"done", "dropped"}
+                and r["id"].startswith(prefix)]
         if len(hits) == 1:
             return hits[0], None
         if len(hits) > 1:
@@ -479,6 +482,19 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str)
         }
         save(ledger_path, merge(rows, [row]))
         return "Noted."
+
+    if action in {"convert", "tonote"}:
+        row, err = _pick(rows, body)
+        if err:
+            return err
+        row["kind"] = "note"
+        row["due"] = None
+        row["status"] = "open"
+        row["last_activity"] = now.isoformat()
+        for key in ("priority", "stalled_since", "stalled_reason"):
+            row.pop(key, None)
+        save(ledger_path, rows)
+        return f"Converted to note: {row['what'][:80]}"
 
     if action in {"priority", "prio"}:
         m = re.match(r"^(.*?)\s+(?:to\s+)?(p?[1-5]|high|medium|med|low|none|clear)$",

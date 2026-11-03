@@ -18,8 +18,8 @@ Gmail, Jira and Google Calendar.
   with the join link and "Are you attending?". Answer `yes` or `no <reason>` in the DM.
   The watcher also polls Ridha's DMs for `remind` commands in conversations the bot is
   not part of.
-- **Bot** (`@minireid`): add, note, status, priority, combine, uncombine, undo, done,
-  due, edit, snooze, waiting, drop, not, remind, find, list, ask, help. `list` prints a
+- **Bot** (`@minireid`): add, note, tonote, status, priority, combine, uncombine, undo,
+  done, due, edit, snooze, waiting, drop, not, remind, find, list, ask, help. `list` prints a
   stable short id per row; `185045` or `id:185045` works in every command; `undo:`
   reverses the last change. Priority 1-5 sorts the digest and list. Only you can change the ledger. Anyone can set a private reminder for
   themselves or a teammate — those never enter your ledger.
