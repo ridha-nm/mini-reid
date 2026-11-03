@@ -17,10 +17,10 @@ MENTION = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
 # mention ("remind <@U123> to ...") must survive for split_target.
 LEADING_MENTION = re.compile(
     r"^\s*(?:(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@mini-?reid)\s*)+", re.I)
-COMMANDS = {"add", "note", "notes", "done", "drop", "due", "snooze", "waiting",
-            "find", "list", "not", "remind", "edit", "status", "priority", "prio",
-            "combine", "uncombine", "convert", "tonote", "undo"}
-MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
+COMMANDS = {"add", "note", "notes", "assign", "done", "drop", "due", "snooze",
+            "waiting", "find", "list", "not", "remind", "edit", "status", "priority",
+            "prio", "combine", "uncombine", "convert", "tonote", "undo"}
+MUTATING = {"add", "note", "assign", "done", "drop", "due", "snooze", "waiting", "not",
             "remind", "edit", "status", "priority", "prio", "combine", "uncombine",
             "convert", "tonote"}
 IGNORE_CHANNEL_IDS = {"C0B59LA0X5M"}  # bd-triager-agent
@@ -143,6 +143,7 @@ def other_note(action: str, body: str, user: str) -> str | None:
 HELP = """*Mini-Reid commands*
 • `add: confirm Eupe waste by Friday` — new task
 • `note: Daniel wants the mapping redone` — remember it, no deadline
+• `assign: @Kasib send the deck by Friday` — something you are waiting on
 • `done: Eupe waste` — close it
 • `due: Eupe waste by Monday` — change the date
 • `edit: #1 to Confirm Eupe waste mapping by Monday` — rename and re-date
@@ -307,7 +308,7 @@ def parse_command(text: str) -> tuple[str, str]:
     if body.lower() in {"help", "?", "commands"}:
         return "help", ""
     m = re.match(
-        r"^(add|task|todo|to-do|note|done|drop|remove|delete|due|snooze|waiting|"
+        r"^(add|task|todo|to-do|note|assign|done|drop|remove|delete|due|snooze|waiting|"
         r"find|not|remind|ask|edit|status|priority|prio|combine|uncombine|"
         r"convert|tonote|undo)\s*:\s*(.*)$", body, re.I)
     if m:
@@ -492,6 +493,29 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str)
         due = f" · due {row['due']}" if row["due"] else ""
         client = f"{row['client']} · " if row["client"] else ""
         return f"Added. {client}{row['what']}{due}"
+
+    if action == "assign":
+        from .extract import parse_due
+
+        m = (re.match(r"^@([^\s]+)\s+(.+)$", body or "")
+             or re.match(r"^(.+?)\s+to\s+(.+)$", body or ""))
+        if not m:
+            return "Use: assign: @Kasib send the deck by Friday"
+        person, what = m.group(1).strip(), m.group(2).strip()
+        due, confidence = parse_due(what, now)
+        row = {
+            "id": commitment_id("manual", f"assign:{body}".lower(), what),
+            "direction": "owed_to_me", "what": what[:200], "asker": person[:40],
+            "via": "assigned", "source": "manual", "native_id": body.lower(),
+            "kind": "manual", "source_link": "", "evidence": body[:200],
+            "due": due, "due_confidence": confidence, "cycle": None,
+            "status": "open", "stalled_since": None, "ack_policy": "bot_may_ack",
+            "closure": "open", "client": None, "assigned_to": person[:40],
+            "created_at": now.isoformat(), "last_activity": now.isoformat(),
+            "closed_at": None, "closed_how": None,
+        }
+        save(ledger_path, merge(rows, [row]))
+        return f"Assigned to {person}: {what[:80]}" + (f" · due {due}" if due else "")
 
     if action == "note":
         row = {

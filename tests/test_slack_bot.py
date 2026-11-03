@@ -91,6 +91,24 @@ def test_combine_parses_with_numbers():
     assert parse_command("<@U123> combine: #9 into #7") == ("combine", "#9 into #7")
 
 
+def test_assign_creates_a_waiting_on_row(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    reply = apply_command("assign", "@Kasib send the deck by Friday", NOW,
+                          clients, ledger)
+    row = load(ledger)[0]
+    assert row["direction"] == "owed_to_me"
+    assert row["asker"] == "Kasib"
+    assert row["assigned_to"] == "Kasib"
+    assert row["due"] == "2026-10-30"
+    assert reply.startswith("Assigned to Kasib:")
+
+
+def test_assign_accepts_name_to_phrasing():
+    assert parse_command("<@U123> assign: Kasib to send the deck") == (
+        "assign", "Kasib to send the deck")
+
+
 def test_notes_lists_notes_not_tasks(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")

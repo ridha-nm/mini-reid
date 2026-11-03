@@ -61,6 +61,7 @@ Slack, in the bot's DM or a channel it has been invited to:
 ```
 add: send the deck by Friday      create a task
 task: ... / todo: ...             same as add
+assign: @Kasib send the deck      someone else owes it; Waiting on others
 note that ...                     remember it, no deadline
 combine: #9 into #7               merge a duplicate into the task to keep
 uncombine: #7                     restore everything merged into #7

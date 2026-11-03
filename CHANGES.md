@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (assign tasks to others)
+
+- `assign: @Kasib send the deck by Friday` creates a row in Waiting on others with
+  `direction: owed_to_me`, `assigned_to` and a parsed due date. `Kasib to …` also works.
+- `remind` still sends a Slack DM; `assign` only tracks what they owe.
+- 186 tests passing.
+
 ## 2026-11-03 (immediate reminders fixed)
 
 - An immediate reminder to someone else called `send_dm` with a recipient it does not
