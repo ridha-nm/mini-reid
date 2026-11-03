@@ -133,6 +133,7 @@ def release_message(state_path: str, channel: str, ts: str) -> None:
 
 
 BANTER_FILE = "banter.json"
+BANTER_AUTO_MINUTES = 5
 BANTER_LINES = [
     "🍿 I have no horse in this race, but I do have a ledger.",
     "Noted. Adding “be nice” as P1 for both of you.",
@@ -199,6 +200,27 @@ def banter_active(channel: str, user: str) -> bool:
     return (until > datetime.now().astimezone()
             and channel == cfg.get("channel")
             and ("*" in users or user in users))
+
+
+def arm_banter(channel: str, now: datetime) -> bool:
+    """A mean message opens a five-minute banter window for that channel."""
+    if channel.startswith("D"):
+        return False
+    path = Path(BANTER_FILE)
+    if path.exists():
+        try:
+            cfg = json.loads(path.read_text())
+            until = datetime.fromisoformat(cfg["until"])
+            if until.tzinfo is None:
+                until = until.astimezone()
+            if until > now:
+                return False  # already on somewhere; do not extend it
+        except (OSError, ValueError, KeyError):
+            pass
+    until = (now + timedelta(minutes=BANTER_AUTO_MINUTES)).replace(microsecond=0)
+    path.write_text(json.dumps({"channel": channel, "users": ["*"],
+                                "until": until.isoformat(timespec="seconds")}))
+    return True
 
 
 def banter_reply(channel: str, user: str, text: str, bot_id: str) -> str | None:
@@ -1385,6 +1407,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 _, reply = control
                 web.chat_postMessage(channel=channel, text=reply)
                 return
+        if is_mean(text):
+            arm_banter(channel, datetime.now(MYT))
         addressed = is_bot_addressed(event, bot_user_id)
         if not addressed and banter_active(channel, user):
             line = banter_reply(channel, user, text, bot_user_id)

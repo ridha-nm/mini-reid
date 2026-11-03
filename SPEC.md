@@ -173,12 +173,12 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 - Bot-addressed small talk ("hi", "you there?", "thanks") gets a default reply naming
   `add:`, `note:` and `ask:`; it is not stored.
 - Praise or kindness ("good bot", "loving mini-reid") gets a short kind reply back.
-- Banter mode: `banter on 2h [@person|all]`, `banter off`, `banter status`. It only
-  answers **mean or hostile** messages (insults, threats, "stop messaging me"); neutral
-  chatter gets silence. Replies rotate and never repeat the previous line. Enabling and
-  expiry are announced in the channel. `users: ["*"]` means everyone. Outside banter,
-  the bot only answers messages that address it: a real mention, literal `@mini-reid`,
-  or a DM.
+- Banter mode is **off** by default. Any mean or hostile message in a channel opens a
+  **five-minute** window for that channel; repeated meanness does not extend it. Within
+  the window only mean messages get a rotating sassy reply; neutral chatter is silent.
+  `banter on 2h [@person|all]`, `banter off`, `banter status` still control it manually.
+  The watcher announces and clears the window at expiry. Outside banter, the bot only
+  answers messages that address it: a real mention, literal `@mini-reid`, or a DM.
 - Any other message from someone else gets a ✅ and, if they write something, a note
   plus an instant DM to Ridha. No reply to them.
 - Plain sentences from Ridha become notes; questions go to the knowledge base; due or

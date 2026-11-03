@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (banter auto-arms for five minutes)
+
+- Banter is off by default. A mean or hostile message opens a five-minute window for
+  that channel; further meanness does not extend it. Watcher announces expiry.
+- Manual `banter on/off/status` still available.
+- 198 tests passing.
+
 ## 2026-11-03 (banter only when mean)
 
 - Banter mode now answers only mean or hostile messages. Neutral chatter ("how would you

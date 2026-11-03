@@ -160,6 +160,19 @@ def test_banter_reply_respects_channel_user_expiry_and_mentions(tmp_path, monkey
     assert not is_mean("how would you describe yourself")
 
 
+def test_mean_message_arms_five_minutes_without_extending(tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+
+    from mini_reid.slack_bot import arm_banter
+
+    monkeypatch.chdir(tmp_path)
+    assert arm_banter("C1", NOW)
+    cfg = json.loads(Path("banter.json").read_text())
+    assert cfg["until"] == "2026-10-30T09:05:00+08:00"
+    assert not arm_banter("C1", NOW)  # already on; do not extend
+
+
 def test_banter_command_controls_scope_and_duration(tmp_path, monkeypatch):
     import json
     from pathlib import Path

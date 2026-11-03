@@ -95,10 +95,10 @@ Bot-addressed small talk ("hi", "you there?", "thanks") gets the default reply n
 ("tell X to stop harassing", "unblock me", "treat X nicely"), threats and insults gets a
 silly guardrail line and no ledger row; "start huddle" gets a specific refusal.
 
-Banter mode is controlled from Slack: `banter on 2h [@person|all]`, `banter off`,
-`banter status`. It answers only mean or hostile messages; neutral chatter gets silence.
-Replies rotate without repeating the previous line. Enabling and watcher-detected expiry
-are announced. Currently on for everyone in `C0B0STVFTD2` until 14:00 today.
+Banter mode is off by default. A mean or hostile message in a channel auto-opens a
+five-minute window for that channel; repeated meanness does not extend it. Inside the
+window only mean messages get a rotating sassy reply. `banter on 2h [@person|all]`,
+`banter off`, `banter status` still work manually; the watcher announces expiry.
 
 `#N` from `list` works with `status`, `done`, `due`, `snooze`, `drop`, `waiting`, `not`
 and `edit`, so a rename never depends on fuzzy wording.
