@@ -172,6 +172,7 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
   start huddles."
 - Bot-addressed small talk ("hi", "you there?", "thanks") gets a default reply naming
   `add:`, `note:` and `ask:`; it is not stored.
+- Praise or kindness ("good bot", "loving mini-reid") gets a short kind reply back.
 - Temporary banter mode (`banter.json`: channel, user ids, expiry) answers every message
   from those users in that channel with a canned line. Ridha ends it with `banter off`.
   It expires automatically.

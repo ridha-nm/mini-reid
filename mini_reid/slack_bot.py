@@ -59,6 +59,22 @@ def chatter_reply(text: str) -> str | None:
     return DEFAULT_REPLY if CHATTER.search(text or "") else None
 
 
+NICE = re.compile(
+    r"\b(love|loving|luv|nice|great|awesome|amazing|best|legend|goat|king|queen|"
+    r"appreciate|thanks|thank\s+you|well\s+done|good\s+bot|proud)\b", re.I)
+NICE_LINES = [
+    "Thanks — right back at you. 🫡",
+    "Appreciate it. Now go close a task.",
+    "😊 Likewise. One task at a time.",
+]
+
+
+def nice_reply(text: str) -> str | None:
+    if NICE.search(text or ""):
+        return random.choice(NICE_LINES)
+    return None
+
+
 def guardrail_reply(text: str) -> str | None:
     if HUDDLE.search(text or ""):
         return "🛑 I can't start huddles. I track tasks, notes and reminders."
@@ -987,6 +1003,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         seen.add((channel, ts))
 
         raw_action, _ = parse_command(text)
+        nice = nice_reply(text) if raw_action in {"unknown", "ack"} else None
+        if nice:
+            try:
+                web.chat_postMessage(channel=channel, text=nice)
+            except Exception as ex:  # noqa: BLE001 - best effort
+                print(f"  nice reply failed: {type(ex).__name__}", flush=True)
+            _mark(ts)
+            return
         chatter = chatter_reply(text) if raw_action in {"unknown", "ack"} else None
         if chatter:
             try:
@@ -1224,6 +1248,13 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 print(f"  banter post failed: {type(ex).__name__}", flush=True)
             return
         if banter_active(channel, user):
+            kind = nice_reply(text)
+            if kind:
+                try:
+                    web.chat_postMessage(channel=channel, text=kind)
+                except Exception as ex:  # noqa: BLE001 - best effort
+                    print(f"  nice post failed: {type(ex).__name__}", flush=True)
+                return
             guard = guardrail_reply(text)
             if guard:
                 try:

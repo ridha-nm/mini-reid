@@ -156,6 +156,15 @@ def test_banter_reply_respects_channel_user_expiry_and_mentions(tmp_path, monkey
     assert banter_reply("C1", "U1", "hello", "UBOT") is None
 
 
+def test_nice_messages_get_a_nice_reply():
+    from mini_reid.slack_bot import NICE_LINES, nice_reply
+
+    assert nice_reply("fkin loving @mini-reid") in NICE_LINES
+    assert nice_reply("good bot, thanks") in NICE_LINES
+    assert nice_reply("loving the dashboard") in NICE_LINES
+    assert nice_reply("remind @Kasib to call at 2pm") is None
+
+
 def test_default_reply_for_smalltalk_only():
     from mini_reid.slack_bot import DEFAULT_REPLY, chatter_reply
 

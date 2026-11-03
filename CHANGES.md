@@ -2,6 +2,12 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (be nice back)
+
+- Praise and kindness ("loving mini-reid", "good bot", "thanks") get a short kind reply;
+  it is not stored as a note.
+- 195 tests passing.
+
 ## 2026-11-03 (literal handle, hostile banter)
 
 - Channel messages with a literal `@mini-reid` now count as addressed; Slack does not
