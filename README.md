@@ -20,7 +20,8 @@ Gmail, Jira and Google Calendar.
   not part of.
 - **Bot** (`@minireid`): add, note, status, combine, uncombine, undo, done, due, edit,
   snooze, waiting, drop, not, remind, find, list, ask, help. `list` prints a stable short
-  id per row; `id:185045` works in every command; `undo:` reverses the last change. Only you can change the ledger. Anyone can set a private reminder for
+  id per row; `185045` or `id:185045` works in every command; `undo:` reverses the last
+  change. Only you can change the ledger. Anyone can set a private reminder for
   themselves or a teammate — those never enter your ledger.
 - **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
   local documents. `ask:` returns passages from your own writing, with sources.

@@ -147,7 +147,7 @@ HELP = """*Mini-Reid commands*
 • `combine: #9 into #7` — merge duplicate task #9 into #7
 • `uncombine: #7` — restore everything merged into #7
 • `undo:` — reverse the last ledger change (10 deep)
-• Every `list` row has a stable id: `id:abc123` works in every command
+• Every `list` row has a stable id: `abc123` or `id:abc123` works in every command
 • `drop: Eupe waste` — remove it quietly (`remove:` and `delete:` work too)
 • `not: anything that is not part c` — wrong item, teach it to ignore this kind
 • `remind me to send the deck tomorrow at 3pm` — a timed DM; no time means now
@@ -374,15 +374,17 @@ def _pick(rows: list[dict], target: str) -> tuple[dict | None, str | None]:
     """Return (row, error). `#N` picks from the numbered list; `id:abc123`
     is stable across edits and reordering."""
     t = (target or "").strip()
-    m = re.fullmatch(r"id:([0-9a-f]{4,40})", t, re.I)
+    m = re.fullmatch(r"(?:id:)?([0-9a-f]{4,40})", t, re.I)
     if m:
         prefix = m.group(1).lower()
         hits = [r for r in _open_sorted(rows) if r["id"].startswith(prefix)]
         if len(hits) == 1:
             return hits[0], None
-        if not hits:
+        if len(hits) > 1:
+            return None, f"{prefix} matches more than one item. Use more characters."
+        if t.lower().startswith("id:"):
             return None, f"No open item matches id:{prefix}."
-        return None, f"id:{prefix} matches more than one item. Use more characters."
+        # Not a known id: fall through, a short title could look like hex.
     m = re.fullmatch(r"#(\d+)", t)
     if m:
         items = _open_sorted(rows)

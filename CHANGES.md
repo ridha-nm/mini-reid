@@ -11,8 +11,9 @@ Append-only. Newest first.
 
 ## 2026-11-03 (stable ids and uncombine)
 
-- `list` prints a stable short id per row; `id:185045` resolves regardless of how the
-  numbered list shifts after edits.
+- `list` prints a stable short id per row; `185045` and `id:185045` both resolve
+  regardless of how the numbered list shifts after edits, in every command that picks a
+  row.
 - `uncombine: <keep>` restores every row merged into it.
 - 172 tests passing.
 

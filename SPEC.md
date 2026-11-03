@@ -148,7 +148,7 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
   ledger or digest. An unknown name gets a reply, never a silent reminder to the sender.
 - `list` numbers open items; `#N` works with `combine`, `done`, `due`, `snooze`, `drop`,
   `waiting`, `not`, `status` and `edit`. Each row also carries a stable short id
-  (`[185045]`); `id:185045` resolves regardless of numbering changes.
+  (`[185045]`); `185045` or `id:185045` resolves regardless of numbering changes.
 - `combine: <duplicate> into <keep>` drops the duplicate with `closed_how: merged` and
   records it under `merged_from` on the kept row. `uncombine: <keep>` restores them. No
   automatic dedupe: related asks can describe different deliverables.

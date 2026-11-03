@@ -141,6 +141,17 @@ def test_stable_id_resolves_after_reordering(tmp_path):
     assert load(ledger)[0]["status"] == "done"
 
 
+def test_bare_short_id_works_without_the_prefix(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "First task", NOW, clients, ledger)
+    apply_command("add", "Second task", NOW, clients, ledger)
+    rows = load(ledger)
+    first = next(r for r in rows if r["what"] == "First task")
+    reply = apply_command("done", first["id"][:6], NOW, clients, ledger)
+    assert reply == "Closed: First task"
+
+
 def test_status_sets_in_progress_blocked_and_open(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")
