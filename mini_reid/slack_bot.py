@@ -767,8 +767,16 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         print(f"user list unavailable: {type(ex).__name__}", flush=True)
         users = {}
 
-    def post_reply(channel: str, text: str, notify: bool = True) -> None:
-        """Post in place; DM a copy when the command came from a channel."""
+    def post_reply(channel: str, text: str, notify: bool = True,
+                   private: bool = False) -> None:
+        """Post in place; DM a copy when the command came from a channel.
+        `private` sends only to Ridha's DM, so a channel is not pinged."""
+        if private and not channel.startswith("D"):
+            try:
+                send_dm(env, text)
+            except Exception as ex:  # noqa: BLE001
+                print(f"  dm reply failed: {type(ex).__name__}", flush=True)
+            return
         web.chat_postMessage(channel=channel, text=text)
         if not notify or channel.startswith("D"):
             return
@@ -839,7 +847,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 reply = f"Could not answer: {type(ex).__name__}"
             if late:
                 reply = "_(answered late, I was offline)_\n" + reply
-            post_reply(channel, reply[:3900], notify=user == owner)
+            post_reply(channel, reply[:3900], notify=user == owner,
+                       private=user == owner)
             _mark(ts)
             return
 
@@ -851,18 +860,17 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if action == "remind" and target is None:
             missing = unresolved_recipient(body, users)
             if missing:
-                web.chat_postMessage(
-                    channel=channel,
-                    text=f"I can't find {missing} in this Slack workspace. "
-                         "Reminders can only DM Pantas members.")
+                post_reply(channel, f"I can't find {missing} in this Slack workspace. "
+                                    "Reminders can only DM Pantas members.",
+                           notify=False, private=user == owner)
                 _mark(ts)
                 return
         if should_schedule_reminder(action, user, owner, target):
             fields, _ = parse_remind(rest, datetime.now(MYT))
             if fields is None:
-                web.chat_postMessage(
-                    channel=channel,
-                    text="Use: remind <name> to <what> at 2pm (or add: <what> at 2pm)")
+                post_reply(channel, "Use: remind <name> to <what> at 2pm "
+                                    "(or add: <what> at 2pm)",
+                           notify=False, private=user == owner)
                 _mark(ts)
                 return
             recipient = target or user
@@ -874,17 +882,18 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     send_dm(env, recipient, f"*Reminder*\n{fields['what'][:300]}")
                 except Exception as ex:  # noqa: BLE001 - report, never retry blindly
                     print(f"  immediate remind failed: {type(ex).__name__}: {ex}", flush=True)
-                    web.chat_postMessage(
-                        channel=channel, text=f"Could not send that: {type(ex).__name__}")
+                    post_reply(channel, f"Could not send that: {type(ex).__name__}",
+                               notify=False, private=user == owner)
                     _mark(ts)
                     return
                 reply = f"Reminder sent to {who}: {fields['what'][:80]}"
-                post_reply(channel, reply, notify=user == owner)
+                post_reply(channel, reply, notify=user == owner, private=user == owner)
                 _mark(ts)
                 return
             at = datetime.fromisoformat(fields["remind_at"])
             if at <= datetime.now(MYT):
-                web.chat_postMessage(channel=channel, text="That time is in the past.")
+                post_reply(channel, "That time is in the past.",
+                           notify=False, private=user == owner)
                 _mark(ts)
                 return
             try:
@@ -895,13 +904,12 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                             int(at.timestamp()))
             except Exception as ex:  # noqa: BLE001 - report, never retry blindly
                 print(f"  schedule failed: {type(ex).__name__}: {ex}", flush=True)
-                web.chat_postMessage(
-                    channel=channel,
-                    text=f"Could not schedule that: {type(ex).__name__}")
+                post_reply(channel, f"Could not schedule that: {type(ex).__name__}",
+                           notify=False, private=user == owner)
                 _mark(ts)
                 return
             reply = f"Reminder set for {who} — {at:%a %d %b %H:%M}: {fields['what'][:80]}"
-            post_reply(channel, reply, notify=user == owner)
+            post_reply(channel, reply, notify=user == owner, private=user == owner)
             _mark(ts)
             return
 
@@ -957,7 +965,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 print(f"  ack react failed: {type(ex).__name__}: {ex}", flush=True)
         if late:
             reply = "_(answered late, I was offline)_\n" + reply
-        post_reply(channel, reply)
+        post_reply(channel, reply, private=True)
         _mark(ts)
 
     def handle(_socket_client, req):

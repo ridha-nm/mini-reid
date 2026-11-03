@@ -2,6 +2,12 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (no channel pings)
+
+- Replies to Ridha's own commands now go only to his DM; the channel gets just the
+  ➕ / 📝 reaction. Reminder and error replies follow the same rule.
+- 180 tests passing.
+
 ## 2026-11-03 (emoji acks for add and note)
 
 - Successful `add:` gets a ➕ reaction; `note:` and `tonote:` get 📝. No text reply on
