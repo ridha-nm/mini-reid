@@ -93,9 +93,11 @@ help                              the command list
 Bot-addressed small talk ("hi", "you there?", "thanks") gets the default reply naming
 `add:`, `note:` and `ask:`; praise gets a short kind reply. Nothing is stored. A request to referee a personal fight
 ("tell X to stop harassing", "unblock me", "treat X nicely"), threats and insults gets a
-silly guardrail line and no ledger row; "start huddle" gets a specific refusal. `banter.json` turns on temporary
-canned replies for listed users in one channel; `banter off` ends it, and the `until`
-timestamp expires it anyway.
+silly guardrail line and no ledger row; "start huddle" gets a specific refusal.
+
+Banter mode is off. Only turn it on if XieYi spams again: recreate `banter.json`
+(channel `C0B0STVFTD2`, user `U06BWRJDP8W`, one-hour `until`). `banter off` ends it.
+Otherwise the bot only answers messages that address it.
 
 `#N` from `list` works with `status`, `done`, `due`, `snooze`, `drop`, `waiting`, `not`
 and `edit`, so a rename never depends on fuzzy wording.

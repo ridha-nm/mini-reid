@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (banter off)
+
+- Banter mode switched off. The bot only answers messages that address it: real
+  mention, literal `@mini-reid`, or a DM. Re-enable `banter.json` only if XieYi spams
+  again.
+- 196 tests passing.
+
 ## 2026-11-03 (sass for swearing)
 
 - Swearing or insulting the bot now gets a semi-mean silly line ("Bold words from
