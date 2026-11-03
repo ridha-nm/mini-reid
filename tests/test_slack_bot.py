@@ -156,6 +156,17 @@ def test_banter_reply_respects_channel_user_expiry_and_mentions(tmp_path, monkey
     assert banter_reply("C1", "U1", "hello", "UBOT") is None
 
 
+def test_default_reply_for_smalltalk_only():
+    from mini_reid.slack_bot import DEFAULT_REPLY, chatter_reply
+
+    assert chatter_reply("hi") == DEFAULT_REPLY
+    assert chatter_reply("hey mini-reid, you there?") == DEFAULT_REPLY
+    assert chatter_reply("test") == DEFAULT_REPLY
+    assert chatter_reply("add: send the deck by Friday") is None
+    assert chatter_reply("note: Daniel wants the mapping redone") is None
+    assert chatter_reply("remind @Kasib to call at 2pm") is None
+
+
 def test_guardrail_refuses_interpersonal_relay():
     from mini_reid.slack_bot import guardrail_reply
 

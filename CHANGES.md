@@ -2,6 +2,12 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (default reply for small talk)
+
+- Bot-addressed greetings, "you there?", "test", thanks and similar get a default reply
+  naming `add:`, `note:` and `ask:`. Nothing is stored.
+- 191 tests passing.
+
 ## 2026-11-03 (banter mode)
 
 - `banter.json` answers every message from listed users in one channel with a canned

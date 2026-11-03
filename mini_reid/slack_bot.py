@@ -38,6 +38,20 @@ GUARDRAIL_LINES = [
 ]
 
 
+DEFAULT_REPLY = ("I'm Mini-Reid — tasks, notes and reminders. "
+                 "Try `add: …`, `note: …`, or `ask: …`.")
+CHATTER = re.compile(
+    r"^\s*(?:hi|hello|hey|yo|sup|good\s+(?:morning|afternoon|evening)|"
+    r"how\s+are\s+you|what'?s\s+up|are\s+you\s+(?:there|awake|alive)|"
+    r"you\s+(?:there|awake)|test(?:ing)?|lol|lmao|haha|who\s+are\s+you|"
+    r"what\s+are\s+you|thanks|thank\s+you|got\s+it)\b", re.I)
+
+
+def chatter_reply(text: str) -> str | None:
+    """Default answer for bot-addressed small talk, not task text."""
+    return DEFAULT_REPLY if CHATTER.search(text or "") else None
+
+
 def guardrail_reply(text: str) -> str | None:
     if not GUARDRAIL.search(text or ""):
         return None
@@ -952,6 +966,16 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if (channel, ts) in seen or channel in IGNORE_CHANNEL_IDS:
             return
         seen.add((channel, ts))
+
+        raw_action, _ = parse_command(text)
+        chatter = chatter_reply(text) if raw_action in {"unknown", "ack"} else None
+        if chatter:
+            try:
+                web.chat_postMessage(channel=channel, text=chatter)
+            except Exception as ex:  # noqa: BLE001 - best effort
+                print(f"  default reply failed: {type(ex).__name__}", flush=True)
+            _mark(ts)
+            return
 
         guard = guardrail_reply(text)
         if guard:
