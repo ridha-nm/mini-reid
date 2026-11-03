@@ -157,9 +157,10 @@ def banter_active(channel: str, user: str) -> bool:
         return False
     if until.tzinfo is None:
         until = until.astimezone()
+    users = cfg.get("users") or []
     return (until > datetime.now().astimezone()
             and channel == cfg.get("channel")
-            and user in (cfg.get("users") or []))
+            and ("*" in users or user in users))
 
 
 def banter_reply(channel: str, user: str, text: str, bot_id: str) -> str | None:

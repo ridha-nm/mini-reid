@@ -2,6 +2,12 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (banter for everyone until 2pm)
+
+- `users: ["*"]` enables banter for everyone in a channel. On in `C0B0STVFTD2` until
+  14:00 today at Arman's request; expires automatically.
+- 196 tests passing.
+
 ## 2026-11-03 (banter off)
 
 - Banter mode switched off. The bot only answers messages that address it: real

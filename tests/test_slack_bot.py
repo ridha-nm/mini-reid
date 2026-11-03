@@ -151,6 +151,10 @@ def test_banter_reply_respects_channel_user_expiry_and_mentions(tmp_path, monkey
     assert banter_reply("C1", "U2", "hello", "UBOT") is None
     assert banter_reply("C1", "U1", "<@UBOT> hello", "UBOT") is None
     Path("banter.json").write_text(json.dumps({
+        "channel": "C1", "users": ["*"],
+        "until": "2099-01-01T00:00:00+08:00"}))
+    assert banter_reply("C1", "U2", "hello", "UBOT") in BANTER_LINES
+    Path("banter.json").write_text(json.dumps({
         "channel": "C1", "users": ["U1"],
         "until": "2020-01-01T00:00:00+08:00"}))
     assert banter_reply("C1", "U1", "hello", "UBOT") is None

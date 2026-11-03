@@ -173,10 +173,10 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 - Bot-addressed small talk ("hi", "you there?", "thanks") gets a default reply naming
   `add:`, `note:` and `ask:`; it is not stored.
 - Praise or kindness ("good bot", "loving mini-reid") gets a short kind reply back.
-- Banter mode is **off**. If XieYi starts spamming again, recreate `banter.json` with
-  the channel, his user id and a one-hour `until`; it answers him with a canned line and
-  expires on its own. Ridha can also say `banter off`. Outside that exception, the bot
-  only answers messages that address it: a real mention, literal `@mini-reid`, or a DM.
+- Banter mode is **on until 14:00 today** for everyone in `C0B0STVFTD2` (Arman asked):
+  every untagged message there gets a canned silly line. `users: ["*"]` means everyone.
+  It expires on its own; `banter off` ends it early. Outside that exception, the bot only
+  answers messages that address it: a real mention, literal `@mini-reid`, or a DM.
 - Any other message from someone else gets a ✅ and, if they write something, a note
   plus an instant DM to Ridha. No reply to them.
 - Plain sentences from Ridha become notes; questions go to the knowledge base; due or
