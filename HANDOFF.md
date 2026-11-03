@@ -63,6 +63,9 @@ add: send the deck by Friday      create a task
 task: ... / todo: ...             same as add
 note that ...                     remember it, no deadline
 combine: #9 into #7               merge a duplicate into the task to keep
+uncombine: #7                     restore everything merged into #7
+undo:                             reverse the last ledger change (10 deep)
+id:185045                         stable row reference, survives renumbering
 done: send the deck               close it
 status: deck in progress          open, in progress, blocked
 due: deck by Monday               change the date

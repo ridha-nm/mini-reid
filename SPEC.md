@@ -134,8 +134,8 @@ stalled status counts as overdue; undated rows stay in No date.
 ## Bot commands
 
 `add:`, `task:`, `todo:`, `note that`, `status: <item> in progress | blocked | open`,
-`combine: <duplicate> into <keep>`, `done:`, `due:`, `edit: <item> to <new name> [by
-<when>]`, `snooze:`, `waiting:`,
+`combine: <duplicate> into <keep>`, `uncombine: <keep>`, `undo:`, `done:`, `due:`,
+`edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
 ignores that title), `remind` (absolute or `in 2 minutes`),
 `ask:`, `find:`, `list`, `help`.
@@ -147,10 +147,13 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
   reminders are scheduled in Slack (server-side), stay private, and never enter Ridha's
   ledger or digest. An unknown name gets a reply, never a silent reminder to the sender.
 - `list` numbers open items; `#N` works with `combine`, `done`, `due`, `snooze`, `drop`,
-  `waiting`, `not`, `status` and `edit`.
+  `waiting`, `not`, `status` and `edit`. Each row also carries a stable short id
+  (`[185045]`); `id:185045` resolves regardless of numbering changes.
 - `combine: <duplicate> into <keep>` drops the duplicate with `closed_how: merged` and
-  records it under `merged_from` on the kept row. No automatic dedupe: related asks can
-  describe different deliverables.
+  records it under `merged_from` on the kept row. `uncombine: <keep>` restores them. No
+  automatic dedupe: related asks can describe different deliverables.
+- `undo:` reverses the last mutating command. Ten snapshots are kept in
+  `ledger_undo.json`; background watcher merges are not snapshots.
 - Any other message from someone else gets a ✅ and, if they write something, a note
   plus an instant DM to Ridha. No reply to them.
 - Plain sentences from Ridha become notes; questions go to the knowledge base; due or

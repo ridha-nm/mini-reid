@@ -17,10 +17,10 @@ MENTION = re.compile(r"<@[A-Z0-9]+(?:\|[^>]*)?>")
 # mention ("remind <@U123> to ...") must survive for split_target.
 LEADING_MENTION = re.compile(
     r"^\s*(?:(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@mini-?reid)\s*)+", re.I)
-COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting",
-            "find", "list", "not", "remind", "edit", "status", "combine"}
+COMMANDS = {"add", "note", "done", "drop", "due", "snooze", "waiting", "find",
+            "list", "not", "remind", "edit", "status", "combine", "uncombine", "undo"}
 MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
-            "remind", "edit", "status", "combine"}
+            "remind", "edit", "status", "combine", "uncombine"}
 IGNORE_CHANNEL_IDS = {"C0B59LA0X5M"}  # bd-triager-agent
 STATUS_ALIASES = {
     "open": "open", "todo": "open", "pending": "open",
@@ -145,6 +145,9 @@ HELP = """*Mini-Reid commands*
 • `waiting: Eupe waste on Daniel` — waiting on someone else
 • `status: Eupe waste in progress` — or `blocked`, `open`
 • `combine: #9 into #7` — merge duplicate task #9 into #7
+• `uncombine: #7` — restore everything merged into #7
+• `undo:` — reverse the last ledger change (10 deep)
+• Every `list` row has a stable id: `id:abc123` works in every command
 • `drop: Eupe waste` — remove it quietly (`remove:` and `delete:` work too)
 • `not: anything that is not part c` — wrong item, teach it to ignore this kind
 • `remind me to send the deck tomorrow at 3pm` — a timed DM; no time means now
@@ -295,7 +298,7 @@ def parse_command(text: str) -> tuple[str, str]:
         return "help", ""
     m = re.match(
         r"^(add|task|todo|to-do|note|done|drop|remove|delete|due|snooze|waiting|"
-        r"find|not|remind|ask|edit|status|combine)\s*:\s*(.+)$", body, re.I)
+        r"find|not|remind|ask|edit|status|combine|uncombine|undo)\s*:\s*(.*)$", body, re.I)
     if m:
         act = m.group(1).lower()
         if act in {"task", "todo", "to-do"}:
@@ -368,8 +371,18 @@ def _open_sorted(rows: list[dict]) -> list[dict]:
 
 
 def _pick(rows: list[dict], target: str) -> tuple[dict | None, str | None]:
-    """Return (row, error). `#N` picks from the numbered list."""
+    """Return (row, error). `#N` picks from the numbered list; `id:abc123`
+    is stable across edits and reordering."""
     t = (target or "").strip()
+    m = re.fullmatch(r"id:([0-9a-f]{4,40})", t, re.I)
+    if m:
+        prefix = m.group(1).lower()
+        hits = [r for r in _open_sorted(rows) if r["id"].startswith(prefix)]
+        if len(hits) == 1:
+            return hits[0], None
+        if not hits:
+            return None, f"No open item matches id:{prefix}."
+        return None, f"id:{prefix} matches more than one item. Use more characters."
     m = re.fullmatch(r"#(\d+)", t)
     if m:
         items = _open_sorted(rows)
@@ -398,9 +411,46 @@ def _shift(text: str, now):
     return parse_due(text, now)[0]
 
 
+UNDO_DEPTH = 10
+
+
+def _undo_path(ledger_path: str) -> Path:
+    return Path(ledger_path).with_name(Path(ledger_path).stem + "_undo.json")
+
+
+def _push_undo(ledger_path: str, before: str) -> None:
+    path = _undo_path(ledger_path)
+    data = json.loads(path.read_text()) if path.exists() else {}
+    stack = data.get("snapshots") or []
+    stack.append(before or "[]")
+    path.write_text(json.dumps({"snapshots": stack[-UNDO_DEPTH:]}))
+
+
 def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) -> str:
+    """Run a command, and snapshot the ledger before any mutation so `undo:`
+    can reverse it."""
+    path = Path(ledger_path)
+    before = path.read_text() if path.exists() else ""
+    reply = _apply_command(action, body, now, clients, ledger_path)
+    if action in MUTATING:
+        after = path.read_text() if path.exists() else ""
+        if after and after != before:
+            _push_undo(ledger_path, before)
+    return reply
+
+
+def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str) -> str:
     """Mutate the ledger and return the reply text. Pure enough to test."""
     rows = load(ledger_path)
+
+    if action == "undo":
+        path = _undo_path(ledger_path)
+        stack = (json.loads(path.read_text()).get("snapshots") or []) if path.exists() else []
+        if not stack:
+            return "Nothing to undo."
+        Path(ledger_path).write_text(stack.pop())
+        path.write_text(json.dumps({"snapshots": stack}))
+        return "Undone the last ledger change."
 
     if action == "add":
         row = parse_capture(f"add: {body}", now, clients)
@@ -448,6 +498,28 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
         save(ledger_path, rows)
         return (f"Combined: {duplicate['what'][:70]} → {keep['what'][:70]}\n"
                 f"Kept #{_open_sorted(rows).index(keep) + 1}: {keep['what'][:80]}")
+
+    if action == "uncombine":
+        keep, err = _pick(rows, body)
+        if err:
+            return err
+        merged = keep.pop("merged_from", [])
+        if not merged:
+            return "Nothing is merged into that item."
+        by_id = {r["id"]: r for r in rows}
+        restored = []
+        for entry in merged:
+            row = by_id.get(entry.get("id"))
+            if not row:
+                continue
+            row["status"] = "open"
+            row["last_activity"] = now.isoformat()
+            for key in ("closed_at", "closed_how", "merged_into"):
+                row.pop(key, None)
+            restored.append(row["what"][:70])
+        save(ledger_path, rows)
+        return (f"Restored {len(restored)} item(s):\n"
+                + "\n".join(f"• {w}" for w in restored))
 
     if action == "status":
         m = re.match(
@@ -536,7 +608,8 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str) 
         if not open_rows:
             return "Nothing open."
         return "Open:\n" + "\n".join(
-            f"{i}. {r['what'][:90]}" + (f" — {r['due']}" if r.get("due") else "")
+            f"{i}. [{r['id'][:6]}] {r['what'][:90]}"
+            + (f" — {r['due']}" if r.get("due") else "")
             + (f" — {r['status']}" if r.get("status") in {"in progress", "blocked"}
                else "")
             + _ref(r)

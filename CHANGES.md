@@ -2,6 +2,20 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (undo)
+
+- `undo:` reverses the last mutating bot command. The ledger is snapshotted before each
+  change; ten snapshots live in `ledger_undo.json`. Background watcher merges are not
+  snapshotted.
+- 174 tests passing.
+
+## 2026-11-03 (stable ids and uncombine)
+
+- `list` prints a stable short id per row; `id:185045` resolves regardless of how the
+  numbered list shifts after edits.
+- `uncombine: <keep>` restores every row merged into it.
+- 172 tests passing.
+
 ## 2026-11-03 (combine related tasks)
 
 - `combine: <duplicate> into <keep>` merges two related rows. The duplicate is dropped

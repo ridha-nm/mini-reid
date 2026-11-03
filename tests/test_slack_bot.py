@@ -91,6 +91,56 @@ def test_combine_parses_with_numbers():
     assert parse_command("<@U123> combine: #9 into #7") == ("combine", "#9 into #7")
 
 
+def test_undo_reverses_mutations_and_stops_when_empty(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "First task", NOW, clients, ledger)
+    apply_command("add", "Second task", NOW, clients, ledger)
+    assert apply_command("undo", "", NOW, clients, ledger) == (
+        "Undone the last ledger change.")
+    assert len(load(ledger)) == 1
+    apply_command("undo", "", NOW, clients, ledger)
+    assert load(ledger) == []
+    assert apply_command("undo", "", NOW, clients, ledger) == "Nothing to undo."
+
+
+def test_undo_restores_an_edited_title(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Original title", NOW, clients, ledger)
+    apply_command("edit", "Original title to Renamed title", NOW, clients, ledger)
+    assert load(ledger)[0]["what"] == "Renamed title"
+    apply_command("undo", "", NOW, clients, ledger)
+    assert load(ledger)[0]["what"] == "Original title"
+
+
+def test_uncombine_restores_the_duplicate(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Boon Hee generic activity data for concrete", NOW, clients, ledger)
+    apply_command("add", "Suggest suitable activity item for project usage", NOW,
+                  clients, ledger)
+    apply_command("combine", "generic activity data into suitable activity item",
+                  NOW, clients, ledger)
+    reply = apply_command("uncombine", "suitable activity item", NOW, clients, ledger)
+    rows = load(ledger)
+    assert all(r["status"] == "open" for r in rows)
+    assert len(rows) == 2
+    assert reply.startswith("Restored 1 item(s)")
+
+
+def test_stable_id_resolves_after_reordering(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "First task", NOW, clients, ledger)
+    first_id = load(ledger)[0]["id"]
+    apply_command("add", "Second task", NOW, clients, ledger)
+    apply_command("done", "Second task", NOW, clients, ledger)
+    reply = apply_command("done", f"id:{first_id[:6]}", NOW, clients, ledger)
+    assert "Closed: First task" == reply
+    assert load(ledger)[0]["status"] == "done"
+
+
 def test_status_sets_in_progress_blocked_and_open(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")
