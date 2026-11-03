@@ -2,6 +2,12 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (emoji acks for add and note)
+
+- Successful `add:` gets a ➕ reaction; `note:` and `tonote:` get 📝. No text reply on
+  success. Failures still reply with the reason.
+- 180 tests passing.
+
 ## 2026-11-03 (task to note)
 
 - `tonote: <item>` (alias `convert:`) turns an open task into a note: keeps the text and

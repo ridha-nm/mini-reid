@@ -21,7 +21,8 @@ Gmail, Jira and Google Calendar.
 - **Bot** (`@minireid`): add, note, tonote, status, priority, combine, uncombine, undo,
   done, due, edit, snooze, waiting, drop, not, remind, find, list, ask, help. `list` prints a
   stable short id per row; `185045` or `id:185045` works in every command; `undo:`
-  reverses the last change. Priority 1-5 sorts the digest and list. Only you can change the ledger. Anyone can set a private reminder for
+  reverses the last change. Priority 1-5 sorts the digest and list. Successful `add:`
+  reacts ➕; `note:` / `tonote:` react 📝. Only you can change the ledger. Anyone can set a private reminder for
   themselves or a teammate — those never enter your ledger.
 - **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
   local documents. `ask:` returns passages from your own writing, with sources.

@@ -90,8 +90,10 @@ Plain sentences from Ridha become notes; questions go to the knowledge base; due
 status questions go to the list.
 
 A command run in a channel is answered in the channel and mirrored to Ridha's DM, so it
-raises a Slack notification. Editing a message that still mentions the bot gets a ✅;
-edits are never replayed, so a command cannot be applied twice.
+raises a Slack notification. Successful `add:` is acknowledged with ➕ and `note:` /
+`tonote:` with 📝 instead of a reply; failures still reply. Editing a message that still
+mentions the bot gets a ✅; edits are never replayed, so a command cannot be applied
+twice.
 
 Anyone who tags or DMs the bot can set a reminder for themselves or any teammate in the
 Pantas workspace: `remind me to … at 2pm`, `remind @Arman to … at 2pm`,

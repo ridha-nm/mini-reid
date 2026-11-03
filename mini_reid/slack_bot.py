@@ -24,6 +24,9 @@ MUTATING = {"add", "note", "done", "drop", "due", "snooze", "waiting", "not",
             "remind", "edit", "status", "priority", "prio", "combine", "uncombine",
             "convert", "tonote"}
 IGNORE_CHANNEL_IDS = {"C0B59LA0X5M"}  # bd-triager-agent
+# Successful writes acknowledged with a reaction instead of a reply.
+EMOJI_ACKS = {"add": "heavy_plus_sign", "note": "memo",
+              "tonote": "memo", "convert": "memo"}
 STATUS_ALIASES = {
     "open": "open", "todo": "open", "pending": "open",
     "in progress": "in progress", "in-progress": "in progress",
@@ -943,6 +946,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             print(f"[error] {type(ex).__name__}: {ex}", flush=True)
             reply = f"Something broke: {type(ex).__name__}"
         print(f"  reply: {reply[:120]!r}", flush=True)
+        if action in EMOJI_ACKS and reply.startswith(
+                ("Added.", "Noted.", "Converted to note:")):
+            try:
+                web.reactions_add(channel=channel, timestamp=ts,
+                                  name=EMOJI_ACKS[action])
+                _mark(ts)
+                return
+            except Exception as ex:  # noqa: BLE001 - fall back to the text reply
+                print(f"  ack react failed: {type(ex).__name__}: {ex}", flush=True)
         if late:
             reply = "_(answered late, I was offline)_\n" + reply
         post_reply(channel, reply)
