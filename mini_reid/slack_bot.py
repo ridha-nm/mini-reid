@@ -165,6 +165,14 @@ def _pick_banter(channel: str, lines: list[str]) -> str:
     return line
 
 
+def is_mean(text: str) -> bool:
+    """Only mean or hostile messages earn a banter response."""
+    return bool(INSULT.search(text or "") or re.search(
+        r"\b(harass\w*|bully\w*|unblock\s+me|bomb\w*|kill|threat\w*|deepseek|"
+        r"stop\s+(?:texting|messaging|bothering)|keep\s+messag\w*\s+me)\b",
+        text or "", re.I))
+
+
 def banter_line(channel: str, text: str) -> str:
     nice = nice_reply(text)
     if nice:
@@ -195,7 +203,7 @@ def banter_active(channel: str, user: str) -> bool:
 
 def banter_reply(channel: str, user: str, text: str, bot_id: str) -> str | None:
     """Temporary silly auto-replies, configured in banter.json."""
-    if not banter_active(channel, user):
+    if not banter_active(channel, user) or not is_mean(text):
         return None
     if (f"<@{bot_id}>" in (text or "") or re.search(r"@mini-?reid\b", text or "", re.I)
             or guardrail_reply(text)):

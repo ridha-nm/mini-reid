@@ -2,6 +2,12 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (banter only when mean)
+
+- Banter mode now answers only mean or hostile messages. Neutral chatter ("how would you
+  describe yourself") gets silence.
+- 197 tests passing.
+
 ## 2026-11-03 (banter upgrade)
 
 - `banter on 2h [@person|all]`, `banter off`, `banter status` from Slack; no file editing.

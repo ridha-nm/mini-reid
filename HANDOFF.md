@@ -96,9 +96,9 @@ Bot-addressed small talk ("hi", "you there?", "thanks") gets the default reply n
 silly guardrail line and no ledger row; "start huddle" gets a specific refusal.
 
 Banter mode is controlled from Slack: `banter on 2h [@person|all]`, `banter off`,
-`banter status`. Replies are context-aware (question/greeting/praise/generic) and never
-repeat the previous line. Enabling and watcher-detected expiry are announced. Currently
-on for everyone in `C0B0STVFTD2` until 14:00 today at Arman's request.
+`banter status`. It answers only mean or hostile messages; neutral chatter gets silence.
+Replies rotate without repeating the previous line. Enabling and watcher-detected expiry
+are announced. Currently on for everyone in `C0B0STVFTD2` until 14:00 today.
 
 `#N` from `list` works with `status`, `done`, `due`, `snooze`, `drop`, `waiting`, `not`
 and `edit`, so a rename never depends on fuzzy wording.

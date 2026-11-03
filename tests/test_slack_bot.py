@@ -146,14 +146,18 @@ def test_banter_reply_respects_channel_user_expiry_and_mentions(tmp_path, monkey
     Path("banter.json").write_text(json.dumps({
         "channel": "C1", "users": ["U1"],
         "until": "2099-01-01T00:00:00+08:00"}))
-    assert banter_reply("C1", "U1", "hello", "UBOT") is not None
-    assert banter_reply("C2", "U1", "hello", "UBOT") is None
-    assert banter_reply("C1", "U2", "hello", "UBOT") is None
-    assert banter_reply("C1", "U1", "<@UBOT> hello", "UBOT") is None
+    # Neutral chatter gets no banter; only mean messages do.
+    assert banter_reply("C1", "U1", "hello", "UBOT") is None
+    assert banter_reply("C2", "U1", "you are stupid", "UBOT") is None
     Path("banter.json").write_text(json.dumps({
         "channel": "C1", "users": ["*"],
         "until": "2099-01-01T00:00:00+08:00"}))
-    assert banter_reply("C1", "U2", "hello", "UBOT") is not None
+    assert banter_reply("C1", "U2", "hello", "UBOT") is None
+    from mini_reid.slack_bot import is_mean
+
+    assert is_mean("you are stupid")
+    assert is_mean("shut up")
+    assert not is_mean("how would you describe yourself")
 
 
 def test_banter_command_controls_scope_and_duration(tmp_path, monkeypatch):
