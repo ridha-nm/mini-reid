@@ -85,6 +85,36 @@ def guardrail_reply(text: str) -> str | None:
     return GUARDRAIL_LINES[len(text or "") % len(GUARDRAIL_LINES)]
 
 
+HANDLED_MAX = 1000
+
+
+def claim_message(state_path: str, channel: str, ts: str) -> bool:
+    """True once per Slack message id, even across bot restarts."""
+    path = Path(state_path)
+    state = json.loads(path.read_text()) if path.exists() else {}
+    key = f"{channel}:{ts}"
+    handled = state.get("handled") or {}
+    if key in handled:
+        return False
+    handled[key] = ts
+    if len(handled) > HANDLED_MAX:
+        newest = sorted(handled.items(), key=lambda kv: float(kv[1]))[-HANDLED_MAX:]
+        handled = dict(newest)
+    state["handled"] = handled
+    path.write_text(json.dumps(state))
+    return True
+
+
+def release_message(state_path: str, channel: str, ts: str) -> None:
+    """Allow an edited message to be processed again."""
+    path = Path(state_path)
+    if not path.exists():
+        return
+    state = json.loads(path.read_text())
+    if (state.get("handled") or {}).pop(f"{channel}:{ts}", None) is not None:
+        path.write_text(json.dumps(state))
+
+
 BANTER_FILE = "banter.json"
 BANTER_LINES = [
     "🍿 I have no horse in this race, but I do have a ledger.",
@@ -119,7 +149,8 @@ def banter_reply(channel: str, user: str, text: str, bot_id: str) -> str | None:
     """Temporary silly auto-replies, configured in banter.json."""
     if not banter_active(channel, user):
         return None
-    if f"<@{bot_id}>" in (text or "") or guardrail_reply(text):
+    if (f"<@{bot_id}>" in (text or "") or re.search(r"@mini-?reid\b", text or "", re.I)
+            or guardrail_reply(text)):
         return None
     return random.choice(BANTER_LINES)
 # Successful writes acknowledged with a reaction instead of a reply.
@@ -999,6 +1030,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
     def process(channel: str, user: str, text: str, ts: str, late: bool = False) -> None:
         if (channel, ts) in seen or channel in IGNORE_CHANNEL_IDS:
             return
+        if not claim_message(STATE, channel, ts):
+            return
         seen.add((channel, ts))
 
         raw_action, _ = parse_command(text)
@@ -1225,6 +1258,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     if len(edits) > 200:
                         state["edits"] = dict(list(edits.items())[-200:])
                     Path(STATE).write_text(json.dumps(state))
+                    release_message(STATE, ack[0], ack[1])
                     seen.discard((ack[0], ack[1]))
                     process(ack[0], user, text, ack[1])
             return
@@ -1236,31 +1270,41 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
         if user == env.get("SLACK_OWNER_ID") and text.strip().lower() in (
                 {"banter off", "stop banter"}):
+            if not claim_message(STATE, channel, ts):
+                return
             Path(BANTER_FILE).unlink(missing_ok=True)
             web.chat_postMessage(channel=channel, text="Banter off.")
             return
-        line = banter_reply(channel, user, text, bot_user_id)
-        if line:
-            try:
-                web.chat_postMessage(channel=channel, text=line)
-            except Exception as ex:  # noqa: BLE001 - banter is best effort
-                print(f"  banter post failed: {type(ex).__name__}", flush=True)
-            return
-        if banter_active(channel, user):
-            kind = nice_reply(text)
-            if kind:
+        addressed = is_bot_addressed(event, bot_user_id)
+        if not addressed:
+            line = banter_reply(channel, user, text, bot_user_id)
+            if line:
+                if not claim_message(STATE, channel, ts):
+                    return
                 try:
-                    web.chat_postMessage(channel=channel, text=kind)
-                except Exception as ex:  # noqa: BLE001 - best effort
-                    print(f"  nice post failed: {type(ex).__name__}", flush=True)
+                    web.chat_postMessage(channel=channel, text=line)
+                except Exception as ex:  # noqa: BLE001 - banter is best effort
+                    print(f"  banter post failed: {type(ex).__name__}", flush=True)
                 return
-            guard = guardrail_reply(text)
-            if guard:
-                try:
-                    web.chat_postMessage(channel=channel, text=guard)
-                except Exception as ex:  # noqa: BLE001 - best effort
-                    print(f"  guardrail post failed: {type(ex).__name__}", flush=True)
-                return
+            if banter_active(channel, user):
+                kind = nice_reply(text)
+                if kind:
+                    if not claim_message(STATE, channel, ts):
+                        return
+                    try:
+                        web.chat_postMessage(channel=channel, text=kind)
+                    except Exception as ex:  # noqa: BLE001 - best effort
+                        print(f"  nice post failed: {type(ex).__name__}", flush=True)
+                    return
+                guard = guardrail_reply(text)
+                if guard:
+                    if not claim_message(STATE, channel, ts):
+                        return
+                    try:
+                        web.chat_postMessage(channel=channel, text=guard)
+                    except Exception as ex:  # noqa: BLE001 - best effort
+                        print(f"  guardrail post failed: {type(ex).__name__}", flush=True)
+                    return
         # message.channels/message.groups deliver every channel message. Only
         # act on ones that address the bot; DMs need no mention.
         if not is_bot_addressed(event, bot_user_id):

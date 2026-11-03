@@ -34,6 +34,10 @@ to stay open.
 Slack app subscriptions saved 2026-11-01: `app_mention`, `message.im`,
 `message.channels`, `message.groups`. Socket Mode; no public URL.
 
+One reply per Slack message id. `bot_state.json` holds a persistent `handled` map, claimed
+before any response, so duplicate events (`app_mention` plus `message.channels`), socket
+redelivery or a restart cannot answer twice. A changed edit releases its claim once.
+
 The watcher polls Ridha's DMs with the user token, because Slack delivers no events from
 a DM the bot is not in. It searches for owner messages addressed to the bot, executes
 only `remind`, and DMs the confirmation to Ridha's bot DM. State: `dm_poll_state.json`.

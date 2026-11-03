@@ -156,6 +156,18 @@ def test_banter_reply_respects_channel_user_expiry_and_mentions(tmp_path, monkey
     assert banter_reply("C1", "U1", "hello", "UBOT") is None
 
 
+def test_claim_message_is_persistent_and_releasable(tmp_path):
+    from mini_reid.slack_bot import claim_message, release_message
+
+    state = str(tmp_path / "bot_state.json")
+    assert claim_message(state, "C1", "1.000")
+    assert not claim_message(state, "C1", "1.000")
+    assert claim_message(state, "C1", "2.000")
+    assert claim_message(state, "C2", "1.000")
+    release_message(state, "C1", "1.000")
+    assert claim_message(state, "C1", "1.000")
+
+
 def test_nice_messages_get_a_nice_reply():
     from mini_reid.slack_bot import NICE_LINES, nice_reply
 

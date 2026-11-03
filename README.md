@@ -51,9 +51,10 @@ watcher pass.
 Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
 `message.groups` (manifest: `slack-app-manifest.yaml`). The two message subscriptions
 exist so an edited mention can be acknowledged with ✅; every other channel message is
-ignored unless it addresses the bot. Tags from `bd-triager-agent` are ignored. Slack
-sends no events from DMs the bot is not in, so the watcher polls them for `remind`
-commands with the user token.
+ignored unless it addresses the bot. Each message id is answered once; `bot_state.json`
+tracks handled ids across restarts. Tags from `bd-triager-agent` are ignored. Slack sends
+no events from DMs the bot is not in, so the watcher polls them for `remind` commands
+with the user token.
 
 ## Agents
 

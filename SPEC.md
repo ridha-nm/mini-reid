@@ -186,7 +186,10 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 ### Slack app
 
 Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
-`message.groups`. Channel messages that do not mention the bot are ignored. An edit that
+`message.groups`. Every Slack message id is claimed once in `bot_state.json` before a
+reply, so Slack delivering both `app_mention` and `message.channels` (or a restart
+replaying an event) cannot produce a second response. An edit releases the claim once so
+the corrected text can run. Channel messages that do not mention the bot are ignored. An edit that
 still mentions the bot gets a ✅; if Ridha changed the text, the command is re-run once
 (except `remind` and `undo`, which would duplicate). Commands are otherwise never
 replayed. Replies to Ridha's own commands go to his DM, never to the channel, so a

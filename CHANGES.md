@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-03 (no double replies)
+
+- Every Slack message id is claimed in `bot_state.json` before a response, so duplicate
+  events, socket redelivery or a restart cannot answer twice. Edits release the claim
+  once for the corrected text.
+- 196 tests passing.
+
 ## 2026-11-03 (be nice back)
 
 - Praise and kindness ("loving mini-reid", "good bot", "thanks") get a short kind reply;
