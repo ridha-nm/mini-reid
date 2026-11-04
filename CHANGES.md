@@ -2,6 +2,205 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (confirm clicks acknowledge and lock)
+
+- Clicking **Add to list** / **Not a task** now edits the DM itself: shows
+  `Added to the list: <task>` or `Not a task: <task>` and rebuilds buttons for
+  the items still waiting on that message. No items left → buttons removed.
+- A row already settled ignores further clicks; it cannot be toggled by a stale
+  button. The message says "Already handled".
+- Each inbox row stores `confirm_ts` / `confirm_channel` when its DM is sent, so
+  a click can edit the right message. `send_dm` / `send_dm_to` now return Slack's
+  response instead of only the channel id.
+- 269 tests passing.
+
+## 2026-11-05 (watcher fetches in parallel)
+
+- Slack DM histories, per-message Gmail reads and author-name lookups now run
+  in an 8-worker thread pool instead of serial HTTP calls. Measured on this Mac:
+  Slack DMs 27.3 s → 3.7 s, Gmail 36.0 s → 6.7 s; sources total 65 s → 12 s.
+- No behaviour change: same items, same order-insensitive parse.
+- 264 tests passing.
+
+## 2026-11-04 (confirm every new task)
+
+- The model no longer decides what is a task. Rules capture every candidate; the
+  model only rewrites the title for readability and must return one item per
+  message. It has no `is_commitment` field left.
+- Every new row lands as `status: "inbox"` and stays out of the digest, overdue
+  nudge and numbered list until a person confirms it.
+- The new-item DM carries one section per item with **Add to list** and **Not a
+  task** buttons (up to 10 per DM; the rest stay in the list Inbox). Confirm →
+  `open` and ✅ on the source Slack message. Dismiss → `dropped` / `not_commitment`.
+- Member DMs use the same flow; the click resolves the member's own ledger.
+- `list` due dates read relatively: `3d overdue`, `today`, `in 1d`, `in 6d`,
+  then an absolute date.
+- Digest counts add `N to confirm`; inbox rows are excluded from every bucket.
+- Design note: `docs/superpowers/specs/2026-11-04-task-confirmation-design.md`.
+- 262 tests passing.
+
+## 2026-11-04 (triage inbox, bulk close, stale nudges)
+
+- Watcher triage: when the model rewrites an item it stays a task; when the
+  model never saw it (rejected) it is dropped; when the model failed on it the
+  row is parked as `status: "inbox"` for a person to decide. Only real tasks
+  get the ✅ reaction and the new-item DM; inbox rows get their own nudge.
+- `list` now groups by In progress / Blocked / Overdue / Due today / This week /
+  Later / No date, with an Inbox section. Same numbering as the old list, so
+  `done 4` still works.
+- The list reply carries a **Triage & update** button: pick rows, choose a
+  status once, apply in bulk. Checkboxes are chunked 10 per block (Slack's
+  limit) and capped at 40 selectable rows.
+- Evening stale nudge (18:00, DM, max 3 per row): open / in progress / blocked
+  rows with no activity today get an inline status picker per row.
+- `done` and `not` accept bulk refs: `done 7, 9`, `#7 #9`, `id:abc1, id:def2`.
+- Status changes stamp `last_activity`; triage resets the nudge counter.
+- `send_dm`/`send_dm_to`/bot replies accept Block Kit `blocks`.
+- 258 tests passing.
+
+## 2026-11-04 (never miss a message again)
+
+- Catch-up now sweeps every `CATCHUP_SECONDS` (default 300) while the bot runs,
+  not only at startup. Messages sent while the Mac slept or the socket was down
+  are replayed once it wakes.
+- Catch-up keeps its own `catch_up_ts` watermark. Live messages still advance
+  `last_ts`; tying sweeps to that would skip a gap the socket never delivered
+  (it hid the 17:51 and 18:00 messages today).
+- Mention search paginates up to 10 pages and DM history reads 200 messages per
+  conversation. `claim_message`/`_mark` share a lock so a sweep and a socket
+  event cannot clobber `bot_state.json`.
+- 237 tests passing.
+
+## 2026-11-04 (play replies stay in thread)
+
+- Hug / high-five / fist-bump replies now post as a thread reply on the
+  message that asked for them, not a new channel message.
+- 235 tests passing.
+
+## 2026-11-04 (commands after chatter)
+
+- A bot mention anywhere in the message now counts. `AHAHHA @mini-reid remind
+  <@Eden> to go to bed!` parses as a reminder instead of becoming a note; the
+  recipient's own mention still survives for `split_target`.
+- Laughter prefixes (`AHAHHA`, `haha`, `hehe`, `lol`, `lmao`, `rofl`) are
+  stripped before verb matching, and a literal `@mini-reid` mid-message is
+  recognised.
+- 235 tests passing.
+
+## 2026-11-04 (reminder clarifications, natural language, catch-up)
+
+- Reminder ambiguity: `by Friday 2pm` asks **Now / At Friday / Both** with Slack
+  buttons (unique action ids; text reply `now` / `later` / `both` also works).
+  `now and again …` sends both without asking.
+- `reminder_log.json` audit: pending, sent, replies. `reminders` command lists it.
+- Plain language after a tag: politeness prefixes, typo-tolerant verbs and names,
+  and mappings for done/drop/note/find/assign/waiting/due/snooze.
+- Catch-up now replays every command type across channel mentions and all bot DMs,
+  not only `ask:`; pending clarifications survive restarts.
+- Explicit day+month (`thursday nov 12`) now beats the weekday in due parsing.
+- Setup docs for new operators and teammates (`SETUP.md`), `requirements.txt`,
+  complete `.env.example`; interactivity enabled in the manifest. 228 tests passing.
+- Learning: accepted commands are logged locally (`learning_events.json`) and,
+  with every member ledger, feed the existing naive-Bayes task classifier.
+- Safety: slurs get a 🚩 reaction and a private DM asking the person to be
+  better; profanity directed at the bot keeps the existing sassy defence.
+  Abuse verbs (molest, rape, grope) are treated the same as slurs instead of
+  becoming ledger notes.
+- Fun: `give @Name a hug`, `high five @Name`, `fist bump @Name` reply in
+  channel with no ledger row. 232 tests passing.
+
+## 2026-11-03 (banter channel allowlist)
+
+- Banter can only be enabled in `#ee-leads-only` and `#probies`. Every other channel is
+  rejected at the command and at reply time.
+- `software-related-issues` cannot banter. 213 tests passing.
+
+## 2026-11-03 (no untagged replies)
+
+- Deleted the bot's untagged sassy message in `software-related-issues`
+  (`1793718297.690999`). No ledger row was created by it.
+- Removed auto-banter and the untagged reply path entirely. Untagged channel messages
+  now get no reply, mean or not.
+- Manual `banter on` now only affects messages that address the bot and are mean.
+- 213 tests passing.
+
+## 2026-11-03 (members declare their accounts)
+
+- Added `clients:` / `accounts:` command. Members can inspect or override their email
+  filter: `clients: Eupe, Gamuda`. Unknown names are rejected.
+- Setup-complete DM now states the active filter or asks the member to set one.
+- `allow:` DM now includes numbered setup steps and the `clients` commands.
+- Charanya's override now includes Eupe: Knight Frank, Allianz, Setia, Eupe.
+- 213 tests passing.
+
+## 2026-11-03 (per-person client accounts)
+
+- Added `mini_reid/accounts.py` + `accounts.json` (gitignored, 600): work email → client
+  slugs, built from the live BD Command Centre / stocktake-hub roster
+  (`config-live.json`). `allow:` fills the profile's `clients` from it. GHB/GVC/SAFE are
+  portfolios and skipped.
+- Charanya's override: Knight Frank, Allianz, Setia, Eupe.
+- Expanded `clients.json` from 16 to 38 entries using the live roster: 35 clients plus
+  GHB/GVC/SAFE portfolios. Added Allianz, Setia, DNex, KWAP, PNB Enterprise, Edotco,
+  Sime Darby Property, AmBank FE/EE, Aemulus and Canon. Portfolio domains are the union
+  of their member companies; child clients carry a `portfolio` tag.
+- Gmail filter now keeps only mail matching the member's accounts. One-day check:
+  Charanya 52 messages → 5 Setia/Knight Frank/Allianz.
+- 212 tests passing.
+
+## 2026-11-03 (hosted Gmail setup)
+
+- Added `cloud/relay.py`, deployed to Cloud Run `mini-reid-setup` in
+  `rij-agent-march2026` (asia-southeast1, min/max 1). Fixed HTTPS setup page and Google
+  callback; codes and Jira form held in memory only.
+- Bot polls the relay every 5s with `RELAY_KEY` and finishes the token exchange.
+- Created Internal Web-application OAuth client with redirect
+  `https://mini-reid-setup-355354179016.asia-southeast1.run.app/callback`; JSON at
+  `~/.minireid-oauth-web.json`, client secret in Secret Manager.
+- Setup links now point at the relay. No paste, no Tailscale, no inbound to the Mac.
+- Refresh tokens are bound to the OAuth client that issued them. Each profile stores
+  `google_client`; Charanya stays on the original Desktop client, relay users use the
+  new Web client. Fixed a 401 caused by refreshing her token with the wrong client.
+- Per-profile `clients` filter. Gmail is kept only when sender domain or text matches
+  one of those clients. Charanya: POS Malaysia, Gamuda, Agrobank, Kossan, Knight Frank,
+  Bank Rakyat, Eupe. 52 messages in one day → 9 kept.
+- 210 tests passing.
+
+## 2026-11-03 (member directory + shared Jira)
+
+- `python -m mini_reid.directory` builds `directory.json` (gitignored, 600): Slack id,
+  name, email and Jira account id for every active Pantas member. Current build: 39
+  people, 36 emails, 36 Jira ids.
+- `allow:` uses the directory, so Jira is active immediately from the shared workspace
+  token queried by the member's account id. No member Jira token needed.
+- `assign:` now mirrors the task into the assignee's ledger and DMs them.
+- `setup <redirected-url>` completes Gmail OAuth by DM, without the setup page.
+- Fixed `allow:` re-send raising `UnboundLocalError` instead of DMing the link.
+- 209 tests passing.
+
+## 2026-11-03 (multi-user activation)
+
+- `allow: @Name` now creates the profile, issues a 24-hour setup token and DMs the
+  member a setup link. Re-running `allow:` resends the link until setup completes.
+- Per-member watcher: mentions in channels the bot is in, own Gmail and Jira when
+  connected, reminders, meeting reminders, overdue nudge and 09:15 digest.
+- Setup page on `SETUP_PORT` (8765): Google one-time OAuth plus Jira API-token form.
+  Google uses the HTTPS callback when `SETUP_BASE_URL` is HTTPS; otherwise it uses the
+  registered loopback redirect and the member pastes the redirected URL back once.
+- Member Google tokens and Jira credentials live under `data/<slack_id>/`, mode 600.
+- `members --digest` added to the 09:15 job. 206 tests passing.
+
+## 2026-11-03 (multi-user phase 1)
+
+- Owner-only `allow: @Name` writes `users.json` and creates an isolated
+  `data/<slack_id>/ledger.json` for that member.
+- Allowlisted members run the same commands against their own ledger; replies go to their
+  DM. Non-allowlisted users keep the note-to-Ridha path.
+- A member's `add:` with no recipient stays in their ledger instead of becoming a
+  reminder. `users.json` and `data/` are gitignored.
+- Per-user watcher, digest, Gmail, Jira and self-serve setup remain later phases.
+- 202 tests passing.
+
 ## 2026-11-03 (remind emoji ack)
 
 - A successful `remind` now gets an ⏰ reaction on the command message instead of a text

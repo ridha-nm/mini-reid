@@ -74,6 +74,16 @@ def test_jira_maps_issue_key_due_and_status():
     assert item["status"] == "To Do"
 
 
+def test_jira_member_sees_the_other_person_as_asker():
+    data = {"issues": [{"id": "1", "key": "BO-1", "fields": {
+        "summary": "x", "status": {"name": "To Do"},
+        "assignee": {"displayName": "Charanya Nair"},
+        "reporter": {"displayName": "Kasib"},
+        "project": {"key": "BO"}}}]}
+    item = parse_jira_issues(data, "https://x", me="Charanya")[0]
+    assert item["author"] == "Kasib"
+
+
 def test_jira_auto_assigned_item_names_the_board():
     data = {"issues": [{"id": "1", "key": "BO-1", "fields": {
         "summary": "x", "status": {"name": "To Do"},
@@ -103,6 +113,42 @@ def test_dm_history_pages_through_the_whole_window(monkeypatch):
     msgs = sources._dm_history("tok", "D1", 100.0)
     assert [m["ts"] for m in msgs] == ["1", "2", "3"]
     assert "cursor=abc" in calls[1]
+
+
+def test_gmail_fetches_every_listed_message(monkeypatch):
+    from mini_reid import sources
+
+    monkeypatch.setattr(sources, "gmail_access", lambda *a, **k: "tok")
+    monkeypatch.setattr(sources, "_gmail_list",
+                        lambda access, query: ["m1", "m2"]
+                        if "in:inbox" in query else [])
+
+    def message(access, mid):
+        return {"id": mid, "internalDate": "1793341041000",
+                "payload": {"headers": [
+                    {"name": "From", "value": "a@eupe.com.my"},
+                    {"name": "Subject", "value": "deck"}]}}
+
+    monkeypatch.setattr(sources, "_gmail_message", message)
+    out = sources.fetch_gmail(1, {})
+    assert {i["native_id"] for i in out} == {"m1", "m2"}
+
+
+def test_slack_dm_fetch_reads_every_conversation(monkeypatch):
+    from mini_reid import sources
+
+    monkeypatch.setattr(sources, "_get_json", lambda *a, **k: {"channels": [
+        {"id": "D1", "user": "U2"}, {"id": "D2", "user": "U3"}]})
+    monkeypatch.setattr(sources, "_dm_history", lambda token, cid, oldest: [
+        {"ts": "1793341041.0",
+         "user": "U2" if cid == "D1" else "U3", "text": "hi"}])
+    monkeypatch.setattr(sources, "slack_user_name",
+                        lambda token, uid: {"U2": "Kasib", "U3": "Raj"}[uid])
+
+    out = sources.fetch_slack_dms(1, "tok", "U1")
+    assert {i["native_id"] for i in out} == {
+        "D1:1793341041.0", "D2:1793341041.0"}
+    assert {i["author"] for i in out} == {"Kasib", "Raj"}
 
 
 def test_jira_keeps_the_issue_type():

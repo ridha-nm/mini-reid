@@ -21,11 +21,11 @@ class Stub:
 
 
 def test_builds_rows_from_model_output():
-    stub = Stub({"items": [{"id": "D1:1", "is_commitment": True,
-                            "what": "get FSD to Kasib", "due": "2026-10-30", "client": None}]})
+    stub = Stub({"items": [{"id": "D1:1", "what": "Get FSD to Kasib",
+                            "due": "2026-10-30"}]})
     rows = extract_batch(ITEMS, stub, NOW)
     assert len(rows) == 1
-    assert rows[0]["what"] == "get FSD to Kasib"
+    assert rows[0]["what"] == "Get FSD to Kasib"
     assert rows[0]["due"] == "2026-10-30"
     assert stub.calls == 1
 
@@ -33,14 +33,22 @@ def test_builds_rows_from_model_output():
 def test_one_call_for_many_items():
     items = ITEMS * 5
     items = [dict(i, native_id=f"D1:{n}") for n, i in enumerate(items)]
-    stub = Stub({"items": [{"id": i["native_id"], "is_commitment": True,
-                            "what": "x", "due": None, "client": None} for i in items]})
+    stub = Stub({"items": [{"id": i["native_id"], "what": "x", "due": None}
+                           for i in items]})
     assert len(extract_batch(items, stub, NOW)) == 5
     assert stub.calls == 1
 
 
-def test_non_commitment_is_dropped():
-    stub = Stub({"items": [{"id": "D1:1", "is_commitment": False, "what": "", "due": None}]})
+def test_model_does_not_get_to_drop_an_item():
+    """A title comes back even when the model adds is_commitment: false."""
+    stub = Stub({"items": [{"id": "D1:1", "is_commitment": False,
+                            "what": "Get FSD to Kasib", "due": None}]})
+    rows = extract_batch(ITEMS, stub, NOW)
+    assert [r["what"] for r in rows] == ["Get FSD to Kasib"]
+
+
+def test_empty_title_is_dropped():
+    stub = Stub({"items": [{"id": "D1:1", "what": "  ", "due": None}]})
     assert extract_batch(ITEMS, stub, NOW) == []
 
 
@@ -53,8 +61,7 @@ class SplitStub:
         ids = re.findall(r'"id": "(X\d+)"', prompt)
         if len(ids) > 1:
             raise ValueError("bad json")
-        return {"items": [{"id": ids[0], "is_commitment": True,
-                           "what": f"task {ids[0]}", "due": None, "client": None}]}
+        return {"items": [{"id": ids[0], "what": f"Do {ids[0]}", "due": None}]}
 
 
 def test_bad_batch_splits_until_every_item_is_recovered():

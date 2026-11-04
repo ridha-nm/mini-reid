@@ -80,7 +80,7 @@ calls.
 | `what` | task text: email subject for mail, message text for Slack |
 | `asker`, `via` | who sent it, and where it reached him (DM, #channel, direct, alias, Jira board) |
 | `client` | slug from the rule matcher only |
-| `due`, `status` | date; open, in progress, blocked, stalled, done, dropped |
+| `due`, `status` | date; open, in progress, blocked, stalled, done, dropped; `inbox` = waiting for a person to triage |
 | `priority` | 1-5, absent when unranked; 1 is first |
 | `kind` | mention, dm, inbox, draft, issue, note, reminder |
 | `closure` | open, proposed |
@@ -108,8 +108,12 @@ a channel mention. Channel mentions are always kept unless they are pure chatter
   questions with no ask ("do you have access?"), status updates ("Update: …"), other
   people's own plans ("I try to get … today"), Google boilerplate, URLs, newsletters.
 
-The optional local model only rewrites `what`. Given filtering authority it deleted
-real asks and kept jokes.
+Rules capture. Every captured row starts as `status: inbox` and waits for a person.
+The optional local model only rewrites the title for readability; it is told every
+message is a candidate and returns one item per message. It cannot drop a row and has
+no commitment verdict. A row the model rewrote keeps the cleaner wording; a row it
+omitted or failed on keeps the rule text. Either way it stays in the inbox until
+confirmed (**Add to list**) or dismissed (**Not a task**).
 
 A tiny Naive Bayes classifier (`mini_reid/classifier.py`) gives a second opinion on
 bot-addressed social text, trained from the ledger, `not:` corrections and seed
@@ -139,6 +143,20 @@ A separate overdue nudge runs once a day, on the first watcher cycle after 09:00
 uses the same row renderer as the digest, link included. Only a real past due date or a
 stalled status counts as overdue; undated rows stay in No date.
 
+New items do not enter a digest bucket until confirmed. The capture DM carries one
+section per item with **Add to list** / **Not a task** (at most ten per DM); the rest
+wait in the list Inbox. The header counts unanswered rows as `N to confirm`.
+
+A stale nudge runs at 18:00: open, in progress, blocked and stalled rows with no
+activity today are DMed, up to five at a time, each with an inline status picker. A row
+is nudged at most three times; a status change through triage or the picker resets the
+count. Inbox rows are never nudged as stale or overdue.
+
+`list` is grouped as In progress / Blocked / Overdue / Due today / This week / Later /
+No date, followed by Inbox. The reply carries a **Triage & update** button that opens a
+modal: select rows (checkboxes chunked ten per Slack block, at most forty selectable),
+choose one status, apply once.
+
 ## Bot commands
 
 `add:`, `task:`, `todo:`, `assign: <person> <what>`, `reassign: <item> to <person>`,
@@ -148,9 +166,41 @@ stalled status counts as overdue; undated rows stay in No date.
 `edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
 ignores that title), `remind` (absolute or `in 2 minutes`),
-`ask:`, `find:`, `list`, `notes`, `banter on|off|status`, `help`.
+`ask:`, `find:`, `list`, `notes`, `allow: @Name`, `banter on|off|status`, `help`.
 
-- Only Ridha mutates the ledger.
+- `done` and `not` accept several refs at once: `done 7, 9`, `#7 #9`,
+  `id:abc1, id:def2`. One bad ref rejects the whole batch and changes nothing.
+- A new item's DM offers **Add to list** / **Not a task** per item. Add sets the row
+  `open` and ✅s the source Slack message; Not a task sets `dropped` /
+  `not_commitment`. The click edits the DM to name the outcome and rebuilds buttons
+  for the items still waiting on that message; when none remain the buttons are
+  removed. A settled row ignores further clicks, so a stale button cannot toggle it.
+  The list's **Triage & update** modal can settle unanswered rows.
+- The owner mutates `ledger.json`; an allowlisted member mutates only their own
+  `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
+- `allow: @Name` is owner-only. It writes `users.json`, creates the member's isolated
+  paths, and DMs a one-time setup link. Re-running it resends the link until setup is
+  complete. Non-allowlisted users keep the old note-to-Ridha path; they cannot use
+  ledger commands.
+- The member watcher reads mentions in channels the bot is in, plus their own Gmail and
+  Jira. Jira uses the shared workspace token, queried by the member's Jira account id;
+  Gmail uses the member's own OAuth token. Their reminders, meeting reminders, overdue
+  nudge and 09:15 digest go only to their DM.
+- `directory.json` (gitignored, mode 600) maps Slack id → name, email and Jira account.
+  Rebuild with `python -m mini_reid.directory`. `allow:` reads it first, so any Pantas
+  member can be set up without typing their email or Jira id.
+- A profile may carry `clients`, a list of `clients.json` slugs. Member Gmail is kept
+  only when the sender domain or message text matches one of them. Slack and Jira are
+  not filtered by this list. `accounts.json` (from the BD Command Centre / stocktake-hub
+  roster) maps work email → clients; `allow:` fills the profile from it. Members can
+  override it with `clients: Eupe, Gamuda` or inspect it with `clients`. Portfolios
+  GHB/GVC/SAFE match their member-company domains; a child match also satisfies its
+  portfolio. Charanya is overridden to Knight Frank, Allianz, Setia and Eupe.
+- Setup page: `{RELAY_URL}/setup?state=<setup-token>` on Cloud Run. Google redirects to
+  `{RELAY_URL}/callback`; the relay holds the code in memory and the bot polls
+  `/take` with `RELAY_KEY`. Google consent is one-time and offline; the refresh token
+  lives in the member's data directory. Jira is automatic and the form is only a
+  fallback.
 - Anyone who tags or DMs the bot can set a reminder for themselves or any teammate in
   the Pantas workspace: `remind me …`, `remind @Arman …`, `remind Arman Rahman …`,
   `add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed
@@ -175,12 +225,11 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 - Bot-addressed small talk ("hi", "you there?", "thanks") gets a default reply naming
   `add:`, `note:` and `ask:`; it is not stored.
 - Praise or kindness ("good bot", "loving mini-reid") gets a short kind reply back.
-- Banter mode is **off** by default. Any mean or hostile message in a channel opens a
-  **five-minute** window for that channel; repeated meanness does not extend it. Within
-  the window only mean messages get a rotating sassy reply; neutral chatter is silent.
-  `banter on 2h [@person|all]`, `banter off`, `banter status` still control it manually.
-  The watcher announces and clears the window at expiry. Outside banter, the bot only
-  answers messages that address it: a real mention, literal `@mini-reid`, or a DM.
+- Banter is manual-only and **off** by default. `banter on 2h [@person|all]`,
+  `banter off`, `banter status` control it; the watcher announces expiry. Only a message
+  that both addresses the bot and is mean gets a sassy line. Untagged messages never get
+  a reply, mean or not. Banter can only be enabled in `#ee-leads-only` and `#probies`;
+  every other channel is rejected.
 - Any other message from someone else gets a ✅ and, if they write something, a note
   plus an instant DM to Ridha. No reply to them.
 - Plain sentences from Ridha become notes; questions go to the knowledge base; due or
@@ -249,7 +298,7 @@ Rebuild nightly at 02:00, incremental.
 | Risk | Reality today |
 |---|---|
 | Local model quality | 3B rewrites only; 8B too slow on 8 GB |
-| Sleep gaps | events missed while asleep; catch-up covers questions |
+| Sleep gaps | socket pauses during sleep; the periodic catch-up sweep replays missed commands and questions |
 | Gmail token expiry | weekly refresh; failures show under Source errors |
 | Auto-assigned Jira | board named instead of a person; reassignment closes the row |
 | Shared alias noise | read-mail and DM filters; `not:` teaches the rest |

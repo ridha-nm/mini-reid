@@ -14,10 +14,24 @@ NOW = datetime(2026, 10, 30, 9, 0, tzinfo=MYT)  # a Friday
     ("can you look at this today", "2026-10-30"),
     ("done by tomorrow", "2026-10-31"),
     ("by end of next week", "2026-11-06"),
+    ("by thursday nov 12", "2026-11-12"),
+    ("review on 12 nov", "2026-11-12"),
+    ("review on Nov 12", "2026-11-12"),
     ("no date here", None),
 ])
 def test_parse_due(text, expected):
     assert parse_due(text, NOW)[0] == expected
+
+
+def test_member_gmail_is_scoped_to_their_own_address():
+    item = {"source": "gmail", "native_id": "g1", "kind": "inbox",
+            "author": "Kasib <kasib@pantas.com>",
+            "to": "Charanya <charanya@pantas.com>", "subject": "Deck",
+            "text": "can you send the deck", "link": "l",
+            "ts": "2026-10-30T08:00:00+08:00"}
+    assert extract(item, None, NOW, me="Charanya")
+    item["to"] = "Ridha <ridha@pantas.com>"
+    assert extract(item, None, NOW, me="Charanya") == []
 
 
 def test_undated_ask_still_becomes_a_commitment():

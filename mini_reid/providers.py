@@ -14,29 +14,40 @@ SCHEMA = {
     "items": [
         {
             "id": "the id you were given",
-            "is_commitment": True,
-            "what": "the task as a short imperative, max 120 chars, rewritten not copied",
+            "what": "a clean one-line task title, max 100 chars",
             "from": "who asked, first name or team, empty if unclear",
             "due": "YYYY-MM-DD or null",
-            "client": "client slug or null",
         }
     ]
 }
 
-PROMPT = """You extract commitments from work messages.
+PROMPT = """You tidy work messages into task titles for a personal to-do list.
 
-For each message decide if someone owes something:
-- is_commitment is true only if a person was asked to do something, or promised to do something.
-- Ignore status updates, FYIs, automated notices, meeting notes with no action, greetings, and thanks.
-- Ignore replies that only acknowledge, agree, joke, or mention someone in passing.
-- Ignore anything that is a description of work already done.
-- due is null unless the text states or clearly implies a date.
-- what is the actual task, rewritten in your own words as a short imperative. Never copy the greeting, the email header, the signature or the opening line. Max 120 characters.
-- from is the person or team who asked.
-- client is one of: {clients}, or null.
+A person decides what becomes a task, not you. Every message is a candidate:
+return one item for every message, using the id you were given. Never drop a
+message and never judge whether it is a commitment.
 
-Ridha has previously said these are NOT commitments. Ignore the same kind of message:
-{ignored}
+Rewrite what as a title a person can scan in a list:
+- Start with a verb in sentence case: Send, Confirm, Review, Prepare,
+  Follow up with, Check, Share, Set up.
+- Put the object first after the verb, then the person or project if needed.
+- Keep names, numbers, dates, document names and place names a person needs
+  to act. Drop anything else.
+- Remove greetings, thanks, signatures, email headers (RE:, FW:), quoted
+  history, emoji and filler words.
+- Do not repeat the due date in what; put it in due when the text states or
+  clearly implies one.
+- One line, max 100 characters, no trailing period, no surrounding quotes.
+- If the message has no ask, still return the clearest short title of what it
+  says; the person can dismiss it.
+
+from is the person or team who asked, first name, empty if unclear.
+due is YYYY-MM-DD or null.
+
+Examples:
+"hey could you review the K3 deck by Thu?" -> what "Review the K3 deck"
+"RE: Timesheet submission" -> what "Submit the timesheet"
+"Please confirm if 4:30 works for your team tomorrow" -> what "Confirm 4:30 meeting with your team"
 
 Today is {today} ({weekday}).
 Return JSON exactly matching: {schema}
@@ -82,15 +93,10 @@ def _val(v) -> str | None:
     return None if s.lower() in {"", "null", "none", "n/a"} else s
 
 
-def _batch_prompt(items: list[dict], now: datetime, clients: list[str]) -> str:
-    from .learning import ignored_examples
-
+def _batch_prompt(items: list[dict], now: datetime) -> str:
     payload = [{"id": i["native_id"], "text": (i.get("text") or "")[:500],
                 "from": i.get("author", "")} for i in items]
-    ignored = ignored_examples()
     return PROMPT.format(
-        clients=", ".join(clients),
-        ignored="\n".join(f"- {x}" for x in ignored) if ignored else "- none yet",
         today=now.date().isoformat(),
         weekday=now.strftime("%A"),
         schema=json.dumps(SCHEMA),
@@ -118,16 +124,15 @@ def extract_batch(items: list[dict], provider, now: datetime,
     """One call for many items. Malformed output raises; it never returns []."""
     if not items:
         return []
-    data = provider.complete(_batch_prompt(items, now, clients or []))
+    data = provider.complete(_batch_prompt(items, now))
     if not isinstance(data, dict) or not isinstance(data.get("items"), list):
         raise ValueError(f"model returned unexpected shape: {str(data)[:200]}")
 
-    valid_clients = set(clients or [])
     by_id = {i["native_id"]: i for i in items}
     rows = []
     for out in data["items"]:
         src = by_id.get(out.get("id"))
-        if not src or not out.get("is_commitment"):
+        if not src:
             continue
         what = (out.get("what") or "").strip()
         if not what:

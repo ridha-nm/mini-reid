@@ -28,6 +28,89 @@ def test_new_rows_ignores_noise():
     assert new_rows([noise], [], {}, NOW) == []
 
 
+def _rule(nid: str, what: str = "Do the thing") -> dict:
+    return {"id": f"id-{nid}", "native_id": nid, "what": what,
+            "status": "open", "kind": "email", "source": "gmail"}
+
+
+def test_triage_keeps_the_model_rewrite_but_still_waits_for_a_click():
+    from mini_reid.watcher import triage_rows
+
+    fresh = [_rule("m1")]
+    model = [dict(_rule("m1"), what="Confirm the waste mapping")]
+    out = triage_rows(fresh, model)
+    assert [r["what"] for r in out] == ["Confirm the waste mapping"]
+    assert out[0]["status"] == "inbox"
+
+
+def test_triage_keeps_rows_the_model_did_not_rewrite():
+    from mini_reid.watcher import triage_rows
+
+    out = triage_rows([_rule("m1", "raw rule title")], [])
+    assert [r["what"] for r in out] == ["raw rule title"]
+    assert out[0]["status"] == "inbox"
+
+
+def test_triage_keeps_the_rule_client_and_asker():
+    from mini_reid.watcher import triage_rows
+
+    fresh = [dict(_rule("m1"), client="eupe", asker="Daniel")]
+    model = [dict(_rule("m1"), what="Review the deck", client=None, asker="")]
+    out = triage_rows(fresh, model)
+    assert out[0]["client"] == "eupe"
+    assert out[0]["asker"] == "Daniel"
+
+
+def test_stamp_confirmation_links_rows_to_the_dm(tmp_path, monkeypatch):
+    from mini_reid import watcher as w
+    from mini_reid.ledger import load, save
+
+    monkeypatch.chdir(tmp_path)
+    save("ledger.json", [{"id": "a", "status": "inbox"},
+                         {"id": "b", "status": "inbox"}])
+    w._stamp_confirmation("ledger.json", {"a"},
+                          {"ts": "111.2", "channel": "D1"})
+    rows = {r["id"]: r for r in load("ledger.json")}
+    assert rows["a"]["confirm_ts"] == "111.2"
+    assert rows["a"]["confirm_channel"] == "D1"
+    assert "confirm_ts" not in rows["b"]
+
+
+def test_stale_rows_wait_for_a_day_without_activity():
+    from mini_reid.watcher import stale_rows
+
+    rows = [
+        {"id": "old", "what": "Old", "status": "open",
+         "last_activity": "2026-10-28T09:00:00+08:00"},
+        {"id": "fresh", "what": "Fresh", "status": "open",
+         "last_activity": "2026-10-30T09:00:00+08:00"},
+        {"id": "done", "what": "Done", "status": "done",
+         "last_activity": "2026-10-27T09:00:00+08:00"},
+        {"id": "maxed", "what": "Maxed", "status": "open", "nudges": 3,
+         "last_activity": "2026-10-27T09:00:00+08:00"},
+    ]
+    assert [r["id"] for r in stale_rows(rows, NOW)] == ["old"]
+
+
+def test_stale_nudge_asks_once_a_day_and_counts_up(tmp_path, monkeypatch):
+    from mini_reid import watcher as w
+    from mini_reid.ledger import load, save
+
+    monkeypatch.chdir(tmp_path)
+    sent = []
+    monkeypatch.setattr(w, "send_dm",
+                        lambda env, text, blocks=None: sent.append((text, blocks)))
+    save("ledger.json", [{"id": "a", "what": "Old thing", "status": "open",
+                          "last_activity": "2026-10-28T09:00:00+08:00"}])
+    evening = NOW.replace(hour=19)
+    assert w.nudge_stale({}, "ledger.json", evening, "state.json") == 1
+    assert sent and sent[0][1]
+    row = load("ledger.json")[0]
+    assert row["nudges"] == 1
+    assert w.nudge_stale({}, "ledger.json", evening, "state.json") == 0
+    assert load("ledger.json")[0]["nudges"] == 1
+
+
 def test_brief_counts_and_names_the_most_urgent():
     from mini_reid.kb import brief
 

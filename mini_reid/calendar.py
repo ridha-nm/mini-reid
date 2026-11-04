@@ -14,15 +14,15 @@ OWNER_EMAIL = "ridha@pantas.com"
 IGNORES = "calendar_ignores.json"
 
 
-def ignored_titles() -> set[str]:
-    """Meeting titles Ridha said `not:` to. Kept across days."""
-    p = Path(IGNORES)
+def ignored_titles(path: str = IGNORES) -> set[str]:
+    """Meeting titles the user said `not:` to. Kept across days."""
+    p = Path(path)
     return {t.lower() for t in json.loads(p.read_text())} if p.exists() else set()
 
 
-def ignore_title(title: str) -> None:
-    titles = sorted(ignored_titles() | {title.strip().lower()})
-    Path(IGNORES).write_text(json.dumps(titles, indent=1) + "\n")
+def ignore_title(title: str, path: str = IGNORES) -> None:
+    titles = sorted(ignored_titles(path) | {title.strip().lower()})
+    Path(path).write_text(json.dumps(titles, indent=1) + "\n")
 
 
 def _join_link(event: dict) -> str:
@@ -35,11 +35,13 @@ def _join_link(event: dict) -> str:
 
 
 def parse_events(payload: dict, calendar_name: str, day: str,
-                 owned: bool = False) -> list[dict]:
+                 owned: bool = False,
+                 owner_email: str = OWNER_EMAIL) -> list[dict]:
     """Timed events for one calendar on `day` (YYYY-MM-DD). Declined and
-    cancelled events are not meetings Ridha is attending. Shared calendars
-    contain other people's events, so keep only ones he is invited to unless
-    the calendar is his own."""
+    cancelled events are not meetings this user is attending. Shared calendars
+    contain other people's events, so keep only ones they are invited to unless
+    the calendar is their own."""
+    owner_email = (owner_email or OWNER_EMAIL).lower()
     out = []
     for event in payload.get("items") or []:
         if event.get("status") == "cancelled":
@@ -52,15 +54,15 @@ def parse_events(payload: dict, calendar_name: str, day: str,
             continue  # all-day items are not meetings
         attendees = event.get("attendees") or []
         # `attendees[].self` marks the calendar's owner, not the reader: on
-        # Kasib's shared calendar it is Kasib. Match Ridha by address instead.
+        # Kasib's shared calendar it is Kasib. Match by address instead.
         # A shared calendar is someone else's diary: an event with no invite to
-        # Ridha is not his meeting, even when it has no attendees at all.
+        # the user is not their meeting, even when it has no attendees at all.
         organizer = ((event.get("organizer") or {}).get("email") or "").lower()
-        mine = organizer == OWNER_EMAIL or any(
-            (a.get("email") or "").lower() == OWNER_EMAIL for a in attendees)
+        mine = organizer == owner_email or any(
+            (a.get("email") or "").lower() == owner_email for a in attendees)
         if not owned and not mine:
             continue
-        declined = any(((a.get("email") or "").lower() == OWNER_EMAIL
+        declined = any(((a.get("email") or "").lower() == owner_email
                          and a.get("responseStatus") == "declined")
                         for a in attendees)
         if declined:
@@ -95,14 +97,17 @@ def _day_events(access: str, calendar_id: str, start: datetime,
     return _get_json(url, {"Authorization": f"Bearer {access}"})
 
 
-def meetings_for_day(env: dict, now: datetime) -> list[dict]:
+def meetings_for_day(env: dict, now: datetime, token_path: str | None = None,
+                     owner_email: str | None = None,
+                     ignores_path: str = IGNORES,
+                     client_path: str | None = None) -> list[dict]:
     """Today's meetings across every calendar the account can read."""
-    access = gmail_access(env)
+    access = gmail_access(env, token_path, client_path)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=1)
     day = start.date().isoformat()
     seen: set[str] = set()
-    ignored = ignored_titles()
+    ignored = ignored_titles(ignores_path)
     out: list[dict] = []
     for cal in _calendar_list(access):
         cid = cal.get("id")
@@ -110,7 +115,8 @@ def meetings_for_day(env: dict, now: datetime) -> list[dict]:
             continue
         payload = _day_events(access, cid, start, end)
         owned = bool(cal.get("primary")) or cal.get("accessRole") == "owner"
-        for event in parse_events(payload, cal.get("summary") or cid, day, owned):
+        for event in parse_events(payload, cal.get("summary") or cid, day, owned,
+                                  owner_email or OWNER_EMAIL):
             # A meeting often appears on several calendars.
             if event["id"] and event["id"] in seen:
                 continue

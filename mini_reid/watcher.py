@@ -10,13 +10,14 @@ from pathlib import Path
 from .cli import collect, load_clients, match_client, _domain
 from .extract import extract
 from .ledger import apply_stalled, load, merge, save
-from .notify import react, send_dm
+from .notify import send_dm, send_dm_to
 from .sources import load_env
 
 MYT = timezone(timedelta(hours=8))
 
 
-def new_rows(items: list[dict], existing: list[dict], clients: dict, now: datetime) -> list[dict]:
+def new_rows(items: list[dict], existing: list[dict], clients: dict, now: datetime,
+             me: str | None = None) -> list[dict]:
     known = {r["id"] for r in existing}
     known_links = {r.get("source_link") for r in existing if r.get("source_link")}
     out = []
@@ -25,7 +26,7 @@ def new_rows(items: list[dict], existing: list[dict], clients: dict, now: dateti
         channel = item.get("channel") if item.get("source") == "slack" else None
         client = (match_client(text, item.get("author", ""), clients, channel)
                   or match_client(text, item.get("to", ""), clients))
-        for row in extract(item, client, now):
+        for row in extract(item, client, now, me=me):
             if row["id"] in known:
                 continue
             # The model may reword a row, changing its id. The source link is
@@ -37,6 +38,30 @@ def new_rows(items: list[dict], existing: list[dict], clients: dict, now: dateti
             known.add(row["id"])
             if link:
                 known_links.add(link)
+    return out
+
+
+def triage_rows(fresh: list[dict], rewritten: list[dict]) -> list[dict]:
+    """Every rule-captured row waits for a person; the model only cleans the title.
+
+    A row the model rewrote keeps its wording. A row the model omitted, rejected
+    or failed on keeps the rule text. Nothing is dropped here: confirming or
+    dismissing is the person's click, not the model's call.
+    """
+    model_by_nid = {r["native_id"]: r for r in rewritten if r.get("native_id")}
+    seen = {r.get("native_id") for r in fresh}
+    out: list[dict] = []
+    for row in fresh:
+        nid = row.get("native_id")
+        better = model_by_nid.pop(nid, None)
+        if better:
+            out.append(dict(better, status="inbox",
+                            client=row.get("client"),
+                            asker=row.get("asker") or better.get("asker")))
+        else:
+            out.append(dict(row, status="inbox"))
+    out.extend(dict(r, status="inbox") for nid, r in model_by_nid.items()
+               if nid not in seen)
     return out
 
 
@@ -77,7 +102,8 @@ def format_alert(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def fire_reminders(env: dict, ledger_path: str, now: datetime) -> int:
+def fire_reminders(env: dict, ledger_path: str, now: datetime,
+                   user_id: str | None = None) -> int:
     rows = load(ledger_path)
     fired = 0
     for r in rows:
@@ -91,7 +117,11 @@ def fire_reminders(env: dict, ledger_path: str, now: datetime) -> int:
         except ValueError:
             continue
         if when <= now:
-            send_dm(env, f"*Reminder*\n{(r.get('what') or '')[:300]}")
+            text = f"*Reminder*\n{(r.get('what') or '')[:300]}"
+            if user_id:
+                send_dm_to(env, user_id, text)
+            else:
+                send_dm(env, text)
             r["reminded"] = True
             fired += 1
     if fired:
@@ -108,9 +138,9 @@ def poll_dm_commands(env: dict, now: datetime,
     """Slack never delivers events from a DM the bot is not in. Read Ridha's
     recent DMs with the user token and act on `remind` commands addressed to
     the bot. Confirmations go to the bot DM, never spoken as Ridha."""
-    from .notify import dm_channel, schedule_dm
-    from .slack_bot import (load_users, parse_command, parse_remind, split_target,
-                            unresolved_recipient)
+    from .notify import dm_channel, log_reminder, schedule_dm, send_dm_to
+    from .slack_bot import (_person_name, load_users, parse_command, parse_remind,
+                            split_target, unresolved_recipient)
     from .sources import _get_json, slack_me
 
     user_token = env.get("SLACK_USER_TOKEN")
@@ -121,6 +151,7 @@ def poll_dm_commands(env: dict, now: datetime,
     bot_id = slack_me(bot_token)
     bot_dm = dm_channel(bot_token, owner)
     users = load_users(bot_token)
+    log_path = str(Path(state_path).parent / "reminder_log.json")
     state = json.loads(Path(state_path).read_text()) if Path(state_path).exists() else {}
     try:
         last = float(state.get("last_ts") or 0)
@@ -155,7 +186,7 @@ def poll_dm_commands(env: dict, now: datetime,
         action, body = parse_command(text)
         if action != "remind":
             continue
-        target, rest = split_target(body, users, owner)
+        target, rest = split_target(body, users, owner, bare_name=True)
         if target is None:
             missing = unresolved_recipient(body, users)
             if missing:
@@ -169,14 +200,23 @@ def poll_dm_commands(env: dict, now: datetime,
         who = "you" if recipient == owner else f"<@{recipient}>"
         try:
             if fields.get("immediate"):
-                from .notify import send_dm_to
-
                 send_dm_to(env, recipient, f"*Reminder*\n{fields['what'][:300]}")
+                log_reminder(log_path, asked_by=owner,
+                             asked_by_name=_person_name(owner, users),
+                             to=recipient, to_name=_person_name(recipient, users),
+                             what=fields["what"], status="sent",
+                             post_at=now.isoformat(timespec="seconds"))
                 note = f"Reminder sent to {who}: {fields['what'][:80]}"
             else:
                 at = datetime.fromisoformat(fields["remind_at"])
-                schedule_dm(env, recipient, f"*Reminder*\n{fields['what'][:300]}",
-                            int(at.timestamp()))
+                sid = schedule_dm(env, recipient,
+                                  f"*Reminder*\n{fields['what'][:300]}",
+                                  int(at.timestamp()))
+                log_reminder(log_path, asked_by=owner,
+                             asked_by_name=_person_name(owner, users),
+                             to=recipient, to_name=_person_name(recipient, users),
+                             what=fields["what"], post_at=at.isoformat(),
+                             scheduled_id=sid)
                 note = f"Reminder set for {who} — {at:%a %d %b %H:%M}: {fields['what'][:80]}"
             send_dm(env, note)
             handled += 1
@@ -216,7 +256,12 @@ def _load_meetings(state_path: str, today: str) -> dict:
     return state
 
 
-def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE) -> int:
+def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE,
+                    user_id: str | None = None,
+                    token_path: str | None = None,
+                    owner_email: str | None = None,
+                    ignores_path: str = "calendar_ignores.json",
+                    client_path: str | None = None) -> int:
     """Schedule each of today's meetings 10 minutes before it starts, once.
     Slack keeps the schedule, so a sleeping Mac still gets the DM."""
     from .calendar import meetings_for_day, span
@@ -224,8 +269,12 @@ def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE) 
 
     today = now.date().isoformat()
     state = _load_meetings(state_path, today)
+    recipient = user_id or env["SLACK_OWNER_ID"]
     sent = 0
-    for meeting in meetings_for_day(env, now):
+    for meeting in meetings_for_day(env, now, token_path=token_path,
+                                    owner_email=owner_email,
+                                    ignores_path=ignores_path,
+                                    client_path=client_path):
         mid = meeting.get("id")
         rec = state["meetings"].get(mid) if mid else None
         if not mid or rec:
@@ -238,10 +287,13 @@ def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE) 
                 + "\n\nAre you attending? Reply `yes` or `no <reason>`.")
         remind_at = start - timedelta(minutes=10)
         if remind_at <= now:
-            send_dm(env, text)
+            if user_id:
+                send_dm_to(env, recipient, text)
+            else:
+                send_dm(env, text)
             status = "sent"
         else:
-            schedule_dm(env, env["SLACK_OWNER_ID"], text, int(remind_at.timestamp()))
+            schedule_dm(env, recipient, text, int(remind_at.timestamp()))
             status = "scheduled"
         state["meetings"][mid] = {"title": meeting["title"], "start": meeting["start"],
                                   "status": status}
@@ -250,8 +302,8 @@ def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE) 
     from .calendar import ignored_titles
     from .notify import _post
 
-    ignored = ignored_titles()
-    if ignored:
+    ignored = ignored_titles(ignores_path)
+    if ignored and not user_id:
         d = _post("chat.scheduledMessages.list", env["SLACK_BOT_TOKEN"])
         for msg in d.get("scheduled_messages") or []:
             text = msg.get("text") or ""
@@ -302,7 +354,7 @@ def overdue_today(rows: list[dict], now: datetime) -> list[dict]:
     for r in rows:
         due = r.get("due") or ""
         if (r.get("direction", "owed_by_me") != "owed_by_me"
-                or r.get("status") in {"done", "dropped"}
+                or r.get("status") in {"done", "dropped", "inbox"}
                 or r.get("kind") in {"note", "reminder"}
                 or r.get("closure") == "proposed"):
             continue
@@ -312,11 +364,72 @@ def overdue_today(rows: list[dict], now: datetime) -> list[dict]:
     return out
 
 
-def nudge_overdue(env: dict, ledger_path: str, now: datetime) -> int:
+STALE_STATUSES = {"open", "in progress", "blocked", "stalled"}
+STALE_NUDGE_HOUR = 18
+STALE_MAX_NUDGES = 3
+
+
+def stale_rows(rows: list[dict], now: datetime) -> list[dict]:
+    """Live rows untouched today, nudged at most three times."""
+    from .ledger import _dt
+
+    out = []
+    for row in rows:
+        status = (row.get("status") or "open").lower()
+        if status not in STALE_STATUSES or row.get("kind") == "note":
+            continue
+        if int(row.get("nudges") or 0) >= STALE_MAX_NUDGES:
+            continue
+        activity = _dt(row.get("last_activity") or row.get("created_at"))
+        if activity is None or activity.date() >= now.date():
+            continue
+        out.append(row)
+    return out
+
+
+def nudge_stale(env: dict, ledger_path: str, now: datetime,
+                state_path: str = "watcher_state.json") -> int:
+    """Evening DM: ask what happened to tasks that saw no update today."""
+    from .ledger import save
+    from .triage_ui import stale_blocks
+
+    state = Path(state_path)
+    today = now.date().isoformat()
+    seen = json.loads(state.read_text()) if state.exists() else {}
+    if now.hour < STALE_NUDGE_HOUR or seen.get("stale_date") == today:
+        return 0
+    rows = stale_rows(load(ledger_path), now)
+    state.write_text(json.dumps({**seen, "stale_date": today}))
+    if not rows:
+        return 0
+    shown = rows[:5]
+    text = f"*No update today ({len(rows)})*\nStill open — what happened?"
+    send_dm(env, text, blocks=stale_blocks(shown))
+    for row in shown:
+        row["nudges"] = int(row.get("nudges") or 0) + 1
+        row["last_nudged"] = today
+    save(ledger_path, _merge_nudges(ledger_path, shown))
+    return len(rows)
+
+
+def _merge_nudges(ledger_path: str, shown: list[dict]) -> list[dict]:
+    """Persist the nudge counters without dropping rows added meanwhile."""
+    rows = load(ledger_path)
+    by_id = {r["id"]: r for r in shown}
+    for row in rows:
+        if row["id"] in by_id:
+            row["nudges"] = by_id[row["id"]]["nudges"]
+            row["last_nudged"] = by_id[row["id"]]["last_nudged"]
+    return rows
+
+
+def nudge_overdue(env: dict, ledger_path: str, now: datetime,
+                  user_id: str | None = None,
+                  state_path: str = "watcher_state.json") -> int:
     """Once a day after 09:00, restate what is overdue. Silence is how things rot."""
     from .render import _line
 
-    state = Path("watcher_state.json")
+    state = Path(state_path)
     today = now.date().isoformat()
     seen = json.loads(state.read_text()) if state.exists() else {}
     if now.hour < 9 or seen.get("overdue_date") == today:
@@ -325,9 +438,33 @@ def nudge_overdue(env: dict, ledger_path: str, now: datetime) -> int:
     if rows:
         # Same row renderer as the digest: client name, due, sender, time, link.
         lines = "\n".join(_line(r, slack=True, now=now) for r in rows[:10])
-        send_dm(env, f"*Still overdue ({len(rows)})*\n{lines}")
+        text = f"*Still overdue ({len(rows)})*\n{lines}"
+        if user_id:
+            send_dm_to(env, user_id, text)
+        else:
+            send_dm(env, text)
     state.write_text(json.dumps({"overdue_date": today}))
     return len(rows)
+
+
+def _stamp_confirmation(ledger_path: str, ids: set[str], sent) -> None:
+    """Remember which DM carries each row's buttons, so a click can edit it.
+
+    Reloads first: a click may land between the alert send and this stamp, and
+    only the confirmation fields are touched.
+    """
+    ts = sent.get("ts") if isinstance(sent, dict) else ""
+    if not ts:
+        return
+    rows = load(ledger_path)
+    changed = False
+    for row in rows:
+        if row.get("id") in ids:
+            row["confirm_ts"] = ts
+            row["confirm_channel"] = sent.get("channel") or ""
+            changed = True
+    if changed:
+        save(ledger_path, rows)
 
 
 def main() -> int:
@@ -370,6 +507,12 @@ def main() -> int:
     nudged = nudge_overdue(env, ledger_path, now)
     if nudged:
         print(f"[{now:%H:%M:%S}] overdue nudge: {nudged}", flush=True)
+    try:
+        stale = nudge_stale(env, ledger_path, now)
+        if stale:
+            print(f"[{now:%H:%M:%S}] stale nudge: {stale}", flush=True)
+    except Exception as ex:  # noqa: BLE001 - a nudge must not stop capture
+        print(f"[{now:%H:%M:%S}] stale nudge: {type(ex).__name__}: {ex}", flush=True)
 
     items, errors = collect(days=1, offline=False)
     existing = load(ledger_path)
@@ -385,32 +528,27 @@ def main() -> int:
         rewritten: list[dict] = []
         provider = OllamaProvider(model=env.get("OLLAMA_MODEL", "llama3.2:3b"))
         for start in range(0, len(candidates), 5):
-            rows, _ = extract_batch_safe(
+            rows, _bad = extract_batch_safe(
                 candidates[start:start + 5], provider, now, list(clients))
             rewritten.extend(rows)
-        if rewritten:
-            by_nid = {r["native_id"]: r for r in rewritten}
-            merged = []
-            for r in fresh:
-                better = by_nid.pop(r["native_id"], None)
-                if better:
-                    better = dict(better, client=r.get("client"), asker=r.get("asker"))
-                merged.append(better or r)
-            fresh = merged + list(by_nid.values())
+        fresh = triage_rows(fresh, rewritten)
 
     if fresh:
         ledger = apply_stalled(merge(existing, fresh), now)
         save(ledger_path, ledger)
-        for r in fresh:
-            if r.get("source") != "slack":
-                continue
-            channel_id, _, ts = (r.get("native_id") or "").partition(":")
-            try:
-                react(env["SLACK_BOT_TOKEN"], channel_id, ts)
-            except Exception as ex:  # noqa: BLE001 - reaction is best effort
-                print(f"  react failed: {ex}", flush=True)
-        send_dm(env, format_alert(fresh))
-        print(f"[{now:%H:%M:%S}] alerted {len(fresh)} new", flush=True)
+        from .triage_ui import confirm_blocks
+
+        sent = send_dm(env, format_alert(fresh), blocks=confirm_blocks(fresh))
+        _stamp_confirmation(ledger_path, {r["id"] for r in fresh}, sent)
+        print(f"[{now:%H:%M:%S}] asked to confirm {len(fresh)} new", flush=True)
+    try:
+        from .members import cycle as member_cycle
+
+        handled = member_cycle(env, now)
+        if handled:
+            print(f"[{now:%H:%M:%S}] members checked: {handled}", flush=True)
+    except Exception as ex:  # noqa: BLE001 - member work must not stop the owner
+        print(f"[{now:%H:%M:%S}] member cycle: {type(ex).__name__}: {ex}", flush=True)
     print(f"[{now:%H:%M:%S}] checked {len(items)} items, {len(fresh)} new", flush=True)
     if errors:
         print(f"[{now:%H:%M:%S}] source errors: {errors}", flush=True)

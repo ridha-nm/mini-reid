@@ -36,6 +36,32 @@ def _text_match(text: str, client: dict) -> bool:
     return False
 
 
+def resolve_clients(text: str, clients: dict[str, dict]
+                    ) -> tuple[list[str], list[str]]:
+    """Map a comma-separated list of names/slugs to client slugs."""
+    raw = (text or "").strip()
+    if raw.lower() in {"all", "*", "everyone"}:
+        return sorted(clients), []
+    slugs: list[str] = []
+    unknown: list[str] = []
+    for token in (t.strip() for t in re.split(r"[,/]", raw)):
+        if not token:
+            continue
+        low = token.lower()
+        found = low if low in clients else None
+        if not found:
+            for slug, client in clients.items():
+                names = [client.get("name", ""), *(client.get("aliases") or [])]
+                if low in {n.lower() for n in names if n}:
+                    found = slug
+                    break
+        if found and found not in slugs:
+            slugs.append(found)
+        elif not found:
+            unknown.append(token)
+    return slugs, unknown
+
+
 def match_client(text: str, sender: str, clients: dict[str, dict],
                  channel: str | None = None) -> dict | None:
     """Return {slug, name, group, matched_by} or None.

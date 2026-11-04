@@ -1,11 +1,18 @@
 import pytest
 
-from mini_reid.clients import load_clients, match_client
+from mini_reid.clients import load_clients, match_client, resolve_clients
 
 
 @pytest.fixture(scope="module")
 def c():
     return load_clients("clients.json")
+
+
+def test_resolves_names_to_client_slugs(c):
+    assert resolve_clients("Knight Frank, SP Setia", c) == (
+        ["knight-frank", "setia"], [])
+    assert resolve_clients("Eupe, Unknown Co", c) == (["eupe"], ["Unknown Co"])
+    assert resolve_clients("GHB, GVC, SAFE", c) == (["ghb", "gvc", "safe"], [])
 
 
 def test_matches_domain(c):

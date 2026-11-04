@@ -38,6 +38,10 @@ WEEKDAYS = {
     "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
     "friday": 4, "saturday": 5, "sunday": 6,
 }
+MONTHS = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12,
+}
 
 
 def parse_due(text: str, now: datetime) -> tuple[str | None, float]:
@@ -56,6 +60,28 @@ def parse_due(text: str, now: datetime) -> tuple[str | None, float]:
         return now.date().isoformat(), 0.7
     if re.search(r"\btomorrow\b", t):
         return (now + timedelta(days=1)).date().isoformat(), 0.7
+
+    # An explicit day and month beats a weekday: "Thursday Nov 12" is Nov 12.
+    m = re.search(
+        r"\b(\d{1,2})(?:st|nd|rd|th)?\s+"
+        r"(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b", t)
+    if m:
+        day, month = int(m.group(1)), MONTHS[m.group(2)]
+    else:
+        m = re.search(
+            r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\s+"
+            r"(\d{1,2})(?:st|nd|rd|th)?\b", t)
+        day, month = (int(m.group(2)), MONTHS[m.group(1)]) if m else (None, None)
+    if day:
+        try:
+            found = now.replace(month=month, day=day, hour=0, minute=0,
+                                second=0, microsecond=0)
+        except ValueError:
+            found = None
+        if found:
+            if found.date() < now.date():
+                found = found.replace(year=found.year + 1)
+            return found.date().isoformat(), 0.9
 
     for name, idx in WEEKDAYS.items():
         if re.search(r"\b" + name + r"\b", t):
@@ -128,7 +154,8 @@ def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def extract(item: dict, client: dict | None, now: datetime) -> list[dict]:
+def extract(item: dict, client: dict | None, now: datetime,
+            me: str | None = None) -> list[dict]:
     """One raw item may yield several commitments; rules yield at most one."""
     author = item.get("author") or ""
     if BOT_AUTHOR.search(author):
@@ -169,10 +196,11 @@ def extract(item: dict, client: dict | None, now: datetime) -> list[dict]:
     else:
         due, conf = parse_due(f"{item.get('subject') or ''} {text}", now)
 
-    # Shared-alias mail with no date and no direct address is not Ridha's work.
+    # Shared-alias mail with no date and no direct address is not this user's work.
     if item.get("source") == "gmail" and item.get("kind") == "inbox" and due is None:
         to = (item.get("to") or "").lower()
-        if "ridha" not in to and "ridha" not in text.lower():
+        needle = ((me or "Ridha").split("@")[0]).lower()
+        if needle not in to and needle not in text.lower():
             return []
     ts = item.get("created_at") or item.get("ts") or now.isoformat()
     # A subject line is a task name. The body opens with "Hi X, thanks for..."

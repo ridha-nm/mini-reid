@@ -33,6 +33,14 @@ def test_slack_render_uses_slack_markup():
     assert "[open](" not in out
 
 
+def test_inbox_rows_wait_for_confirmation_and_are_counted():
+    pending = dict(ROW, id="p1", status="inbox", what="Maybe a task")
+    out = render([ROW, pending], NOW, [], slack=True)
+    assert "Maybe a task" not in out
+    assert "1 to confirm" in out
+    assert "send the FSD" in out
+
+
 def test_notes_get_their_own_section_not_the_task_buckets():
     note = {"id": "n1", "what": "Daniel wants the mapping redone", "kind": "note",
             "status": "open", "due": None, "source_link": "", "direction": "owed_by_me"}
