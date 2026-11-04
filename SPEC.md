@@ -80,7 +80,7 @@ calls.
 | `what` | task text: email subject for mail, message text for Slack |
 | `asker`, `via` | who sent it, and where it reached him (DM, #channel, direct, alias, Jira board) |
 | `client` | slug from the rule matcher only |
-| `due`, `status` | date; open, in progress, blocked, stalled, done, dropped |
+| `due`, `status` | date; open, in progress, blocked, stalled, done, dropped; `inbox` = waiting for a person to triage |
 | `priority` | 1-5, absent when unranked; 1 is first |
 | `kind` | mention, dm, inbox, draft, issue, note, reminder |
 | `closure` | open, proposed |
@@ -108,8 +108,11 @@ a channel mention. Channel mentions are always kept unless they are pure chatter
   questions with no ask ("do you have access?"), status updates ("Update: …"), other
   people's own plans ("I try to get … today"), Google boilerplate, URLs, newsletters.
 
-The optional local model only rewrites `what`. Given filtering authority it deleted
-real asks and kept jokes.
+Rules capture first; the optional local model then triages. A row the model rewrites
+keeps its wording and stays a task. A row the model saw and marked not a commitment is
+dropped. A row the model failed on (bad response, timeout) becomes `status: inbox` and
+is surfaced in its own DM and the `list` inbox section for a person to decide. The
+model never deletes a row it did not actually see.
 
 A tiny Naive Bayes classifier (`mini_reid/classifier.py`) gives a second opinion on
 bot-addressed social text, trained from the ledger, `not:` corrections and seed
@@ -139,6 +142,16 @@ A separate overdue nudge runs once a day, on the first watcher cycle after 09:00
 uses the same row renderer as the digest, link included. Only a real past due date or a
 stalled status counts as overdue; undated rows stay in No date.
 
+A stale nudge runs at 18:00: open, in progress, blocked and stalled rows with no
+activity today are DMed, up to five at a time, each with an inline status picker. A row
+is nudged at most three times; a status change through triage or the picker resets the
+count.
+
+`list` is grouped as In progress / Blocked / Overdue / Due today / This week / Later /
+No date, followed by Inbox. The reply carries a **Triage & update** button that opens a
+modal: select rows (checkboxes chunked ten per Slack block, at most forty selectable),
+choose one status, apply once.
+
 ## Bot commands
 
 `add:`, `task:`, `todo:`, `assign: <person> <what>`, `reassign: <item> to <person>`,
@@ -150,6 +163,8 @@ stalled status counts as overdue; undated rows stay in No date.
 ignores that title), `remind` (absolute or `in 2 minutes`),
 `ask:`, `find:`, `list`, `notes`, `allow: @Name`, `banter on|off|status`, `help`.
 
+- `done` and `not` accept several refs at once: `done 7, 9`, `#7 #9`,
+  `id:abc1, id:def2`. One bad ref rejects the whole batch and changes nothing.
 - The owner mutates `ledger.json`; an allowlisted member mutates only their own
   `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
 - `allow: @Name` is owner-only. It writes `users.json`, creates the member's isolated
@@ -272,7 +287,7 @@ Rebuild nightly at 02:00, incremental.
 | Risk | Reality today |
 |---|---|
 | Local model quality | 3B rewrites only; 8B too slow on 8 GB |
-| Sleep gaps | events missed while asleep; catch-up covers questions |
+| Sleep gaps | socket pauses during sleep; the periodic catch-up sweep replays missed commands and questions |
 | Gmail token expiry | weekly refresh; failures show under Source errors |
 | Auto-assigned Jira | board named instead of a person; reassignment closes the row |
 | Shared alias noise | read-mail and DM filters; `not:` teaches the rest |

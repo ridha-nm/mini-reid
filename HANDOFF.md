@@ -1,7 +1,7 @@
 # Handoff
 
 Current state of Mini-Reid. Update after every material change. Last updated
-2026-11-03; next session can start here.
+2026-11-04; next session can start here.
 
 ## What it is
 
@@ -28,8 +28,17 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Knight Frank, Allianz, Setia and Eupe. 213 tests pass. Remaining work is the "Next, agreed"
-list below.
+overridden to Knight Frank, Allianz, Setia and Eupe. 258 tests pass.
+
+2026-11-04: `list` groups by status and due date and carries a **Triage & update**
+button (multi-select, one status applied in bulk). Model-rejected items are dropped;
+model failures land in the inbox instead of becoming tasks, and only real tasks get
+the ✅ and new-item DM. Open rows untouched for a day get an 18:00 DM with an inline
+status picker, at most three times. `done`/`not` accept bulk refs (`7, 9`, `#7 #9`,
+`id:abc1`). Catch-up sweeps every `CATCHUP_SECONDS` (default 300) using its own
+`catch_up_ts` watermark, so messages missed while the Mac slept or the socket dropped
+are replayed; live messages still advance `last_ts`. Remaining build phases are in
+`SPEC.md`: P2 cycles, P4 closure confirmation, P7 stock-take hub.
 
 ## Running now
 
@@ -103,7 +112,7 @@ combine: #9 into #7               merge a duplicate into the task to keep
 uncombine: #7                     restore everything merged into #7
 undo:                             reverse the last ledger change (10 deep)
 185045 / id:185045                stable row reference, survives renumbering
-done: send the deck               close it
+done: send the deck               close it; bulk refs work: done 7, 9 / #7 #9
 status: deck in progress          open, in progress, blocked
 priority: deck 1                  P1 first; high/medium/low/none
 tonote: deck                      keep as a note (also convert:)
@@ -113,11 +122,11 @@ edit: deck to Send deck by Monday rename and re-date
 snooze: deck 3d                   push it out
 waiting: deck on Daniel           move to Waiting on others
 drop: deck                        remove quietly (also remove: / delete:)
-not: anything not part c          wrong item; a meeting title cancels its reminder
+not: anything not part c          wrong item; also takes bulk refs; meeting title cancels reminder
 remind me to send the deck in 2 minutes
 ask: what did we agree with Eupe  answer from your own writing, with sources
 find: eupe                        search the ledger
-list                              numbered open items; use #1 in later commands
+list                              grouped open items + Inbox, with a Triage button
 notes                             list notes; they also appear in the digest
 help                              the command list
 ```
@@ -170,6 +179,11 @@ The daily overdue nudge (first watcher cycle after 09:00) uses the same row rend
 the digest, so it carries the same sender, time and link. Undated rows are not overdue;
 only a real past due date or a stalled status is.
 
+A stale nudge runs at 18:00 for open / in progress / blocked / stalled rows whose
+`last_activity` is older than today. It DMs up to five rows, each with an inline status
+picker, and stops after three nudges per row. Any status change through triage resets
+the counter.
+
 ## Completion rules
 
 Nothing closes by itself.
@@ -208,12 +222,15 @@ kept or a real ask was missed.
 
 ## Known limits
 
-- 3B model only rewords tasks; it is not trusted to filter.
+- The 3B model rewrites tasks and flags non-commitments; a model failure parks the row
+  in the inbox rather than guessing. It never silently drops a row the rules captured
+  and the model failed to see — that is the inbox's job.
 - 8B local is unusable on 8 GB (about five minutes per answer).
 - Answers are extractive, not composed.
 - Untagged asks in channels and thread replies without a mention are not captured.
 - WhatsApp and calls are manual capture only.
-- macOS sleep pauses everything; catch-up answers missed questions on wake.
+- macOS sleep pauses the socket; the catch-up sweep (every `CATCHUP_SECONDS`, default
+  300) replays commands and questions missed while asleep or disconnected.
 - Watcher takes about 40 s per cycle, hence the two-minute interval.
 - Edited-message ✅ depends on the app keeping `message.channels`/`message.groups`. A
   reinstall can rotate the bot token; update `.env` and restart the bot if it stops.
@@ -231,7 +248,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-213 tests passing as of 2026-11-03.
+258 tests passing as of 2026-11-04.
 
 ## Next, agreed
 
