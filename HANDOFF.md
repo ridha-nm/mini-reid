@@ -28,13 +28,15 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Knight Frank, Allianz, Setia and Eupe. 258 tests pass.
+overridden to Knight Frank, Allianz, Setia and Eupe. 262 tests pass.
 
-2026-11-04: `list` groups by status and due date and carries a **Triage & update**
-button (multi-select, one status applied in bulk). Model-rejected items are dropped;
-model failures land in the inbox instead of becoming tasks, and only real tasks get
-the ✅ and new-item DM. Open rows untouched for a day get an 18:00 DM with an inline
-status picker, at most three times. `done`/`not` accept bulk refs (`7, 9`, `#7 #9`,
+2026-11-04: every new candidate lands as `inbox` and waits for a click — the
+new-item DM has **Add to list** / **Not a task** per item. The model never decides;
+it only rewrites the title. Confirm → `open` and ✅ on the source message; dismiss →
+`dropped`. Unanswered rows stay in the list Inbox and its **Triage & update** modal.
+`list` groups by status and due date and reads due dates relatively (`3d overdue`,
+`today`, `in 2d`). Open rows untouched for a day get an 18:00 DM with an inline status
+picker, at most three times. `done`/`not` accept bulk refs (`7, 9`, `#7 #9`,
 `id:abc1`). Catch-up sweeps every `CATCHUP_SECONDS` (default 300) using its own
 `catch_up_ts` watermark, so messages missed while the Mac slept or the socket dropped
 are replayed; live messages still advance `last_ts`. Remaining build phases are in
@@ -179,6 +181,10 @@ The daily overdue nudge (first watcher cycle after 09:00) uses the same row rend
 the digest, so it carries the same sender, time and link. Undated rows are not overdue;
 only a real past due date or a stalled status is.
 
+A new item does not enter any digest bucket until it is confirmed. The capture DM
+shows each item with **Add to list** / **Not a task**; unanswered items stay in the
+list Inbox and are counted as `N to confirm` in the digest header.
+
 A stale nudge runs at 18:00 for open / in progress / blocked / stalled rows whose
 `last_activity` is older than today. It DMs up to five rows, each with an inline status
 picker, and stops after three nudges per row. Any status change through triage resets
@@ -222,9 +228,8 @@ kept or a real ask was missed.
 
 ## Known limits
 
-- The 3B model rewrites tasks and flags non-commitments; a model failure parks the row
-  in the inbox rather than guessing. It never silently drops a row the rules captured
-  and the model failed to see — that is the inbox's job.
+- The 3B model only rewrites titles. It does not decide what is a task and cannot drop
+  a captured row; every candidate waits in the inbox for a person's click.
 - 8B local is unusable on 8 GB (about five minutes per answer).
 - Answers are extractive, not composed.
 - Untagged asks in channels and thread replies without a mention are not captured.
@@ -248,7 +253,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-258 tests passing as of 2026-11-04.
+262 tests passing as of 2026-11-04.
 
 ## Next, agreed
 

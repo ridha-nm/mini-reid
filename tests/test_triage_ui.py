@@ -27,6 +27,30 @@ def test_list_blocks_offer_a_triage_button():
     assert "Triage" in action["text"]["text"]
 
 
+def test_confirm_blocks_offer_add_and_dismiss_per_item():
+    from mini_reid.triage_ui import confirm_blocks
+
+    rows = [_row("aaaa11", "Send the deck", asker="Kasib", due="2026-11-06"),
+            _row("bbbb22", "Maybe a task")]
+    blocks = confirm_blocks(rows)
+    actions = [b for b in blocks if b.get("type") == "actions"]
+    assert len(actions) == 2
+    first = actions[0]["elements"]
+    assert [b["action_id"] for b in first] == ["confirm_task", "reject_task"]
+    assert [b["value"] for b in first] == ["aaaa11", "aaaa11"]
+    assert "Send the deck" in blocks[1]["text"]["text"]
+    assert "Kasib" in blocks[1]["text"]["text"]
+
+
+def test_confirm_blocks_cap_the_batch_and_point_at_the_inbox():
+    from mini_reid.triage_ui import CONFIRM_MAX, confirm_blocks
+
+    rows = [_row(f"id{i:02d}", f"Task {i}") for i in range(CONFIRM_MAX + 2)]
+    blocks = confirm_blocks(rows)
+    assert len([b for b in blocks if b.get("type") == "actions"]) == CONFIRM_MAX
+    assert "2 more" in blocks[-1]["text"]["text"]
+
+
 def test_triage_modal_chunks_more_than_ten_items():
     rows = [_row(f"id{i:02d}", f"Task {i}", status="inbox") for i in range(23)]
     modal = triage_modal(rows)

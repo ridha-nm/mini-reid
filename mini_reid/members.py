@@ -13,7 +13,7 @@ from pathlib import Path
 from .cli import load_clients
 from .clients import match_client
 from .ledger import apply_stalled, load, merge, save
-from .notify import react, send_dm_to
+from .notify import send_dm_to
 from .profiles import load as load_profiles
 from .render import render
 from .sources import _get_json, fetch_gmail, fetch_jira, slack_user_name
@@ -199,16 +199,11 @@ def refresh(env: dict, user: str, profile: dict, days: int = 1) -> list[dict]:
     fresh = new_rows(items, existing, clients, now,
                      me=profile.get("email") or profile.get("name"))
     if fresh:
+        fresh = [dict(row, status="inbox") for row in fresh]
         save(ledger_path, apply_stalled(merge(existing, fresh), now))
-        for row in fresh:
-            if row.get("source") != "slack":
-                continue
-            channel, _, ts = (row.get("native_id") or "").partition(":")
-            try:
-                react(env["SLACK_BOT_TOKEN"], channel, ts)
-            except Exception as ex:  # noqa: BLE001 - reaction is best effort
-                print(f"  member react failed: {type(ex).__name__}: {ex}", flush=True)
-        send_dm_to(env, user, format_alert(fresh))
+        from .triage_ui import confirm_blocks
+
+        send_dm_to(env, user, format_alert(fresh), blocks=confirm_blocks(fresh))
     if errors:
         print(f"  member source errors: {errors}", flush=True)
     return fresh

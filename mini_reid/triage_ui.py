@@ -41,6 +41,52 @@ def list_blocks(rows: list[dict], now: datetime) -> list[dict]:
     return blocks
 
 
+CONFIRM_MAX = 10
+
+
+def confirm_blocks(rows: list[dict]) -> list[dict]:
+    """One new item per section, each with Add to list / Not a task buttons."""
+    shown = rows[:CONFIRM_MAX]
+    headline = (f"*{len(rows)} new — add to the list?*" if len(rows) > 1
+                else "*New — add to the list?*")
+    blocks: list[dict] = [{
+        "type": "section",
+        "text": {"type": "mrkdwn", "text": headline},
+    }]
+    for row in shown:
+        meta = []
+        if row.get("asker"):
+            meta.append(f"from {row['asker']}")
+        if row.get("due"):
+            meta.append(f"due {row['due']}")
+        tail = f"\n_{' · '.join(meta)}_" if meta else ""
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn",
+                     "text": f"*{_title(row)[:110]}*{tail}"},
+        })
+        blocks.append({
+            "type": "actions",
+            "elements": [
+                {"type": "button", "action_id": "confirm_task",
+                 "value": row.get("id", ""),
+                 "text": {"type": "plain_text", "text": "Add to list"},
+                 "style": "primary"},
+                {"type": "button", "action_id": "reject_task",
+                 "value": row.get("id", ""),
+                 "text": {"type": "plain_text", "text": "Not a task"},
+                 "style": "danger"},
+            ],
+        })
+    if len(rows) > CONFIRM_MAX:
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn",
+                     "text": f"…and {len(rows) - CONFIRM_MAX} more in the list Inbox."},
+        })
+    return blocks
+
+
 def triage_modal(rows: list[dict], now: datetime | None = None) -> dict:
     now = now or datetime.now()
     rows = _selectable(rows, now)

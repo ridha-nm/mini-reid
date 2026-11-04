@@ -2258,6 +2258,32 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                             print(f"  stale confirm failed: {type(ex).__name__}",
                                   flush=True)
                     continue
+                if action_id in {"confirm_task", "reject_task"}:
+                    from .notify import react
+                    from .triage_ui import apply_triage
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    member_profiles = load_profiles()
+                    if clicker != owner and clicker not in member_profiles:
+                        continue
+                    target = (ledger_for(member_profiles, clicker, ledger_path)
+                              if clicker != owner else ledger_path)
+                    row_id = action.get("value") or ""
+                    verdict = "open" if action_id == "confirm_task" else "dropped"
+                    rows, count = apply_triage(load(target), [row_id], verdict,
+                                               datetime.now(MYT))
+                    save(target, rows)
+                    if count and verdict == "open":
+                        row = next((r for r in rows if r.get("id") == row_id), None)
+                        if row and row.get("source") == "slack":
+                            channel_id, _, ts = (row.get("native_id") or "").partition(":")
+                            if channel_id and ts:
+                                try:
+                                    react(env["SLACK_BOT_TOKEN"], channel_id, ts)
+                                except Exception as ex:  # noqa: BLE001 - best effort
+                                    print(f"  confirm react failed: "
+                                          f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
                 if not action_id.startswith("remind_"):
                     continue
                 clicker = (payload.get("user") or {}).get("id") or ""

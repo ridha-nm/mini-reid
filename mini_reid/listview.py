@@ -64,11 +64,24 @@ def _title(row: dict) -> str:
     return (row.get("action") or row.get("what") or "").strip()
 
 
-def _line(number: int, row: dict) -> str:
+def _due_label(due: datetime, today: date) -> str:
+    days = (due.date() - today).days
+    if days < 0:
+        return f"{abs(days)}d overdue"
+    if days == 0:
+        return "today"
+    if days == 1:
+        return "tomorrow"
+    if days < 7:
+        return f"in {days}d"
+    return f"{due:%a %d %b}"
+
+
+def _line(number: int, row: dict, today: date) -> str:
     parts = [f"{number}. [{row.get('id', '')[:6]}] {_title(row)[:100]}"]
     due = _dt(row.get("due"))
     if due:
-        parts.append(f"— {due:%a %d %b}")
+        parts.append(f"— {_due_label(due, today)}")
     client = _client_name(row.get("client"))
     if client:
         parts.append(f"· {client}")
@@ -94,7 +107,7 @@ def format_list(rows: list[dict], now: datetime, limit: int = 25) -> str:
             current = bucket
             title = dict(BUCKETS)[bucket]
             sections.append(f"*{title}*")
-        sections.append(_line(number, row))
+        sections.append(_line(number, row, today))
     if len(ordered) > limit:
         sections.append(f"… and {len(ordered) - limit} more")
 

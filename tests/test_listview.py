@@ -63,6 +63,18 @@ def test_list_hides_notes_done_and_dropped():
     assert format_list(rows, NOW) == "Nothing open."
 
 
+def test_due_dates_read_relative():
+    rows = [
+        _row("late", "Overdue thing", due="2026-11-01"),
+        _row("today", "Today thing", due="2026-11-04"),
+        _row("soon", "Soon thing", due="2026-11-06"),
+    ]
+    text = format_list(rows, NOW)
+    assert "3d overdue" in text
+    assert "today" in text.lower()
+    assert "in 2d" in text
+
+
 def test_list_line_shows_client_and_priority():
     rows = [_row("a1", "Send the deck", client="eupe", priority=1)]
     line = format_list(rows, NOW)

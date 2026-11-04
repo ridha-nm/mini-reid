@@ -2,6 +2,23 @@
 
 Append-only. Newest first.
 
+## 2026-11-04 (confirm every new task)
+
+- The model no longer decides what is a task. Rules capture every candidate; the
+  model only rewrites the title for readability and must return one item per
+  message. It has no `is_commitment` field left.
+- Every new row lands as `status: "inbox"` and stays out of the digest, overdue
+  nudge and numbered list until a person confirms it.
+- The new-item DM carries one section per item with **Add to list** and **Not a
+  task** buttons (up to 10 per DM; the rest stay in the list Inbox). Confirm →
+  `open` and ✅ on the source Slack message. Dismiss → `dropped` / `not_commitment`.
+- Member DMs use the same flow; the click resolves the member's own ledger.
+- `list` due dates read relatively: `3d overdue`, `today`, `in 1d`, `in 6d`,
+  then an absolute date.
+- Digest counts add `N to confirm`; inbox rows are excluded from every bucket.
+- Design note: `docs/superpowers/specs/2026-11-04-task-confirmation-design.md`.
+- 262 tests passing.
+
 ## 2026-11-04 (triage inbox, bulk close, stale nudges)
 
 - Watcher triage: when the model rewrites an item it stays a task; when the

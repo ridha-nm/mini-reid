@@ -10,7 +10,7 @@ from pathlib import Path
 from .cli import collect, load_clients, match_client, _domain
 from .extract import extract
 from .ledger import apply_stalled, load, merge, save
-from .notify import react, send_dm, send_dm_to
+from .notify import send_dm, send_dm_to
 from .sources import load_env
 
 MYT = timezone(timedelta(hours=8))
@@ -41,15 +41,13 @@ def new_rows(items: list[dict], existing: list[dict], clients: dict, now: dateti
     return out
 
 
-def triage_rows(fresh: list[dict], rewritten: list[dict],
-                failed: list[dict]) -> list[dict]:
-    """Apply the model's verdict to the rows the rules captured.
+def triage_rows(fresh: list[dict], rewritten: list[dict]) -> list[dict]:
+    """Every rule-captured row waits for a person; the model only cleans the title.
 
-    - model rewrote the item -> it is a task; keep its wording.
-    - model never saw it (rejected it) -> not a task; drop it.
-    - model failed on the item -> uncertain; park it in the inbox for a person.
+    A row the model rewrote keeps its wording. A row the model omitted, rejected
+    or failed on keeps the rule text. Nothing is dropped here: confirming or
+    dismissing is the person's click, not the model's call.
     """
-    failed_ids = {i.get("native_id") for i in failed}
     model_by_nid = {r["native_id"]: r for r in rewritten if r.get("native_id")}
     seen = {r.get("native_id") for r in fresh}
     out: list[dict] = []
@@ -57,19 +55,14 @@ def triage_rows(fresh: list[dict], rewritten: list[dict],
         nid = row.get("native_id")
         better = model_by_nid.pop(nid, None)
         if better:
-            out.append(dict(better, client=row.get("client"),
+            out.append(dict(better, status="inbox",
+                            client=row.get("client"),
                             asker=row.get("asker") or better.get("asker")))
-        elif nid in failed_ids:
+        else:
             out.append(dict(row, status="inbox"))
-    out.extend(r for nid, r in model_by_nid.items() if nid not in seen)
+    out.extend(dict(r, status="inbox") for nid, r in model_by_nid.items()
+               if nid not in seen)
     return out
-
-
-def split_inbox(rows: list[dict]) -> tuple[list[dict], list[dict]]:
-    """(real tasks, items waiting for a person to decide)."""
-    tasks = [r for r in rows if r.get("status") != "inbox"]
-    inbox = [r for r in rows if r.get("status") == "inbox"]
-    return tasks, inbox
 
 
 def format_alert(rows: list[dict]) -> str:
@@ -361,7 +354,7 @@ def overdue_today(rows: list[dict], now: datetime) -> list[dict]:
     for r in rows:
         due = r.get("due") or ""
         if (r.get("direction", "owed_by_me") != "owed_by_me"
-                or r.get("status") in {"done", "dropped"}
+                or r.get("status") in {"done", "dropped", "inbox"}
                 or r.get("kind") in {"note", "reminder"}
                 or r.get("closure") == "proposed"):
             continue
@@ -513,37 +506,20 @@ def main() -> int:
         by_nid = {i.get("native_id"): i for i in items}
         candidates = [by_nid[r["native_id"]] for r in fresh if r.get("native_id") in by_nid]
         rewritten: list[dict] = []
-        failed: list[dict] = []
         provider = OllamaProvider(model=env.get("OLLAMA_MODEL", "llama3.2:3b"))
         for start in range(0, len(candidates), 5):
-            rows, bad = extract_batch_safe(
+            rows, _bad = extract_batch_safe(
                 candidates[start:start + 5], provider, now, list(clients))
             rewritten.extend(rows)
-            failed.extend(bad)
-        fresh = triage_rows(fresh, rewritten, failed)
-
-    tasks, inbox = split_inbox(fresh)
+        fresh = triage_rows(fresh, rewritten)
 
     if fresh:
         ledger = apply_stalled(merge(existing, fresh), now)
         save(ledger_path, ledger)
-        for r in tasks:
-            if r.get("source") != "slack":
-                continue
-            channel_id, _, ts = (r.get("native_id") or "").partition(":")
-            try:
-                react(env["SLACK_BOT_TOKEN"], channel_id, ts)
-            except Exception as ex:  # noqa: BLE001 - reaction is best effort
-                print(f"  react failed: {ex}", flush=True)
-        if tasks:
-            send_dm(env, format_alert(tasks))
-            print(f"[{now:%H:%M:%S}] alerted {len(tasks)} new", flush=True)
-        if inbox:
-            send_dm(env, f"*{len(inbox)} need triage*\n"
-                        + "\n".join(f"• {(r.get('what') or '')[:100]}"
-                                    for r in inbox[:10])
-                        + "\nOpen the list to decide.")
-            print(f"[{now:%H:%M:%S}] inbox {len(inbox)} new", flush=True)
+        from .triage_ui import confirm_blocks
+
+        send_dm(env, format_alert(fresh), blocks=confirm_blocks(fresh))
+        print(f"[{now:%H:%M:%S}] asked to confirm {len(fresh)} new", flush=True)
     try:
         from .members import cycle as member_cycle
 

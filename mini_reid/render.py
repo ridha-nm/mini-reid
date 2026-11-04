@@ -153,7 +153,7 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
                        row.get("client") or ""))
 
     for row in sorted(rows, key=lambda r: (r.get("due") or "9999-12-31", r.get("what") or "")):
-        if row.get("status") in {"done", "dropped"} or row["id"] in used:
+        if row.get("status") in {"done", "dropped", "inbox"} or row["id"] in used:
             continue
         if row.get("closure") == "proposed" or row.get("kind") == "note":
             continue
@@ -179,7 +179,7 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
     undated_order = sorted(rows, key=lambda r: r.get("created_at") or "", reverse=True)
     undated_order.sort(key=lambda r: r.get("priority") or 99)
     for row in undated_order:
-        if row["id"] in used or row.get("status") in {"done", "dropped"}:
+        if row["id"] in used or row.get("status") in {"done", "dropped", "inbox"}:
             continue
         if (row.get("direction") == "owed_to_me" or row.get("closure") == "proposed"
                 or row.get("kind") == "note"):
@@ -196,6 +196,9 @@ def render(rows: list[dict], now: datetime, review: list[str] | None = None,
     counts = (f"{total} open · {len(buckets['overdue'])} overdue · "
               f"{len(buckets['today'])} due today · {len(buckets['week'])} this week · "
               f"{len(buckets['undated'])} no date · {len(buckets['waiting'])} waiting")
+    pending = [r for r in rows if r.get("status") == "inbox"]
+    if pending:
+        counts += f" · {len(pending)} to confirm"
     if meetings:
         counts += f" · {len(meetings)} meetings"
     if slack:

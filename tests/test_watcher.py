@@ -33,36 +33,32 @@ def _rule(nid: str, what: str = "Do the thing") -> dict:
             "status": "open", "kind": "email", "source": "gmail"}
 
 
-def test_triage_keeps_the_model_rewrite_for_an_approved_row():
+def test_triage_keeps_the_model_rewrite_but_still_waits_for_a_click():
     from mini_reid.watcher import triage_rows
 
     fresh = [_rule("m1")]
     model = [dict(_rule("m1"), what="Confirm the waste mapping")]
-    out = triage_rows(fresh, model, [])
+    out = triage_rows(fresh, model)
     assert [r["what"] for r in out] == ["Confirm the waste mapping"]
-    assert out[0]["status"] == "open"
-
-
-def test_triage_drops_rows_the_model_rejected():
-    from mini_reid.watcher import triage_rows
-
-    assert triage_rows([_rule("m1")], [], []) == []
-
-
-def test_triage_holds_model_failures_in_the_inbox():
-    from mini_reid.watcher import triage_rows
-
-    out = triage_rows([_rule("m1")], [], [{"native_id": "m1"}])
-    assert len(out) == 1
     assert out[0]["status"] == "inbox"
 
 
-def test_split_inbox_keeps_tasks_out_of_the_task_list():
-    from mini_reid.watcher import split_inbox
+def test_triage_keeps_rows_the_model_did_not_rewrite():
+    from mini_reid.watcher import triage_rows
 
-    tasks, inbox = split_inbox([_rule("m1"), dict(_rule("m2"), status="inbox")])
-    assert [r["native_id"] for r in tasks] == ["m1"]
-    assert [r["native_id"] for r in inbox] == ["m2"]
+    out = triage_rows([_rule("m1", "raw rule title")], [])
+    assert [r["what"] for r in out] == ["raw rule title"]
+    assert out[0]["status"] == "inbox"
+
+
+def test_triage_keeps_the_rule_client_and_asker():
+    from mini_reid.watcher import triage_rows
+
+    fresh = [dict(_rule("m1"), client="eupe", asker="Daniel")]
+    model = [dict(_rule("m1"), what="Review the deck", client=None, asker="")]
+    out = triage_rows(fresh, model)
+    assert out[0]["client"] == "eupe"
+    assert out[0]["asker"] == "Daniel"
 
 
 def test_stale_rows_wait_for_a_day_without_activity():
