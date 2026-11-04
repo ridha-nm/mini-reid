@@ -61,6 +61,21 @@ def test_triage_keeps_the_rule_client_and_asker():
     assert out[0]["asker"] == "Daniel"
 
 
+def test_stamp_confirmation_links_rows_to_the_dm(tmp_path, monkeypatch):
+    from mini_reid import watcher as w
+    from mini_reid.ledger import load, save
+
+    monkeypatch.chdir(tmp_path)
+    save("ledger.json", [{"id": "a", "status": "inbox"},
+                         {"id": "b", "status": "inbox"}])
+    w._stamp_confirmation("ledger.json", {"a"},
+                          {"ts": "111.2", "channel": "D1"})
+    rows = {r["id"]: r for r in load("ledger.json")}
+    assert rows["a"]["confirm_ts"] == "111.2"
+    assert rows["a"]["confirm_channel"] == "D1"
+    assert "confirm_ts" not in rows["b"]
+
+
 def test_stale_rows_wait_for_a_day_without_activity():
     from mini_reid.watcher import stale_rows
 

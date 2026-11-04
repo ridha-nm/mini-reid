@@ -28,12 +28,14 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Knight Frank, Allianz, Setia and Eupe. 264 tests pass.
+overridden to Knight Frank, Allianz, Setia and Eupe. 269 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
 it only rewrites the title. Confirm → `open` and ✅ on the source message; dismiss →
-`dropped`. Unanswered rows stay in the list Inbox and its **Triage & update** modal.
+`dropped`. The click edits the DM in place with the outcome, rebuilds buttons for
+remaining items, and refuses to toggle a row already settled. Unanswered rows stay in
+the list Inbox and its **Triage & update** modal.
 `list` groups by status and due date and reads due dates relatively (`3d overdue`,
 `today`, `in 2d`). Open rows untouched for a day get an 18:00 DM with an inline status
 picker, at most three times. `done`/`not` accept bulk refs (`7, 9`, `#7 #9`,
@@ -255,7 +257,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-264 tests passing as of 2026-11-05.
+269 tests passing as of 2026-11-05.
 
 ## Next, agreed
 

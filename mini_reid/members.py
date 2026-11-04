@@ -17,8 +17,8 @@ from .notify import send_dm_to
 from .profiles import load as load_profiles
 from .render import render
 from .sources import _get_json, fetch_gmail, fetch_jira, slack_user_name
-from .watcher import (fire_reminders, format_alert, new_rows, nudge_overdue,
-                      remind_meetings)
+from .watcher import (_stamp_confirmation, fire_reminders, format_alert,
+                      new_rows, nudge_overdue, remind_meetings)
 
 MYT = timezone(timedelta(hours=8))
 IGNORE_CHANNELS = {"bd-triager-agent", "C0B59LA0X5M"}
@@ -203,7 +203,8 @@ def refresh(env: dict, user: str, profile: dict, days: int = 1) -> list[dict]:
         save(ledger_path, apply_stalled(merge(existing, fresh), now))
         from .triage_ui import confirm_blocks
 
-        send_dm_to(env, user, format_alert(fresh), blocks=confirm_blocks(fresh))
+        sent = send_dm_to(env, user, format_alert(fresh), blocks=confirm_blocks(fresh))
+        _stamp_confirmation(ledger_path, {r["id"] for r in fresh}, sent)
     if errors:
         print(f"  member source errors: {errors}", flush=True)
     return fresh

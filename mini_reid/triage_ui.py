@@ -44,11 +44,12 @@ def list_blocks(rows: list[dict], now: datetime) -> list[dict]:
 CONFIRM_MAX = 10
 
 
-def confirm_blocks(rows: list[dict]) -> list[dict]:
+def confirm_blocks(rows: list[dict],
+                   headline: str | None = None) -> list[dict]:
     """One new item per section, each with Add to list / Not a task buttons."""
     shown = rows[:CONFIRM_MAX]
-    headline = (f"*{len(rows)} new — add to the list?*" if len(rows) > 1
-                else "*New — add to the list?*")
+    headline = headline or (f"*{len(rows)} new — add to the list?*"
+                            if len(rows) > 1 else "*New — add to the list?*")
     blocks: list[dict] = [{
         "type": "section",
         "text": {"type": "mrkdwn", "text": headline},
@@ -84,6 +85,43 @@ def confirm_blocks(rows: list[dict]) -> list[dict]:
             "text": {"type": "mrkdwn",
                      "text": f"…and {len(rows) - CONFIRM_MAX} more in the list Inbox."},
         })
+    return blocks
+
+
+def remaining_confirmations(rows: list[dict], message_ts: str) -> list[dict]:
+    """Inbox rows that arrived in the same DM, so its buttons can be rebuilt."""
+    if not message_ts:
+        return []
+    return [r for r in rows
+            if (r.get("status") or "") == "inbox"
+            and r.get("confirm_ts") == message_ts]
+
+
+def apply_confirmation(rows: list[dict], row_id: str, verdict: str,
+                       now: datetime) -> tuple[list[dict], dict | None, int]:
+    """Settle one inbox row. A row already handled is never toggled again."""
+    row = next((r for r in rows if r.get("id") == row_id), None)
+    if not row or (row.get("status") or "") != "inbox":
+        return rows, row, 0
+    rows, count = apply_triage(rows, [row_id], verdict, now)
+    return rows, row, count
+
+
+def confirmation_update_blocks(settled: dict, verdict: str,
+                               remaining: list[dict],
+                               already: bool = False) -> list[dict]:
+    label = ("Already handled" if already
+             else "Added to the list" if verdict == "open" else "Not a task")
+    blocks = [{"type": "section",
+               "text": {"type": "mrkdwn",
+                        "text": f"*{label}:* {_title(settled)[:110]}"}}]
+    if remaining:
+        blocks += confirm_blocks(
+            remaining, headline=f"*{len(remaining)} still to decide*")
+    else:
+        blocks.append({"type": "section",
+                       "text": {"type": "mrkdwn",
+                                "text": "Nothing left on this message."}})
     return blocks
 
 

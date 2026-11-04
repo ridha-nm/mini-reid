@@ -13,8 +13,9 @@ Gmail, Jira and Google Calendar.
   join links, then Overdue, Today, This week, Waiting on others, No date, Notes.
 - **Watcher** (every 2 min): new Slack mentions, DMs to you, inbox mail including
   already-read mail, and Jira issues assigned to you. Every new item waits as Inbox and
-  gets a DM with **Add to list** / **Not a task**; Add opens it on the list and ✅s the
-  source message. Nothing reaches the digest until confirmed. The first cycle after 09:00 also
+  gets a DM with **Add to list** / **Not a task**; the click updates that DM with the
+  outcome and removes its buttons, Add opens it on the list and ✅s the source message.
+  Nothing reaches the digest until confirmed. The first cycle after 09:00 also
   DMs any overdue rows once a day. Each meeting gets a DM 10 minutes before it starts,
   with the join link and "Are you attending?". Answer `yes` or `no <reason>` in the DM.
   The watcher also polls Ridha's DMs for `remind` commands in conversations the bot is

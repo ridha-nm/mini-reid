@@ -447,6 +447,26 @@ def nudge_overdue(env: dict, ledger_path: str, now: datetime,
     return len(rows)
 
 
+def _stamp_confirmation(ledger_path: str, ids: set[str], sent) -> None:
+    """Remember which DM carries each row's buttons, so a click can edit it.
+
+    Reloads first: a click may land between the alert send and this stamp, and
+    only the confirmation fields are touched.
+    """
+    ts = sent.get("ts") if isinstance(sent, dict) else ""
+    if not ts:
+        return
+    rows = load(ledger_path)
+    changed = False
+    for row in rows:
+        if row.get("id") in ids:
+            row["confirm_ts"] = ts
+            row["confirm_channel"] = sent.get("channel") or ""
+            changed = True
+    if changed:
+        save(ledger_path, rows)
+
+
 def main() -> int:
     import fcntl
 
@@ -518,7 +538,8 @@ def main() -> int:
         save(ledger_path, ledger)
         from .triage_ui import confirm_blocks
 
-        send_dm(env, format_alert(fresh), blocks=confirm_blocks(fresh))
+        sent = send_dm(env, format_alert(fresh), blocks=confirm_blocks(fresh))
+        _stamp_confirmation(ledger_path, {r["id"] for r in fresh}, sent)
         print(f"[{now:%H:%M:%S}] asked to confirm {len(fresh)} new", flush=True)
     try:
         from .members import cycle as member_cycle

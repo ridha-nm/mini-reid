@@ -2,6 +2,18 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (confirm clicks acknowledge and lock)
+
+- Clicking **Add to list** / **Not a task** now edits the DM itself: shows
+  `Added to the list: <task>` or `Not a task: <task>` and rebuilds buttons for
+  the items still waiting on that message. No items left → buttons removed.
+- A row already settled ignores further clicks; it cannot be toggled by a stale
+  button. The message says "Already handled".
+- Each inbox row stores `confirm_ts` / `confirm_channel` when its DM is sent, so
+  a click can edit the right message. `send_dm` / `send_dm_to` now return Slack's
+  response instead of only the channel id.
+- 269 tests passing.
+
 ## 2026-11-05 (watcher fetches in parallel)
 
 - Slack DM histories, per-message Gmail reads and author-name lookups now run

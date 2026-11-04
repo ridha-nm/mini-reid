@@ -51,6 +51,47 @@ def test_confirm_blocks_cap_the_batch_and_point_at_the_inbox():
     assert "2 more" in blocks[-1]["text"]["text"]
 
 
+def test_apply_confirmation_never_toggles_a_settled_row():
+    from mini_reid.triage_ui import apply_confirmation
+
+    rows = [_row("aaaa11", "One", status="open")]
+    out, row, count = apply_confirmation(rows, "aaaa11", "dropped", NOW)
+    assert count == 0
+    assert row["status"] == "open"
+    assert out[0]["status"] == "open"
+
+
+def test_remaining_confirmations_stay_on_the_same_message():
+    from mini_reid.triage_ui import remaining_confirmations
+
+    rows = [_row("a", "A", status="inbox", confirm_ts="111"),
+            _row("b", "B", status="open", confirm_ts="111"),
+            _row("c", "C", status="inbox", confirm_ts="222")]
+    assert [r["id"] for r in remaining_confirmations(rows, "111")] == ["a"]
+    assert remaining_confirmations(rows, "") == []
+
+
+def test_confirmation_update_shows_outcome_and_remaining_buttons():
+    from mini_reid.triage_ui import confirmation_update_blocks
+
+    blocks = confirmation_update_blocks(
+        _row("a", "First task"), "open",
+        [_row("b", "Second task", status="inbox")])
+    assert "Added to the list" in blocks[0]["text"]["text"]
+    assert "First task" in blocks[0]["text"]["text"]
+    actions = [b for b in blocks if b.get("type") == "actions"]
+    assert len(actions) == 1
+    assert actions[0]["elements"][0]["value"] == "b"
+
+
+def test_confirmation_update_removes_buttons_when_done():
+    from mini_reid.triage_ui import confirmation_update_blocks
+
+    blocks = confirmation_update_blocks(_row("a", "First task"), "dropped", [])
+    assert not [b for b in blocks if b.get("type") == "actions"]
+    assert "Nothing left" in blocks[-1]["text"]["text"]
+
+
 def test_triage_modal_chunks_more_than_ten_items():
     rows = [_row(f"id{i:02d}", f"Task {i}", status="inbox") for i in range(23)]
     modal = triage_modal(rows)

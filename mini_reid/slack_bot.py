@@ -2260,7 +2260,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     continue
                 if action_id in {"confirm_task", "reject_task"}:
                     from .notify import react
-                    from .triage_ui import apply_triage
+                    from .triage_ui import (apply_confirmation,
+                                            confirmation_update_blocks,
+                                            remaining_confirmations)
 
                     clicker = (payload.get("user") or {}).get("id") or ""
                     member_profiles = load_profiles()
@@ -2270,19 +2272,40 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                               if clicker != owner else ledger_path)
                     row_id = action.get("value") or ""
                     verdict = "open" if action_id == "confirm_task" else "dropped"
-                    rows, count = apply_triage(load(target), [row_id], verdict,
-                                               datetime.now(MYT))
+                    rows, row, count = apply_confirmation(
+                        load(target), row_id, verdict, datetime.now(MYT))
                     save(target, rows)
-                    if count and verdict == "open":
-                        row = next((r for r in rows if r.get("id") == row_id), None)
-                        if row and row.get("source") == "slack":
-                            channel_id, _, ts = (row.get("native_id") or "").partition(":")
-                            if channel_id and ts:
-                                try:
-                                    react(env["SLACK_BOT_TOKEN"], channel_id, ts)
-                                except Exception as ex:  # noqa: BLE001 - best effort
-                                    print(f"  confirm react failed: "
-                                          f"{type(ex).__name__}: {ex}", flush=True)
+                    if not row:
+                        continue
+
+                    container = payload.get("container") or {}
+                    msg_channel = container.get("channel_id") or ""
+                    msg_ts = container.get("message_ts") or ""
+                    if msg_channel and msg_ts:
+                        already = count == 0
+                        label = ("Already handled" if already else
+                                 "Added to the list" if verdict == "open"
+                                 else "Not a task")
+                        try:
+                            web.chat_update(
+                                channel=msg_channel, ts=msg_ts,
+                                text=f"{label}: {(row.get('what') or '')[:120]}",
+                                blocks=confirmation_update_blocks(
+                                    row, verdict,
+                                    remaining_confirmations(rows, msg_ts),
+                                    already=already))
+                        except Exception as ex:  # noqa: BLE001 - click still applied
+                            print(f"  confirm update failed: "
+                                  f"{type(ex).__name__}: {ex}", flush=True)
+
+                    if count and verdict == "open" and row.get("source") == "slack":
+                        channel_id, _, ts = (row.get("native_id") or "").partition(":")
+                        if channel_id and ts:
+                            try:
+                                react(env["SLACK_BOT_TOKEN"], channel_id, ts)
+                            except Exception as ex:  # noqa: BLE001 - best effort
+                                print(f"  confirm react failed: "
+                                      f"{type(ex).__name__}: {ex}", flush=True)
                     continue
                 if not action_id.startswith("remind_"):
                     continue

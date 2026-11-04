@@ -172,7 +172,10 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
   `id:abc1, id:def2`. One bad ref rejects the whole batch and changes nothing.
 - A new item's DM offers **Add to list** / **Not a task** per item. Add sets the row
   `open` and ✅s the source Slack message; Not a task sets `dropped` /
-  `not_commitment`. The list's **Triage & update** modal can settle unanswered rows.
+  `not_commitment`. The click edits the DM to name the outcome and rebuilds buttons
+  for the items still waiting on that message; when none remain the buttons are
+  removed. A settled row ignores further clicks, so a stale button cannot toggle it.
+  The list's **Triage & update** modal can settle unanswered rows.
 - The owner mutates `ledger.json`; an allowlisted member mutates only their own
   `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
 - `allow: @Name` is owner-only. It writes `users.json`, creates the member's isolated
