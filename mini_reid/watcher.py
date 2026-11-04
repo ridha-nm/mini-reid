@@ -41,6 +41,37 @@ def new_rows(items: list[dict], existing: list[dict], clients: dict, now: dateti
     return out
 
 
+def triage_rows(fresh: list[dict], rewritten: list[dict],
+                failed: list[dict]) -> list[dict]:
+    """Apply the model's verdict to the rows the rules captured.
+
+    - model rewrote the item -> it is a task; keep its wording.
+    - model never saw it (rejected it) -> not a task; drop it.
+    - model failed on the item -> uncertain; park it in the inbox for a person.
+    """
+    failed_ids = {i.get("native_id") for i in failed}
+    model_by_nid = {r["native_id"]: r for r in rewritten if r.get("native_id")}
+    seen = {r.get("native_id") for r in fresh}
+    out: list[dict] = []
+    for row in fresh:
+        nid = row.get("native_id")
+        better = model_by_nid.pop(nid, None)
+        if better:
+            out.append(dict(better, client=row.get("client"),
+                            asker=row.get("asker") or better.get("asker")))
+        elif nid in failed_ids:
+            out.append(dict(row, status="inbox"))
+    out.extend(r for nid, r in model_by_nid.items() if nid not in seen)
+    return out
+
+
+def split_inbox(rows: list[dict]) -> tuple[list[dict], list[dict]]:
+    """(real tasks, items waiting for a person to decide)."""
+    tasks = [r for r in rows if r.get("status") != "inbox"]
+    inbox = [r for r in rows if r.get("status") == "inbox"]
+    return tasks, inbox
+
+
 def format_alert(rows: list[dict]) -> str:
     """One line per distinct item, even when one invite produced several emails."""
     from .render import _client_name, _source_quote, _when
@@ -340,6 +371,65 @@ def overdue_today(rows: list[dict], now: datetime) -> list[dict]:
     return out
 
 
+STALE_STATUSES = {"open", "in progress", "blocked", "stalled"}
+STALE_NUDGE_HOUR = 18
+STALE_MAX_NUDGES = 3
+
+
+def stale_rows(rows: list[dict], now: datetime) -> list[dict]:
+    """Live rows untouched today, nudged at most three times."""
+    from .ledger import _dt
+
+    out = []
+    for row in rows:
+        status = (row.get("status") or "open").lower()
+        if status not in STALE_STATUSES or row.get("kind") == "note":
+            continue
+        if int(row.get("nudges") or 0) >= STALE_MAX_NUDGES:
+            continue
+        activity = _dt(row.get("last_activity") or row.get("created_at"))
+        if activity is None or activity.date() >= now.date():
+            continue
+        out.append(row)
+    return out
+
+
+def nudge_stale(env: dict, ledger_path: str, now: datetime,
+                state_path: str = "watcher_state.json") -> int:
+    """Evening DM: ask what happened to tasks that saw no update today."""
+    from .ledger import save
+    from .triage_ui import stale_blocks
+
+    state = Path(state_path)
+    today = now.date().isoformat()
+    seen = json.loads(state.read_text()) if state.exists() else {}
+    if now.hour < STALE_NUDGE_HOUR or seen.get("stale_date") == today:
+        return 0
+    rows = stale_rows(load(ledger_path), now)
+    state.write_text(json.dumps({**seen, "stale_date": today}))
+    if not rows:
+        return 0
+    shown = rows[:5]
+    text = f"*No update today ({len(rows)})*\nStill open — what happened?"
+    send_dm(env, text, blocks=stale_blocks(shown))
+    for row in shown:
+        row["nudges"] = int(row.get("nudges") or 0) + 1
+        row["last_nudged"] = today
+    save(ledger_path, _merge_nudges(ledger_path, shown))
+    return len(rows)
+
+
+def _merge_nudges(ledger_path: str, shown: list[dict]) -> list[dict]:
+    """Persist the nudge counters without dropping rows added meanwhile."""
+    rows = load(ledger_path)
+    by_id = {r["id"]: r for r in shown}
+    for row in rows:
+        if row["id"] in by_id:
+            row["nudges"] = by_id[row["id"]]["nudges"]
+            row["last_nudged"] = by_id[row["id"]]["last_nudged"]
+    return rows
+
+
 def nudge_overdue(env: dict, ledger_path: str, now: datetime,
                   user_id: str | None = None,
                   state_path: str = "watcher_state.json") -> int:
@@ -404,6 +494,12 @@ def main() -> int:
     nudged = nudge_overdue(env, ledger_path, now)
     if nudged:
         print(f"[{now:%H:%M:%S}] overdue nudge: {nudged}", flush=True)
+    try:
+        stale = nudge_stale(env, ledger_path, now)
+        if stale:
+            print(f"[{now:%H:%M:%S}] stale nudge: {stale}", flush=True)
+    except Exception as ex:  # noqa: BLE001 - a nudge must not stop capture
+        print(f"[{now:%H:%M:%S}] stale nudge: {type(ex).__name__}: {ex}", flush=True)
 
     items, errors = collect(days=1, offline=False)
     existing = load(ledger_path)
@@ -417,25 +513,21 @@ def main() -> int:
         by_nid = {i.get("native_id"): i for i in items}
         candidates = [by_nid[r["native_id"]] for r in fresh if r.get("native_id") in by_nid]
         rewritten: list[dict] = []
+        failed: list[dict] = []
         provider = OllamaProvider(model=env.get("OLLAMA_MODEL", "llama3.2:3b"))
         for start in range(0, len(candidates), 5):
-            rows, _ = extract_batch_safe(
+            rows, bad = extract_batch_safe(
                 candidates[start:start + 5], provider, now, list(clients))
             rewritten.extend(rows)
-        if rewritten:
-            by_nid = {r["native_id"]: r for r in rewritten}
-            merged = []
-            for r in fresh:
-                better = by_nid.pop(r["native_id"], None)
-                if better:
-                    better = dict(better, client=r.get("client"), asker=r.get("asker"))
-                merged.append(better or r)
-            fresh = merged + list(by_nid.values())
+            failed.extend(bad)
+        fresh = triage_rows(fresh, rewritten, failed)
+
+    tasks, inbox = split_inbox(fresh)
 
     if fresh:
         ledger = apply_stalled(merge(existing, fresh), now)
         save(ledger_path, ledger)
-        for r in fresh:
+        for r in tasks:
             if r.get("source") != "slack":
                 continue
             channel_id, _, ts = (r.get("native_id") or "").partition(":")
@@ -443,8 +535,15 @@ def main() -> int:
                 react(env["SLACK_BOT_TOKEN"], channel_id, ts)
             except Exception as ex:  # noqa: BLE001 - reaction is best effort
                 print(f"  react failed: {ex}", flush=True)
-        send_dm(env, format_alert(fresh))
-        print(f"[{now:%H:%M:%S}] alerted {len(fresh)} new", flush=True)
+        if tasks:
+            send_dm(env, format_alert(tasks))
+            print(f"[{now:%H:%M:%S}] alerted {len(tasks)} new", flush=True)
+        if inbox:
+            send_dm(env, f"*{len(inbox)} need triage*\n"
+                        + "\n".join(f"• {(r.get('what') or '')[:100]}"
+                                    for r in inbox[:10])
+                        + "\nOpen the list to decide.")
+            print(f"[{now:%H:%M:%S}] inbox {len(inbox)} new", flush=True)
     try:
         from .members import cycle as member_cycle
 

@@ -155,33 +155,69 @@ def play_reply(text: str, users: dict[str, str]) -> str | None:
 
 
 HANDLED_MAX = 1000
+# Socket events and the catch-up sweep both rewrite bot_state.json.
+_STATE_LOCK = threading.Lock()
 
 
 def claim_message(state_path: str, channel: str, ts: str) -> bool:
     """True once per Slack message id, even across bot restarts."""
-    path = Path(state_path)
-    state = json.loads(path.read_text()) if path.exists() else {}
-    key = f"{channel}:{ts}"
-    handled = state.get("handled") or {}
-    if key in handled:
-        return False
-    handled[key] = ts
-    if len(handled) > HANDLED_MAX:
-        newest = sorted(handled.items(), key=lambda kv: float(kv[1]))[-HANDLED_MAX:]
-        handled = dict(newest)
-    state["handled"] = handled
-    path.write_text(json.dumps(state))
-    return True
+    with _STATE_LOCK:
+        path = Path(state_path)
+        state = json.loads(path.read_text()) if path.exists() else {}
+        key = f"{channel}:{ts}"
+        handled = state.get("handled") or {}
+        if key in handled:
+            return False
+        handled[key] = ts
+        if len(handled) > HANDLED_MAX:
+            newest = sorted(handled.items(), key=lambda kv: float(kv[1]))[-HANDLED_MAX:]
+            handled = dict(newest)
+        state["handled"] = handled
+        path.write_text(json.dumps(state))
+        return True
 
 
 def release_message(state_path: str, channel: str, ts: str) -> None:
     """Allow an edited message to be processed again."""
-    path = Path(state_path)
-    if not path.exists():
-        return
-    state = json.loads(path.read_text())
-    if (state.get("handled") or {}).pop(f"{channel}:{ts}", None) is not None:
-        path.write_text(json.dumps(state))
+    with _STATE_LOCK:
+        path = Path(state_path)
+        if not path.exists():
+            return
+        state = json.loads(path.read_text())
+        if (state.get("handled") or {}).pop(f"{channel}:{ts}", None) is not None:
+            path.write_text(json.dumps(state))
+
+
+def _catch_up_loop(me_id: str, interval: float, run, stop: threading.Event) -> None:
+    """Sweep for messages missed while the Mac slept or the socket died.
+
+    Sleeps in short wall-clock chunks: the monotonic clock Event.wait uses can
+    pause during Mac sleep, which would delay the first sweep after wake.
+    Runs beside the socket listener; claim_message makes replays idempotent.
+    """
+    import time
+
+    last = time.time()
+    tick = min(max(interval, 0.01), 30.0)
+    while not stop.wait(tick):
+        now = time.time()
+        if now - last < interval:
+            continue
+        try:
+            run(me_id)
+        except Exception as ex:  # noqa: BLE001 - one failed sweep must not stop the loop
+            print(f"catch-up loop failed: {type(ex).__name__}: {ex}", flush=True)
+        last = time.time()
+
+
+def _catch_up_watermark(state: dict, now: float, lookback: float = 3600) -> float:
+    """Timestamp a sweep resumes from. Deliberately not `last_ts`: live
+    messages advance that, which would hide a gap the socket never saw."""
+    try:
+        ts = float(state.get("catch_up_ts") or 0)
+    except (TypeError, ValueError):
+        ts = 0
+    return ts or now - lookback
 
 
 BANTER_FILE = "banter.json"
@@ -757,7 +793,8 @@ def edit_ack_target(event: dict, bot_user_id: str) -> tuple[str, str] | None:
 
 
 POLITE_PREFIX = re.compile(
-    r"^(?:(?:hi|hey|hello|ok|okay)\s+)?(?:(?:mini-?reid|bot)[\s,:]+)?"
+    r"^(?:(?:[ah]{3,}|lol|lmao|rofl|hehe+)\s+)?"
+    r"(?:(?:hi|hey|hello|ok|okay)\s+)?(?:(?:@?mini-?reid|bot)[\s,:]+)?"
     r"(?:(?:please|pls|kindly|can you|could you|would you|will you|can u)\s+)*",
     re.I)
 NATURAL_VERBS = ("add", "note", "done", "drop", "remind", "due", "snooze",
@@ -885,9 +922,17 @@ def clarify_choice(text: str) -> str | None:
     return None
 
 
-def parse_command(text: str) -> tuple[str, str]:
-    """Return (action, body). action is one of COMMANDS, or ack|unknown|list."""
-    body = LEADING_MENTION.sub("", text or "").strip()
+def parse_command(text: str, bot_user_id: str = "") -> tuple[str, str]:
+    """Return (action, body). action is one of COMMANDS, or ack|unknown|list.
+
+    The bot's own mention is removed wherever it appears, so 'lol <@BOT>
+    remind <@Eden> to sleep' reads as a command. Mentions of other people
+    survive for split_target.
+    """
+    raw = text or ""
+    if bot_user_id:
+        raw = re.sub(rf"<@{re.escape(bot_user_id)}(?:\|[^>]*)?>", " ", raw)
+    body = LEADING_MENTION.sub("", raw).strip()
     if not body:
         return "unknown", ""
     if body.lower() in {"list", "ls", "today", "open"}:
@@ -994,10 +1039,9 @@ def _ref(row: dict) -> str:
 
 def _open_sorted(rows: list[dict]) -> list[dict]:
     """The order `list` prints; numbers stay stable across commands."""
-    open_rows = [r for r in rows if r.get("status") not in {"done", "dropped"}
-                 and r.get("kind") != "note"]
-    open_rows.sort(key=lambda r: (r.get("priority") or 99, r.get("due") or "9999"))
-    return open_rows
+    from .listview import ordered_rows
+
+    return ordered_rows(rows, datetime.now(MYT))
 
 
 def _pick(rows: list[dict], target: str) -> tuple[dict | None, str | None]:
@@ -1032,6 +1076,49 @@ def _pick(rows: list[dict], target: str) -> tuple[dict | None, str | None]:
         listing = "\n".join(f"• {r['what'][:80]}" for r in found[:3])
         return None, f"Which one?\n{listing}\nAdd a word that only fits one."
     return found[0], None
+
+
+def _pick_many(rows: list[dict], target: str) -> tuple[list[dict] | None, str | None]:
+    """Bulk refs: '7, 9' or '#7 #9' or 'id:abc1, id:def2'. None = not bulk."""
+    tokens = [t for t in re.split(r"[\s,]+", (target or "").strip()) if t]
+    if len(tokens) < 2:
+        return None, None
+    ref = re.compile(r"^(?:#\d+|(?:id:)?[0-9a-f]{4,40})$", re.I)
+    if not all(ref.fullmatch(t) for t in tokens):
+        return None, None
+
+    items = _open_sorted(rows)
+    picked: list[dict] = []
+    errors: list[str] = []
+    for token in tokens:
+        raw = token.strip().strip("[]")
+        m = re.fullmatch(r"#?(\d+)", raw)
+        if m:
+            i = int(m.group(1))
+            if 1 <= i <= len(items):
+                picked.append(items[i - 1])
+            else:
+                errors.append(f"No open item #{i}.")
+            continue
+        prefix = raw[3:] if raw.lower().startswith("id:") else raw
+        hits = [r for r in items if (r.get("id") or "").lower().startswith(prefix.lower())]
+        if len(hits) == 1:
+            picked.append(hits[0])
+        elif hits:
+            errors.append(f"{prefix} matches more than one item.")
+        else:
+            errors.append(f"No open item matches id:{prefix}.")
+
+    if errors:
+        return None, "\n".join(errors)
+    seen: set[str] = set()
+    unique = []
+    for row in picked:
+        if row.get("id") in seen:
+            continue
+        seen.add(row.get("id"))
+        unique.append(row)
+    return unique, None
 
 
 def _shift(text: str, now):
@@ -1350,12 +1437,26 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
         return f"Status: {row['what'][:80]} — {status}"
 
     if action == "done":
+        many, bulk_err = _pick_many(rows, body)
+        if bulk_err:
+            return bulk_err
+        if many:
+            for row in many:
+                row["status"] = "done"
+                row["closed_at"] = now.isoformat()
+                row["closed_how"] = "manual"
+                row["last_activity"] = now.isoformat()
+            save(ledger_path, rows)
+            names = ", ".join((r.get("action") or r.get("what") or "")[:40]
+                              for r in many[:5])
+            return f"Closed {len(many)}: {names}"
         best, err = _pick(rows, body)
         if err:
             return err
         best["status"] = "done"
         best["closed_at"] = now.isoformat()
         best["closed_how"] = "manual"
+        best["last_activity"] = now.isoformat()
         save(ledger_path, rows)
         return f"Closed: {best['what'][:80]}"
 
@@ -1384,6 +1485,22 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
         from . import learning
         from .calendar import ignore_title
 
+        many, bulk_err = _pick_many(rows, body)
+        if bulk_err:
+            return bulk_err
+        if many:
+            for row in many:
+                row["status"] = "dropped"
+                row["closed_at"] = now.isoformat()
+                row["closed_how"] = "not_commitment"
+                row["last_activity"] = now.isoformat()
+                learning.add(row.get("what", ""), reason="bulk not",
+                             source=row.get("source", ""))
+            save(ledger_path, rows)
+            names = ", ".join((r.get("action") or r.get("what") or "")[:40]
+                              for r in many[:5])
+            return f"Removed {len(many)}: {names}"
+
         # `not:` also dismisses a meeting reminder. No ledger row exists for a
         # meeting, so match the title recorded in today's reminder state.
         state_path = Path(ledger_path).parent / "meeting_reminders.json"
@@ -1404,6 +1521,7 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
             row["status"] = "dropped"
             row["closed_at"] = now.isoformat()
             row["closed_how"] = "not_commitment"
+            row["last_activity"] = now.isoformat()
             save(ledger_path, rows)
             learning.add(row.get("what", ""), reason=body,
                          source=row.get("source", ""))
@@ -1423,18 +1541,9 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
             f"• [{r['id'][:6]}] {r.get('what', '')[:140]}" for r in notes[:25])
 
     if action == "list":
-        open_rows = _open_sorted(rows)
-        if not open_rows:
-            return "Nothing open."
-        return "Open:\n" + "\n".join(
-            f"{i}. [{r['id'][:6]}]"
-            + (f" [P{r['priority']}]" if isinstance(r.get("priority"), int) else "")
-            + f" {r['what'][:90]}"
-            + (f" — {r['due']}" if r.get("due") else "")
-            + (f" — {r['status']}" if r.get("status") in {"in progress", "blocked"}
-               else "")
-            + _ref(r)
-            for i, r in enumerate(open_rows[:25], 1))
+        from .listview import format_list
+
+        return format_list(rows, now)
 
     if action == "find":
         hits = [r for r in rows
@@ -1560,22 +1669,26 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         threading.Thread(target=_relay_loop, daemon=True).start()
 
     def post_reply(channel: str, text: str, notify: bool = True,
-                   private: bool = False, dm_to: str | None = None) -> None:
+                   private: bool = False, dm_to: str | None = None,
+                   blocks: list[dict] | None = None) -> None:
         """Post in place; DM a copy when the command came from a channel.
         `private` sends only to Ridha's DM; `dm_to` sends only to that user."""
         if dm_to and not channel.startswith("D"):
             try:
-                send_dm_to(env, dm_to, text)
+                send_dm_to(env, dm_to, text, blocks=blocks)
             except Exception as ex:  # noqa: BLE001
                 print(f"  dm reply failed: {type(ex).__name__}", flush=True)
             return
         if private and not channel.startswith("D"):
             try:
-                send_dm(env, text)
+                send_dm(env, text, blocks=blocks)
             except Exception as ex:  # noqa: BLE001
                 print(f"  dm reply failed: {type(ex).__name__}", flush=True)
             return
-        web.chat_postMessage(channel=channel, text=text)
+        data = {"channel": channel, "text": text}
+        if blocks:
+            data["blocks"] = blocks
+        web.chat_postMessage(**data)
         if not notify or channel.startswith("D"):
             return
         try:
@@ -1597,13 +1710,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         import json
         from pathlib import Path as P
 
-        s = _state()
-        try:
-            if not s.get("last_ts") or float(ts) > float(s["last_ts"]):
-                s["last_ts"] = ts
-                P(STATE).write_text(json.dumps(s))
-        except ValueError:
-            pass
+        with _STATE_LOCK:
+            s = _state()
+            try:
+                if not s.get("last_ts") or float(ts) > float(s["last_ts"]):
+                    s["last_ts"] = ts
+                    P(STATE).write_text(json.dumps(s))
+            except ValueError:
+                pass
 
     def process(channel: str, user: str, text: str, ts: str, late: bool = False) -> None:
         if (channel, ts) in seen or channel in IGNORE_CHANNEL_IDS:
@@ -1631,15 +1745,16 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         member = user != owner and user in profiles
         user_ledger = ledger_for(profiles, user, ledger_path) if member else ledger_path
 
-        def say(text: str, notify: bool | None = None) -> None:
+        def say(text: str, notify: bool | None = None,
+                blocks: list[dict] | None = None) -> None:
             """Reply to the command sender, privately for owner and members."""
             notify = (user == owner) if notify is None else notify
             if user == owner:
-                post_reply(channel, text, notify=notify, private=True)
+                post_reply(channel, text, notify=notify, private=True, blocks=blocks)
             elif member:
-                post_reply(channel, text, dm_to=user)
+                post_reply(channel, text, dm_to=user, blocks=blocks)
             else:
-                post_reply(channel, text, notify=notify)
+                post_reply(channel, text, notify=notify, blocks=blocks)
 
         key = f"{channel}:{user}"
         state_now = _state()
@@ -1667,7 +1782,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 _mark(ts)
                 return
 
-        raw_action, _ = parse_command(text)
+        raw_action, _ = parse_command(text, bot_user_id)
         nice = nice_reply(text) if raw_action in {"unknown", "ack"} else None
         if nice:
             try:
@@ -1706,7 +1821,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         play = play_reply(text, users)
         if play:
             try:
-                web.chat_postMessage(channel=channel, text=play)
+                web.chat_postMessage(channel=channel, text=play, thread_ts=ts)
             except Exception as ex:  # noqa: BLE001 - fun is best effort
                 print(f"  play post failed: {type(ex).__name__}", flush=True)
             _mark(ts)
@@ -1723,7 +1838,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 _mark(ts)
                 return
 
-        action, body = parse_command(text)
+        action, body = parse_command(text, bot_user_id)
         allow = {u.strip() for u in env.get("KB_ALLOWLIST", "").split(",") if u.strip()}
         if user == owner:
             action = owner_action(action, body)
@@ -2069,15 +2184,81 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 print(f"  ack react failed: {type(ex).__name__}: {ex}", flush=True)
         if late:
             reply = "_(answered late, I was offline)_\n" + reply
-        say(reply)
+        blocks = None
+        if action == "list" and user == owner:
+            try:
+                from .triage_ui import list_blocks
+
+                blocks = list_blocks(load(user_ledger), datetime.now(MYT))
+            except Exception as ex:  # noqa: BLE001 - plain text still works
+                print(f"  list blocks failed: {type(ex).__name__}", flush=True)
+        say(reply, blocks=blocks)
         _mark(ts)
 
     def handle(_socket_client, req):
         client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
         payload = req.payload or {}
+        if payload.get("type") == "view_submission":
+            view = payload.get("view") or {}
+            if view.get("callback_id") == "triage_apply":
+                from .triage_ui import apply_triage
+
+                values = (view.get("state") or {}).get("values") or {}
+                ids: list[str] = []
+                for block_id, elements in values.items():
+                    if not block_id.startswith("sel_"):
+                        continue
+                    chosen = (elements.get("items") or {}).get("selected_options") or []
+                    ids.extend(o.get("value") for o in chosen if o.get("value"))
+                choice = ((values.get("verdict") or {}).get("value") or {}) \
+                    .get("selected_option") or {}
+                verdict = choice.get("value") or "open"
+                rows, count = apply_triage(load(ledger_path), ids,
+                                           verdict, datetime.now(MYT))
+                save(ledger_path, rows)
+                clicker = (payload.get("user") or {}).get("id") or owner
+                try:
+                    send_dm_to(env, clicker,
+                               f"Updated {count} item(s) to *{verdict}*.")
+                except Exception as ex:  # noqa: BLE001 - best effort
+                    print(f"  triage confirm failed: {type(ex).__name__}", flush=True)
+            return
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
-                if not (action.get("action_id") or "").startswith("remind_"):
+                action_id = action.get("action_id") or ""
+                if action_id == "triage_open":
+                    trigger = payload.get("trigger_id") or ""
+                    try:
+                        from .triage_ui import triage_modal
+
+                        web.views_open(trigger_id=trigger,
+                                       view=triage_modal(load(ledger_path),
+                                                         datetime.now(MYT)))
+                    except Exception as ex:  # noqa: BLE001 - user can retry
+                        print(f"  triage modal failed: {type(ex).__name__}: {ex}",
+                              flush=True)
+                    continue
+                if action_id == "stale_set":
+                    from .triage_ui import apply_triage, parse_stale_value
+
+                    selected = action.get("selected_option") or {}
+                    parsed = parse_stale_value(selected.get("value") or "")
+                    if not parsed:
+                        continue
+                    row_id, verdict = parsed
+                    rows, count = apply_triage(load(ledger_path), [row_id],
+                                               verdict, datetime.now(MYT))
+                    save(ledger_path, rows)
+                    clicker = (payload.get("user") or {}).get("id") or owner
+                    if count:
+                        try:
+                            send_dm_to(env, clicker,
+                                       f"Updated to *{verdict}*.")
+                        except Exception as ex:  # noqa: BLE001 - best effort
+                            print(f"  stale confirm failed: {type(ex).__name__}",
+                                  flush=True)
+                    continue
+                if not action_id.startswith("remind_"):
                     continue
                 clicker = (payload.get("user") or {}).get("id") or ""
                 st = _state()
@@ -2116,7 +2297,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     print(f"  edit react failed: {type(ex).__name__}: {ex}", flush=True)
                 msg = event.get("message") or {}
                 text, user = msg.get("text") or "", msg.get("user") or ""
-                action, _ = parse_command(text)
+                action, _ = parse_command(text, bot_user_id)
                 if user == owner:
                     action = owner_action(action, text)
                 key = f"{ack[0]}:{ack[1]}"
@@ -2164,33 +2345,43 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         token = env.get("SLACK_USER_TOKEN")
         if not token or not me_id:
             return
-        last = float(_state().get("last_ts") or 0)
-        if not last:
-            # First run: look back one hour, not zero. Otherwise a message sent just
-            # before the restart is invisible forever.
-            import time
-            from pathlib import Path as P
-            import json as _json
+        import time
 
-            last = time.time() - 3600
-            P(STATE).write_text(_json.dumps({"last_ts": f"{last:.6f}"}))
+        started = time.time()
+        with _STATE_LOCK:
+            state = _state()
+            last = _catch_up_watermark(state, started)
+            if not state.get("catch_up_ts"):
+                state["catch_up_ts"] = f"{last:.6f}"
+                Path(STATE).write_text(json.dumps(state))
 
         from .sources import _get_json
 
-        url = ("https://slack.com/api/search.messages?"
-               + urllib.parse.urlencode({"query": f"<@{me_id}>", "count": 50,
-                                         "sort": "timestamp", "sort_dir": "desc"}))
-        try:
-            d = _get_json(url, {"Authorization": f"Bearer {token}"})
-        except Exception as ex:  # noqa: BLE001
-            print(f"catch-up search failed: {type(ex).__name__}", flush=True)
-            return
-        if not d.get("ok"):
-            print(f"catch-up search error: {d.get('error')}", flush=True)
-            return
+        matches: list[dict] = []
+        page = 1
+        while page <= 10:
+            url = ("https://slack.com/api/search.messages?"
+                   + urllib.parse.urlencode({
+                       "query": f"<@{me_id}>", "count": 100, "page": page,
+                       "sort": "timestamp", "sort_dir": "desc"}))
+            try:
+                d = _get_json(url, {"Authorization": f"Bearer {token}"})
+            except Exception as ex:  # noqa: BLE001
+                print(f"catch-up search failed: {type(ex).__name__}", flush=True)
+                return
+            if not d.get("ok"):
+                print(f"catch-up search error: {d.get('error')}", flush=True)
+                return
+            batch = (d.get("messages") or {}).get("matches") or []
+            matches.extend(batch)
+            pages = (((d.get("messages") or {}).get("paging") or {}).get("pages")
+                     or page)
+            if len(batch) < 100 or page >= pages:
+                break
+            page += 1
 
         late = 0
-        for m in reversed((d.get("messages") or {}).get("matches") or []):
+        for m in reversed(matches):
             try:
                 if float(m.get("ts", 0)) <= last:
                     continue
@@ -2204,6 +2395,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 late += 1
         # DMs carry no literal mention, so search never returns them. Read every
         # DM the bot is in, not only the owner's.
+        dm_ok = True
         try:
             from .notify import _post as slack_post
             from .sources import _get_json as slack_get
@@ -2224,19 +2416,25 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             for dm in dms:
                 hist = slack_get(
                     "https://slack.com/api/conversations.history?"
-                    + urllib.parse.urlencode({"channel": dm, "oldest": f"{last:.6f}", "limit": 100}),
+                    + urllib.parse.urlencode({"channel": dm, "oldest": f"{last:.6f}", "limit": 200}),
                     {"Authorization": f"Bearer {bot}"})
                 for m in reversed(hist.get("messages") or []):
                     if m.get("bot_id") or m.get("subtype") or not m.get("user"):
                         continue
-                    action, _ = parse_command(m.get("text") or "")
+                    action, _ = parse_command(m.get("text") or "", me_id)
                     if action in {"unknown", "ack"}:
                         continue
                     process(dm, m["user"], m.get("text") or "", m["ts"], late=True)
                     late += 1
         except Exception as ex:  # noqa: BLE001
+            dm_ok = False
             print(f"catch-up DM read failed: {type(ex).__name__}", flush=True)
 
+        if dm_ok:
+            with _STATE_LOCK:
+                state = _state()
+                state["catch_up_ts"] = f"{started:.6f}"
+                Path(STATE).write_text(json.dumps(state))
         if late:
             print(f"catch-up: processed {late} missed message(s)", flush=True)
 
@@ -2254,6 +2452,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         catch_up(ident.get("user_id"))
     except Exception as ex:  # noqa: BLE001 - catch-up must never stop the listener
         print(f"catch-up failed: {type(ex).__name__}: {ex}", flush=True)
+    try:
+        interval = float(env.get("CATCHUP_SECONDS") or 300)
+    except ValueError:
+        interval = 300
+    if interval > 0:
+        threading.Thread(target=_catch_up_loop,
+                         args=(ident.get("user_id") or "", interval, catch_up,
+                               threading.Event()),
+                         daemon=True).start()
     threading.Event().wait()
     return 0
 

@@ -2,6 +2,54 @@
 
 Append-only. Newest first.
 
+## 2026-11-04 (triage inbox, bulk close, stale nudges)
+
+- Watcher triage: when the model rewrites an item it stays a task; when the
+  model never saw it (rejected) it is dropped; when the model failed on it the
+  row is parked as `status: "inbox"` for a person to decide. Only real tasks
+  get the ✅ reaction and the new-item DM; inbox rows get their own nudge.
+- `list` now groups by In progress / Blocked / Overdue / Due today / This week /
+  Later / No date, with an Inbox section. Same numbering as the old list, so
+  `done 4` still works.
+- The list reply carries a **Triage & update** button: pick rows, choose a
+  status once, apply in bulk. Checkboxes are chunked 10 per block (Slack's
+  limit) and capped at 40 selectable rows.
+- Evening stale nudge (18:00, DM, max 3 per row): open / in progress / blocked
+  rows with no activity today get an inline status picker per row.
+- `done` and `not` accept bulk refs: `done 7, 9`, `#7 #9`, `id:abc1, id:def2`.
+- Status changes stamp `last_activity`; triage resets the nudge counter.
+- `send_dm`/`send_dm_to`/bot replies accept Block Kit `blocks`.
+- 258 tests passing.
+
+## 2026-11-04 (never miss a message again)
+
+- Catch-up now sweeps every `CATCHUP_SECONDS` (default 300) while the bot runs,
+  not only at startup. Messages sent while the Mac slept or the socket was down
+  are replayed once it wakes.
+- Catch-up keeps its own `catch_up_ts` watermark. Live messages still advance
+  `last_ts`; tying sweeps to that would skip a gap the socket never delivered
+  (it hid the 17:51 and 18:00 messages today).
+- Mention search paginates up to 10 pages and DM history reads 200 messages per
+  conversation. `claim_message`/`_mark` share a lock so a sweep and a socket
+  event cannot clobber `bot_state.json`.
+- 237 tests passing.
+
+## 2026-11-04 (play replies stay in thread)
+
+- Hug / high-five / fist-bump replies now post as a thread reply on the
+  message that asked for them, not a new channel message.
+- 235 tests passing.
+
+## 2026-11-04 (commands after chatter)
+
+- A bot mention anywhere in the message now counts. `AHAHHA @mini-reid remind
+  <@Eden> to go to bed!` parses as a reminder instead of becoming a note; the
+  recipient's own mention still survives for `split_target`.
+- Laughter prefixes (`AHAHHA`, `haha`, `hehe`, `lol`, `lmao`, `rofl`) are
+  stripped before verb matching, and a literal `@mini-reid` mid-message is
+  recognised.
+- 235 tests passing.
+
 ## 2026-11-04 (reminder clarifications, natural language, catch-up)
 
 - Reminder ambiguity: `by Friday 2pm` asks **Now / At Friday / Both** with Slack

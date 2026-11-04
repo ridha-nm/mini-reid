@@ -13,7 +13,8 @@ Gmail, Jira and Google Calendar.
   join links, then Overdue, Today, This week, Waiting on others, No date, Notes.
 - **Watcher** (every 2 min): new Slack mentions, DMs to you, inbox mail including
   already-read mail, and Jira issues assigned to you. New items get a DM and, where the
-  bot is in the channel, a ✅ on the source message. The first cycle after 09:00 also
+  bot is in the channel, a ✅ on the source message. Items the model could not
+  classify are parked in the inbox instead of becoming tasks. The first cycle after 09:00 also
   DMs any overdue rows once a day. Each meeting gets a DM 10 minutes before it starts,
   with the join link and "Are you attending?". Answer `yes` or `no <reason>` in the DM.
   The watcher also polls Ridha's DMs for `remind` commands in conversations the bot is
@@ -25,8 +26,13 @@ Gmail, Jira and Google Calendar.
   `banter on/off/status` controls sassy replies; only tagged abuse triggers one.
   Untagged messages are always ignored. Banter is allowed only in `#ee-leads-only`
   and `#probies`.
-  `list` prints a stable short id per row; `185045` or `id:185045` works in every
-  command; `undo:` reverses the last change. Priority 1-5 sorts the digest and list.
+  `list` prints a stable short id per row, grouped by status and due date, with an
+  Inbox section for items the model could not classify; its **Triage & update**
+  button lets you set a status on several rows at once. `185045` or `id:185045`
+  works in every command; `done`/`not` also take bulk refs (`done 7, 9`).
+  `undo:` reverses the last change. Priority 1-5 sorts the digest and list.
+  Open rows untouched for a day get an evening DM (max 3 per row) with an inline
+  status picker.
   Successful `add:` reacts ➕; `note:` / `tonote:` react 📝; `remind:` reacts ⏰.
   Your command replies go to your DM, not the channel. Only you can change your ledger.
   Anyone can set a private

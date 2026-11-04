@@ -24,6 +24,19 @@ def test_recipient_mention_survives_command_parsing():
         "remind", "@arman on K3 at 2pm")
 
 
+def test_bot_mentioned_mid_message_still_finds_command():
+    assert parse_command(
+        "AHAHHA <@UBOT> remind <@UEDEN> to go to bed!", "UBOT") == (
+        "remind", "<@UEDEN> to go to bed!")
+    assert parse_command(
+        "lol @mini-reid remind <@UEDEN> to go to bed!") == (
+        "remind", "<@UEDEN> to go to bed!")
+
+
+def test_chatter_before_command_is_not_a_command_by_itself():
+    assert parse_command("AHAHHA the deck is late")[0] == "unknown"
+
+
 def test_natural_add_phrasings():
     assert parse_command("<@U1> add this to my todo: send the deck") == ("add", "send the deck")
     assert parse_command("<@U1> task: send the deck") == ("add", "send the deck")
@@ -220,6 +233,37 @@ def test_claim_message_is_persistent_and_releasable(tmp_path):
     assert claim_message(state, "C2", "1.000")
     release_message(state, "C1", "1.000")
     assert claim_message(state, "C1", "1.000")
+
+
+def test_catch_up_watermark_ignores_live_last_ts():
+    from mini_reid.slack_bot import _catch_up_watermark
+
+    now = 1_000_000.0
+    assert _catch_up_watermark({"last_ts": "999999.0"}, now) == now - 3600
+    assert _catch_up_watermark({"catch_up_ts": "900000.5"}, now) == 900000.5
+    assert _catch_up_watermark({"catch_up_ts": "bad"}, now) == now - 3600
+
+
+def test_catch_up_loop_survives_a_failed_sweep():
+    import threading
+
+    from mini_reid.slack_bot import _catch_up_loop
+
+    calls = []
+    stop = threading.Event()
+
+    def run(me_id):
+        calls.append(me_id)
+        if len(calls) == 1:
+            raise RuntimeError("network down")
+        stop.set()
+
+    thread = threading.Thread(target=_catch_up_loop,
+                              args=("U1", 0.01, run, stop), daemon=True)
+    thread.start()
+    thread.join(2)
+    assert not thread.is_alive()
+    assert calls == ["U1", "U1"]
 
 
 def test_nice_messages_get_a_nice_reply():
@@ -768,6 +812,39 @@ def test_done_accepts_a_list_number(tmp_path):
     rows = load(ledger)
     assert [r["status"] for r in rows if r["what"] == "Eupe dashboard item"] == ["done"]
     assert [r["status"] for r in rows if r["what"] == "Gamuda file"] == ["open"]
+
+
+def test_not_accepts_a_bulk_list_of_numbers(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "First thing by Friday", NOW, clients, ledger)
+    apply_command("add", "Second thing by Friday", NOW, clients, ledger)
+    apply_command("add", "Third thing by Friday", NOW, clients, ledger)
+    reply = apply_command("not", "#1, #3", NOW, clients, ledger)
+    rows = load(ledger)
+    dropped = [r["what"] for r in rows if r["status"] == "dropped"]
+    assert sorted(dropped) == ["First thing by Friday", "Third thing by Friday"]
+    assert "Removed 2" in reply
+
+
+def test_done_accepts_a_bulk_list_of_ids(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "First thing by Friday", NOW, clients, ledger)
+    apply_command("add", "Second thing by Friday", NOW, clients, ledger)
+    ids = [r["id"] for r in load(ledger)]
+    reply = apply_command("done", f"{ids[0]}, {ids[1]}", NOW, clients, ledger)
+    assert [r["status"] for r in load(ledger)] == ["done", "done"]
+    assert "Closed 2" in reply
+
+
+def test_bulk_ref_with_one_bad_number_changes_nothing(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "First thing by Friday", NOW, clients, ledger)
+    reply = apply_command("not", "#1, #9", NOW, clients, ledger)
+    assert "No open item #9" in reply
+    assert [r["status"] for r in load(ledger)] == ["open"]
 
 
 def test_assign_mirrors_into_the_assignees_ledger(tmp_path, monkeypatch):

@@ -115,7 +115,8 @@ SLACK_APP_TOKEN, SLACK_BOT_TOKEN, SLACK_USER_TOKEN, SLACK_OWNER_ID, SLACK_TEAM
 
 Optional: `KB_ALLOWLIST` (comma-separated Slack IDs allowed to use `ask:`),
 `KB_PATHS` (extra local knowledge sources), `OLLAMA_MODEL` (local rewording
-model), `SETUP_*`, `RELAY_*`, `JIRA_*`, `GMAIL_*`.
+model), `CATCHUP_SECONDS` (catch-up sweep interval, default 300; 0 disables),
+`SETUP_*`, `RELAY_*`, `JIRA_*`, `GMAIL_*`.
 
 ### Run
 

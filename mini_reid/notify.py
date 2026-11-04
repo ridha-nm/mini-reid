@@ -40,17 +40,21 @@ def react(token: str, channel: str, ts: str, name: str = "white_check_mark") -> 
     return bool(d.get("ok"))
 
 
-def send_dm_to(env: dict, user_id: str, text: str) -> str:
+def send_dm_to(env: dict, user_id: str, text: str,
+               blocks: list[dict] | None = None) -> str:
     token = env["SLACK_BOT_TOKEN"]
     ch = dm_channel(token, user_id)
-    d = _post("chat.postMessage", token, channel=ch, text=text[:39000])
+    data = {"channel": ch, "text": text[:39000]}
+    if blocks:
+        data["blocks"] = json.dumps(blocks)
+    d = _post("chat.postMessage", token, **data)
     if not d.get("ok"):
         raise RuntimeError(f"chat.postMessage: {d.get('error')}")
     return d["channel"]
 
 
-def send_dm(env: dict, text: str) -> str:
-    return send_dm_to(env, env["SLACK_OWNER_ID"], text)
+def send_dm(env: dict, text: str, blocks: list[dict] | None = None) -> str:
+    return send_dm_to(env, env["SLACK_OWNER_ID"], text, blocks=blocks)
 
 
 def schedule_dm(env: dict, user_id: str, text: str, post_at: int) -> str:
