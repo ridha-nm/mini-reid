@@ -1006,3 +1006,11 @@ def test_profanity_gets_a_defensive_line():
 
     assert guardrail_reply("fuck you mini-reid") in SASSY_LINES
     assert guardrail_reply("you are stupid") in SASSY_LINES
+
+
+def test_abuse_words_are_flagged_not_noted():
+    from mini_reid.slack_bot import ABUSE
+
+    assert ABUSE.search("molest <@U1>")
+    assert ABUSE.search("do not rape anyone")
+    assert not ABUSE.search("a grape and a drape")

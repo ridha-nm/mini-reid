@@ -49,6 +49,10 @@ SLUR = re.compile(
     r"retards?|retarded|mongoloids?|coons?|wetbacks?)\b", re.I)
 SLUR_DM = ("That word is a slur and it isn't okay here. "
            "I flagged the message — please be better.")
+ABUSE = re.compile(
+    r"\b(?:molests?|rap(?:e|es|ed|ing|ist|ists)|grop(?:e|es|ed|ing))\b", re.I)
+ABUSE_DM = ("That message was abusive and it isn't okay here. "
+            "I flagged it — please be better.")
 INSULT = re.compile(
     r"\b(shut\s+up|stfu|fuck\w*|fking|fkin|fck|fk|idiot|stupid|dumb|moron|"
     r"asshole|bastard|bitch\w*|ass|arse|shit\w*|crap|damn|piss\s+off|"
@@ -1608,16 +1612,18 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
         seen.add((channel, ts))
 
-        if SLUR.search(text or ""):
+        slur = SLUR.search(text or "")
+        abuse = ABUSE.search(text or "")
+        if slur or abuse:
             try:
                 web.reactions_add(channel=channel, timestamp=ts,
                                   name="triangular_flag_on_post")
             except Exception as ex:  # noqa: BLE001 - reaction is best effort
-                print(f"  slur react failed: {type(ex).__name__}", flush=True)
+                print(f"  flag react failed: {type(ex).__name__}", flush=True)
             try:
-                send_dm_to(env, user, SLUR_DM)
+                send_dm_to(env, user, SLUR_DM if slur else ABUSE_DM)
             except Exception as ex:  # noqa: BLE001 - never retry blindly
-                print(f"  slur dm failed: {type(ex).__name__}", flush=True)
+                print(f"  flag dm failed: {type(ex).__name__}", flush=True)
             _mark(ts)
             return
 

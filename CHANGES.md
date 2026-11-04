@@ -19,6 +19,8 @@ Append-only. Newest first.
   with every member ledger, feed the existing naive-Bayes task classifier.
 - Safety: slurs get a 🚩 reaction and a private DM asking the person to be
   better; profanity directed at the bot keeps the existing sassy defence.
+  Abuse verbs (molest, rape, grope) are treated the same as slurs instead of
+  becoming ledger notes.
 - Fun: `give @Name a hug`, `high five @Name`, `fist bump @Name` reply in
   channel with no ledger row. 232 tests passing.
 
