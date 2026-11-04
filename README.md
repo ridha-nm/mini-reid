@@ -36,6 +36,9 @@ Gmail, Jira and Google Calendar.
   and names. An ambiguous `by Friday 2pm` asks **Now / At Friday / Both** with
   buttons; `now and again Friday 2pm` sends both without asking. `reminders`
   lists the audit log: pending, sent, and how many replies the DM got.
+  Silly requests work too (`give @Raj a hug`). Profanity gets a defensive
+  reply; slurs get 🚩 on the message and a private DM. Accepted commands are
+  logged locally and feed the task-vs-chatter classifier — no external training.
 - **Teammates**: Ridha runs `allow: @Charanya`. The bot creates an isolated profile,
   DMs a one-time setup link, and starts capture for that member. Their commands, ledger,
   Slack mention alerts, reminders, meeting reminders and 09:15 digest stay private.

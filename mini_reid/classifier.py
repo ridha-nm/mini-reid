@@ -82,16 +82,21 @@ def _tokens(text: str) -> list[str]:
 def _examples(ledger_path: str = "ledger.json",
               corrections_path: str = "corrections.json") -> tuple[list[str], list[str]]:
     pos, neg = list(POSITIVE_SEED), list(NEGATIVE_SEED)
-    try:
-        rows = json.loads(Path(ledger_path).read_text())
-    except (OSError, ValueError):
-        rows = []
-    for row in rows:
-        what = row.get("what") or ""
-        if (len(what) >= 8 and row.get("status") in {"open", "stalled", "done"}
-                and row.get("kind") not in {"note", "reminder"}
-                and row.get("closed_how") not in {"not_commitment", "merged"}):
-            pos.append(what)
+    ledgers = [Path(ledger_path)]
+    if ledger_path == "ledger.json":
+        # Learn from every member's ledger too, not only the owner's.
+        ledgers += sorted(Path("data").glob("*/ledger.json"))
+    for ledger in ledgers:
+        try:
+            rows = json.loads(ledger.read_text())
+        except (OSError, ValueError):
+            continue
+        for row in rows:
+            what = row.get("what") or ""
+            if (len(what) >= 8 and row.get("status") in {"open", "stalled", "done"}
+                    and row.get("kind") not in {"note", "reminder"}
+                    and row.get("closed_how") not in {"not_commitment", "merged"}):
+                pos.append(what)
     try:
         corrections = json.loads(Path(corrections_path).read_text())
     except (OSError, ValueError):
@@ -99,6 +104,10 @@ def _examples(ledger_path: str = "ledger.json",
     for item in corrections:
         if item.get("what"):
             neg.append(item["what"])
+    if corrections_path == "corrections.json":
+        from .learning import accepted_texts
+
+        pos.extend(accepted_texts())
     return pos, neg
 
 

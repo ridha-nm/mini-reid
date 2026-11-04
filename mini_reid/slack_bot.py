@@ -43,6 +43,12 @@ GUARDRAIL = re.compile(
     r"shut\s+up|stfu|fuck\w*|fking|fkin|fck|fk\b|idiot|stupid|dumb|moron|"
     r"asshole|bastard|bitch\w*|ass\b|arse\b|shit\w*|crap\b|damn\b|"
     r"piss\s+off|screw\s+you)\b", re.I)
+SLUR = re.compile(
+    r"\b(?:n[i1]gg(?:er|a|ah)s?|f[a4]gg(?:ot|ots)?|k[i1]kes?|"
+    r"sp[i1]cs?|ch[i1]nks?|g[o0]{2}ks?|tr[a4]nn(?:y|ies)|"
+    r"retards?|retarded|mongoloids?|coons?|wetbacks?)\b", re.I)
+SLUR_DM = ("That word is a slur and it isn't okay here. "
+           "I flagged the message — please be better.")
 INSULT = re.compile(
     r"\b(shut\s+up|stfu|fuck\w*|fking|fkin|fck|fk|idiot|stupid|dumb|moron|"
     r"asshole|bastard|bitch\w*|ass|arse|shit\w*|crap|damn|piss\s+off|"
@@ -1602,6 +1608,19 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
         seen.add((channel, ts))
 
+        if SLUR.search(text or ""):
+            try:
+                web.reactions_add(channel=channel, timestamp=ts,
+                                  name="triangular_flag_on_post")
+            except Exception as ex:  # noqa: BLE001 - reaction is best effort
+                print(f"  slur react failed: {type(ex).__name__}", flush=True)
+            try:
+                send_dm_to(env, user, SLUR_DM)
+            except Exception as ex:  # noqa: BLE001 - never retry blindly
+                print(f"  slur dm failed: {type(ex).__name__}", flush=True)
+            _mark(ts)
+            return
+
         profiles = load_profiles()
         member = user != owner and user in profiles
         user_ledger = ledger_for(profiles, user, ledger_path) if member else ledger_path
@@ -2017,6 +2036,13 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         except Exception as ex:  # noqa: BLE001 - never leave the user without a reply
             print(f"[error] {type(ex).__name__}: {ex}", flush=True)
             reply = f"Something broke: {type(ex).__name__}"
+        if action not in {"unknown", "ack", "help", "list", "notes", "ask"}:
+            try:
+                from . import learning
+
+                learning.remember(LEADING_MENTION.sub("", text), action, user)
+            except Exception as ex:  # noqa: BLE001 - learning must never block
+                print(f"  learn failed: {type(ex).__name__}", flush=True)
         if action == "assign" and reply.startswith("Assigned to "):
             assign_to, assign_what = split_target(body, users, user)
             if assign_to and assign_to != user:

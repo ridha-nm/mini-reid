@@ -990,3 +990,19 @@ def test_play_reply_hugs_and_high_fives():
     assert play_reply("fist bump @Raj", {"raj": "U2"}) == "👊 *<@U2>* — bump."
     assert play_reply("give @Nobody a hug", {}) is None
     assert play_reply("give the deck a hug", {}) is None
+
+
+def test_slur_detection_flags_but_ignores_normal_words():
+    from mini_reid.slack_bot import SLUR
+
+    assert SLUR.search("don't be a retard")
+    assert SLUR.search("what a f4ggot take")
+    assert not SLUR.search("please review the deck")
+    assert not SLUR.search("the flag is triangular")
+
+
+def test_profanity_gets_a_defensive_line():
+    from mini_reid.slack_bot import SASSY_LINES, guardrail_reply
+
+    assert guardrail_reply("fuck you mini-reid") in SASSY_LINES
+    assert guardrail_reply("you are stupid") in SASSY_LINES

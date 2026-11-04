@@ -19,6 +19,7 @@ directory.json
 accounts.json
 data/
 corrections.json
+learning_events.json
 expected.txt
 scorecard.md
 kb.json

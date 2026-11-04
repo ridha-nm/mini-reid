@@ -15,6 +15,12 @@ Append-only. Newest first.
 - Explicit day+month (`thursday nov 12`) now beats the weekday in due parsing.
 - Setup docs for new operators and teammates (`SETUP.md`), `requirements.txt`,
   complete `.env.example`; interactivity enabled in the manifest. 228 tests passing.
+- Learning: accepted commands are logged locally (`learning_events.json`) and,
+  with every member ledger, feed the existing naive-Bayes task classifier.
+- Safety: slurs get a 🚩 reaction and a private DM asking the person to be
+  better; profanity directed at the bot keeps the existing sassy defence.
+- Fun: `give @Name a hug`, `high five @Name`, `fist bump @Name` reply in
+  channel with no ledger row. 232 tests passing.
 
 ## 2026-11-03 (banter channel allowlist)
 

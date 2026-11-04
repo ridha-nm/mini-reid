@@ -10,3 +10,10 @@ def test_add_and_read_back(tmp_path, monkeypatch):
 
 def test_missing_file_is_empty(tmp_path):
     assert learning.load(str(tmp_path / "nope.json")) == []
+
+
+def test_remember_and_accepted_texts(tmp_path):
+    p = str(tmp_path / "learning_events.json")
+    learning.remember("pls send the deck by friday", "add", "U1", path=p)
+    learning.remember("hi", "unknown", "U1", path=p)
+    assert learning.accepted_texts(path=p) == ["pls send the deck by friday"]
