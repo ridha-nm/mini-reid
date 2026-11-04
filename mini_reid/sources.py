@@ -10,6 +10,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -155,22 +156,38 @@ def _dm_history(token: str, channel_id: str, oldest: float) -> list[dict]:
             return out
 
 
+def _names_for(token: str, items: list[dict], workers: int = 8) -> None:
+    """Resolve every distinct author once, in parallel."""
+    authors = sorted({i.get("author") for i in items if i.get("author")})
+    if not authors:
+        return
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        names = dict(zip(authors, pool.map(
+            lambda u: slack_user_name(token, u), authors)))
+    for item in items:
+        item["author"] = names.get(item.get("author"), item.get("author"))
+
+
 def fetch_slack_dms(days: int, token: str, me: str) -> list[dict]:
     """Recent messages in Ridha's direct messages, from other people."""
     ims = _get_json(
         "https://slack.com/api/conversations.list?" + urllib.parse.urlencode(
             {"types": "im", "limit": 200}),
         {"Authorization": f"Bearer {token}"})
-    items = []
     oldest = (datetime.now(MYT) - timedelta(days=days)).timestamp()
-    for ch in ims.get("channels") or []:
-        cid = ch.get("id")
-        if not cid or ch.get("user") == me:
-            continue
+    channels = [ch.get("id") for ch in ims.get("channels") or []
+                if ch.get("id") and ch.get("user") != me]
+
+    def read(cid: str) -> list[dict]:
         hist = {"messages": _dm_history(token, cid, oldest)}
-        for item in parse_slack_dm_history(cid, hist, me):
-            item["author"] = slack_user_name(token, item["author"])
-            items.append(item)
+        return parse_slack_dm_history(cid, hist, me)
+
+    items: list[dict] = []
+    if channels:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for batch in pool.map(read, channels):
+                items.extend(batch)
+    _names_for(token, items)
     return items
 
 
@@ -192,9 +209,8 @@ def fetch_slack(days: int, token: str, me: str) -> list[dict]:
             break
         page += 1
         time.sleep(1.2)
-    for item in items:
-        # Search sometimes returns a bare user id; people read names.
-        item["author"] = slack_user_name(token, item["author"])
+    # Search sometimes returns a bare user id; people read names.
+    _names_for(token, items)
     return items
 
 
@@ -268,7 +284,12 @@ def fetch_gmail(days: int, env: dict[str, str],
         (f"in:sent newer_than:{days}d -in:spam -in:trash", "sent"),
     ]:
         ids = _gmail_list(access, query)
-        msgs = [_gmail_message(access, i) for i in ids]
+        if ids:
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                msgs = list(pool.map(
+                    lambda mid: _gmail_message(access, mid), ids))
+        else:
+            msgs = []
         out.extend(parse_gmail_messages(msgs, kind))
 
     return out

@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Knight Frank, Allianz, Setia and Eupe. 262 tests pass.
+overridden to Knight Frank, Allianz, Setia and Eupe. 264 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
@@ -236,7 +236,9 @@ kept or a real ask was missed.
 - WhatsApp and calls are manual capture only.
 - macOS sleep pauses the socket; the catch-up sweep (every `CATCHUP_SECONDS`, default
   300) replays commands and questions missed while asleep or disconnected.
-- Watcher takes about 40 s per cycle, hence the two-minute interval.
+- Watcher takes about 55 s per cycle after parallel source fetches (sources ~12 s;
+  the member cycle and meeting scheduling make up the rest), inside the two-minute
+  interval. Before the parallel fix a cycle ran 2+ minutes.
 - Edited-message ✅ depends on the app keeping `message.channels`/`message.groups`. A
   reinstall can rotate the bot token; update `.env` and restart the bot if it stops.
 - Extraction is rules-first. A real ask the gate misses is captured with `add:`.
@@ -253,7 +255,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-262 tests passing as of 2026-11-04.
+264 tests passing as of 2026-11-05.
 
 ## Next, agreed
 

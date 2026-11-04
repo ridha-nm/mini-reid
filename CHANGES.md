@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (watcher fetches in parallel)
+
+- Slack DM histories, per-message Gmail reads and author-name lookups now run
+  in an 8-worker thread pool instead of serial HTTP calls. Measured on this Mac:
+  Slack DMs 27.3 s → 3.7 s, Gmail 36.0 s → 6.7 s; sources total 65 s → 12 s.
+- No behaviour change: same items, same order-insensitive parse.
+- 264 tests passing.
+
 ## 2026-11-04 (confirm every new task)
 
 - The model no longer decides what is a task. Rules capture every candidate; the
