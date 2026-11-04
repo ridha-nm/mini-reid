@@ -110,7 +110,8 @@ def test_remind_meetings_schedules_once_and_sends_late_discovery_now(tmp_path, m
         {"id": "soon", "title": "Soon", "start": "2026-11-02T09:05:00+08:00",
          "end": "2026-11-02T09:20:00+08:00", "link": ""},
     ]
-    monkeypatch.setattr(cal, "meetings_for_day", lambda env, now: meetings)
+    monkeypatch.setattr(cal, "meetings_for_day",
+                        lambda env, now, **kwargs: meetings)
     scheduled, sent = [], []
     monkeypatch.setattr(watcher, "send_dm", lambda env, text: sent.append(text))
     monkeypatch.setattr("mini_reid.notify.schedule_dm",

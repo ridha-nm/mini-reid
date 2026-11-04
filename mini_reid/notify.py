@@ -5,6 +5,7 @@ import json
 import ssl
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 try:
     import certifi
@@ -61,3 +62,46 @@ def schedule_dm(env: dict, user_id: str, text: str, post_at: int) -> str:
     if not d.get("ok"):
         raise RuntimeError(f"chat.scheduleMessage: {d.get('error')}")
     return d.get("scheduled_message_id") or ""
+
+
+REMINDER_LOG = "reminder_log.json"
+
+
+def log_reminder(path: str, *, asked_by: str, asked_by_name: str, to: str,
+                 to_name: str, what: str, post_at: str,
+                 scheduled_id: str = "", status: str = "scheduled",
+                 channel: str = "") -> None:
+    """Append one reminder to the audit log. Best effort, last 200 kept."""
+    p = Path(path)
+    try:
+        rows = json.loads(p.read_text()) if p.exists() else []
+    except (OSError, ValueError):
+        rows = []
+    rows.append({"asked_by": asked_by, "asked_by_name": asked_by_name,
+                 "to": to, "to_name": to_name, "what": what,
+                 "post_at": post_at, "scheduled_id": scheduled_id,
+                 "status": status, "channel": channel})
+    p.write_text(json.dumps(rows[-200:], indent=1, ensure_ascii=False) + "\n")
+
+
+def scheduled_ids(env: dict) -> set[str]:
+    """Slack scheduled-message ids still waiting to post."""
+    d = _post("chat.scheduledMessages.list", env["SLACK_BOT_TOKEN"])
+    if not d.get("ok"):
+        return set()
+    return {m.get("id") for m in (d.get("scheduled_messages") or [])}
+
+
+def dm_reply_count(env: dict, user_id: str, since_ts: float) -> int:
+    """Messages the recipient sent in the bot DM since the reminder posted."""
+    token = env["SLACK_BOT_TOKEN"]
+    try:
+        ch = dm_channel(token, user_id)
+        d = _post("conversations.history", token, channel=ch,
+                  oldest=f"{since_ts:.6f}", limit=100)
+    except Exception:  # noqa: BLE001 - the audit view must never fail
+        return 0
+    if not d.get("ok"):
+        return 0
+    return sum(1 for m in d.get("messages") or []
+               if m.get("user") == user_id and not m.get("subtype"))

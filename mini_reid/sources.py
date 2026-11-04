@@ -225,10 +225,12 @@ def parse_gmail_messages(messages: list[dict], kind: str) -> list[dict]:
     return out
 
 
-def gmail_access(env: dict[str, str]) -> str:
-    creds = json.loads(Path(os.path.expanduser(env["GMAIL_CREDS"])).read_text())
+def gmail_access(env: dict[str, str], token_path: str | None = None,
+                 client_path: str | None = None) -> str:
+    creds = json.loads(Path(os.path.expanduser(
+        client_path or env["GMAIL_CREDS"])).read_text())
     inst = creds.get("installed") or creds.get("web")
-    tok = json.loads(Path(os.path.expanduser(env["GMAIL_TOKEN"])).read_text())
+    tok = json.loads(Path(os.path.expanduser(token_path or env["GMAIL_TOKEN"])).read_text())
     data = urllib.parse.urlencode({
         "client_id": inst["client_id"], "client_secret": inst["client_secret"],
         "refresh_token": tok["refresh_token"], "grant_type": "refresh_token"}).encode()
@@ -253,8 +255,10 @@ def _gmail_message(access: str, mid: str) -> dict:
     return _get_json(url, {"Authorization": f"Bearer {access}"})
 
 
-def fetch_gmail(days: int, env: dict[str, str]) -> list[dict]:
-    access = gmail_access(env)
+def fetch_gmail(days: int, env: dict[str, str],
+                token_path: str | None = None,
+                client_path: str | None = None) -> list[dict]:
+    access = gmail_access(env, token_path, client_path)
     out: list[dict] = []
     for query, kind in [
         # Read mail counts too. An email opened and never answered is the exact
@@ -272,7 +276,14 @@ def fetch_gmail(days: int, env: dict[str, str]) -> list[dict]:
 
 # ---------------------------------------------------------------- jira
 
-def parse_jira_issues(data: dict, base: str) -> list[dict]:
+def _same_person(name: str, me: str | None) -> bool:
+    """Jira display names vary: 'Charanya' vs 'Charanya Nair'."""
+    a, b = (name or "").strip().lower(), (me or "").strip().lower()
+    return bool(a and b) and (a == b or a in b or b in a)
+
+
+def parse_jira_issues(data: dict, base: str, me: str | None = None) -> list[dict]:
+    me = me or "Ridha Mohamed"
     out = []
     for issue in data.get("issues") or []:
         f = issue.get("fields") or {}
@@ -281,11 +292,11 @@ def parse_jira_issues(data: dict, base: str) -> list[dict]:
         reporter = (f.get("reporter") or {}).get("displayName")
         project = ((f.get("project") or {}).get("key")
                    or (f.get("project") or {}).get("name") or "Jira")
-        # RIJ items are auto-assigned to Ridha, so the assignee says nothing.
-        # The board is the honest source; a real human assignee wins if present.
-        if assignee and assignee != "Ridha Mohamed":
+        # Auto-assigned board items say nothing. The other person, if any,
+        # is the honest source.
+        if assignee and not _same_person(assignee, me):
             who = assignee
-        elif reporter and reporter != "Ridha Mohamed":
+        elif reporter and not _same_person(reporter, me):
             who = reporter
         else:
             who = f"{project} board"
@@ -309,19 +320,41 @@ def parse_jira_issues(data: dict, base: str) -> list[dict]:
     return out
 
 
-def fetch_jira(days: int, env: dict[str, str]) -> list[dict]:
+def jira_user(env: dict[str, str], query: str) -> dict | None:
+    """Find a Jira Cloud account by name using the shared workspace token."""
     base = env.get("JIRA_BASE_URL")
     email = env.get("JIRA_EMAIL")
     token = env.get("JIRA_API_TOKEN")
     if not (base and email and token):
+        return None
+    auth = base64.b64encode(f"{email}:{token}".encode()).decode()
+    url = (f"{base.rstrip('/')}/rest/api/3/user/search?"
+           + urllib.parse.urlencode({"query": query}))
+    data = _get_json(url, {"Authorization": f"Basic {auth}",
+                           "Accept": "application/json"})
+    for user in data or []:
+        if user.get("active") and user.get("accountId"):
+            return user
+    return None
+
+
+def fetch_jira(days: int, env: dict[str, str],
+               creds: dict | None = None, me: str | None = None,
+               assignee: str | None = None) -> list[dict]:
+    base = (creds or {}).get("base_url") or env.get("JIRA_BASE_URL")
+    email = (creds or {}).get("email") or env.get("JIRA_EMAIL")
+    token = (creds or {}).get("api_token") or env.get("JIRA_API_TOKEN")
+    if not (base and email and token):
         raise RuntimeError("Jira credentials missing")
     auth = base64.b64encode(f"{email}:{token}".encode()).decode()
     # Assigned only. A comment that mentions him on someone else's issue is not his
-    # work, and caused the Ramtin triage item to keep resurfacing.
-    jql = ("assignee = currentUser() AND statusCategory != Done "
+    # work, and caused the Ramtin triage item to keep resurfacing. A shared token
+    # can still target a teammate by account id.
+    who = f'"{assignee}"' if assignee else "currentUser()"
+    jql = (f"assignee = {who} AND statusCategory != Done "
            "ORDER BY updated DESC")
     url = f"{base.rstrip('/')}/rest/api/3/search/jql?" + urllib.parse.urlencode(
         {"jql": jql, "maxResults": 50,
          "fields": "summary,duedate,status,reporter,assignee,project,updated,issuetype"})
     data = _get_json(url, {"Authorization": f"Basic {auth}", "Accept": "application/json"})
-    return parse_jira_issues(data, base)
+    return parse_jira_issues(data, base, me)

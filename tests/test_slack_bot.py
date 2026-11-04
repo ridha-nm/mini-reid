@@ -51,8 +51,17 @@ def test_parses_acknowledgement():
     assert parse_command("<@U123> thanks!")[0] == "ack"
 
 
+def test_parses_allow():
+    assert parse_command("allow: <@UCHARANYA>") == ("allow", "<@UCHARANYA>")
+    assert parse_command("allow: Charanya") == ("allow", "Charanya")
+    assert parse_command("setup") == ("setup", "")
+    assert parse_command("clients: Eupe, Gamuda") == ("clients", "Eupe, Gamuda")
+    assert parse_command("accounts") == ("clients", "")
+
+
 def test_unknown_text():
-    assert parse_command("<@U123> what is the weather")[0] == "unknown"
+    assert parse_command("<@U123> what is the weather")[0] == "ask"
+    assert parse_command("<@U123> the weather is nice today")[0] == "unknown"
 
 
 def test_add_writes_to_ledger(tmp_path):
@@ -144,13 +153,13 @@ def test_banter_reply_respects_channel_user_expiry_and_mentions(tmp_path, monkey
 
     monkeypatch.chdir(tmp_path)
     Path("banter.json").write_text(json.dumps({
-        "channel": "C1", "users": ["U1"],
+        "channel": "C1", "name": "probies", "users": ["U1"],
         "until": "2099-01-01T00:00:00+08:00"}))
     # Neutral chatter gets no banter; only mean messages do.
     assert banter_reply("C1", "U1", "hello", "UBOT") is None
     assert banter_reply("C2", "U1", "you are stupid", "UBOT") is None
     Path("banter.json").write_text(json.dumps({
-        "channel": "C1", "users": ["*"],
+        "channel": "C1", "name": "probies", "users": ["*"],
         "until": "2099-01-01T00:00:00+08:00"}))
     assert banter_reply("C1", "U2", "hello", "UBOT") is None
     from mini_reid.slack_bot import is_mean
@@ -180,13 +189,14 @@ def test_banter_command_controls_scope_and_duration(tmp_path, monkeypatch):
     from mini_reid.slack_bot import banter_command
 
     monkeypatch.chdir(tmp_path)
-    kind, _ = banter_command("banter on 2h", "C1", {}, NOW)
+    kind, _ = banter_command("banter on 2h", "C1", {}, NOW, name="probies")
     cfg = json.loads(Path("banter.json").read_text())
     assert kind == "on"
     assert cfg["channel"] == "C1" and cfg["users"] == ["*"]
     assert cfg["until"] == "2026-10-30T11:00:00+08:00"
 
-    kind, _ = banter_command("banter on 30m <@U1>", "C1", {}, NOW)
+    kind, _ = banter_command("banter on 30m <@U1>", "C1", {}, NOW,
+                             name="ee-leads-only")
     cfg = json.loads(Path("banter.json").read_text())
     assert cfg["users"] == ["U1"]
     assert cfg["until"] == "2026-10-30T09:30:00+08:00"
@@ -194,6 +204,10 @@ def test_banter_command_controls_scope_and_duration(tmp_path, monkeypatch):
     kind, _ = banter_command("banter off", "C1", {}, NOW)
     assert kind == "off"
     assert not Path("banter.json").exists()
+
+    kind, _ = banter_command("banter on 1h", "C1", {}, NOW,
+                             name="software-related-issues")
+    assert kind == "error"
 
 
 def test_claim_message_is_persistent_and_releasable(tmp_path):
@@ -490,6 +504,8 @@ def test_remind_at_parses_date_and_time():
 
     fields, clean = parse_remind("send the deck tomorrow at 3pm", NOW)
     assert fields["remind_at"].startswith("2026-10-31T15:00")
+    _, by_clean = parse_remind("he owes me the gameplan by Friday 2pm", NOW)
+    assert by_clean == "he owes me the gameplan"
     assert clean == "send the deck"
 
 
@@ -675,6 +691,15 @@ def test_split_target_accepts_mention_me_for_and_bare_name():
         "UARMAN", "submit timesheet at 2pm")
 
 
+def test_split_target_bare_recipient_only_for_reminders():
+    from mini_reid.slack_bot import split_target
+
+    assert split_target("arman he owes me timesheet at 2pm", USERS, "URIDHA",
+                        bare_name=True) == ("UARMAN", "he owes me timesheet at 2pm")
+    assert split_target("arman he owes me timesheet at 2pm", USERS, "URIDHA") == (
+        None, "arman he owes me timesheet at 2pm")
+
+
 def test_split_target_leaves_ordinary_text_alone():
     from mini_reid.slack_bot import split_target
 
@@ -695,6 +720,9 @@ def test_reminders_are_scheduled_for_others_and_non_owners():
     assert should_schedule_reminder("remind", owner, owner, None)
     assert not should_schedule_reminder("add", owner, owner, None)
     assert not should_schedule_reminder("note", "UARMAN", owner, None)
+    # A member's own `add:` belongs in their ledger, not in a reminder.
+    assert not should_schedule_reminder("add", "UCHARANYA", owner, None, member=True)
+    assert should_schedule_reminder("add", "UCHARANYA", owner, "URAJ", member=True)
 
 
 def test_edit_renames_and_sets_a_deadline(tmp_path):
@@ -742,6 +770,23 @@ def test_done_accepts_a_list_number(tmp_path):
     assert [r["status"] for r in rows if r["what"] == "Gamuda file"] == ["open"]
 
 
+def test_assign_mirrors_into_the_assignees_ledger(tmp_path, monkeypatch):
+    from mini_reid.slack_bot import cross_assign
+
+    sent = []
+    monkeypatch.setattr("mini_reid.notify.send_dm_to",
+                        lambda env, uid, text: sent.append((uid, text)))
+    member_ledger = str(tmp_path / "data/U2/ledger.json")
+    cross_assign({"SLACK_OWNER_ID": "U1"}, {"U2": {"ledger": member_ledger}},
+                 "U3", "Charanya", "U2", "check the deck",
+                 str(tmp_path / "ledger.json"))
+
+    row = load(member_ledger)[0]
+    assert row["direction"] == "owed_by_me"
+    assert row["asker"] == "Charanya"
+    assert sent == [("U2", "*Assigned by Charanya*\ncheck the deck")]
+
+
 def test_owner_reminders_use_slack_scheduling_now():
     from mini_reid.slack_bot import should_schedule_reminder
 
@@ -778,3 +823,156 @@ def test_list_shows_sender_and_link(tmp_path):
     text = apply_command("list", "", NOW, {}, ledger)
     assert "from Kasib (#probies)" in text
     assert "https://x/1" in text
+
+
+def test_reminders_command_is_parsed():
+    assert parse_command("<@U1> reminders") == ("reminders", "")
+    assert parse_command("<@U1> reminder log") == ("reminders", "")
+
+
+def test_reminder_log_shows_pending_and_replies():
+    from mini_reid.slack_bot import format_reminders
+
+    rows = [
+        {"post_at": "2026-11-04T10:00:00+08:00", "to_name": "arman",
+         "what": "old", "scheduled_id": "S1", "status": "scheduled"},
+        {"post_at": "2026-11-06T14:00:00+08:00", "to_name": "xieyi",
+         "what": "brain grill gameplan", "scheduled_id": "S2",
+         "status": "scheduled"},
+    ]
+    out = format_reminders(rows, {"S2"}, {1: 1})
+    assert "→ xieyi — brain grill gameplan [pending]" in out
+    assert "→ arman — old [sent, 1 reply]" in out
+
+
+def test_log_reminder_appends_a_row(tmp_path):
+    import json
+
+    from mini_reid.notify import log_reminder
+
+    path = tmp_path / "reminder_log.json"
+    log_reminder(str(path), asked_by="U1", asked_by_name="arman", to="U2",
+                 to_name="xieyi", what="grill", post_at="2026-11-06T14:00:00+08:00",
+                 scheduled_id="S1")
+    rows = json.loads(path.read_text())
+    assert rows[-1]["to_name"] == "xieyi" and rows[-1]["scheduled_id"] == "S1"
+
+
+def test_natural_language_commands_without_prefixes():
+    assert parse_command("<@U1> please mark the FSD review as done") == (
+        "done", "the FSD review")
+    assert parse_command("<@U1> can you remind xieyi he owes me the gameplan") == (
+        "remind", "xieyi he owes me the gameplan")
+    assert parse_command("<@U1> remidn me to send the deck tomorrow at 3pm") == (
+        "remind", "send the deck tomorrow at 3pm")
+    assert parse_command("<@U1> remember Daniel wants the mapping redone") == (
+        "note", "Daniel wants the mapping redone")
+    assert parse_command("<@U1> close the Eupe dashboard") == ("done", "the Eupe dashboard")
+    assert parse_command("<@U1> show me the FSD review") == ("find", "FSD review")
+    assert parse_command("<@U1> assign the deck to Kasib") == (
+        "assign", "@Kasib the deck")
+    assert parse_command("<@U1> assign the deck to Kasib and send it")[0] == "assign"
+    assert parse_command("<@U1> waiting on Daniel for the deck") == (
+        "waiting", "the deck on Daniel")
+    assert parse_command("<@U1> change the deck due to Friday") == (
+        "due", "the deck by Friday")
+    assert parse_command("<@U1> push the deck out by 3 days") == (
+        "snooze", "the deck 3d")
+    assert parse_command("<@U1> what's the status of the deck?")[0] == "ask"
+
+
+def test_reminder_ambiguity_asks_before_sending():
+    from mini_reid.slack_bot import clarify_choice, needs_reminder_clarification
+
+    assert needs_reminder_clarification("he owes me the gameplan by Friday 2pm")
+    assert not needs_reminder_clarification("he owes me the gameplan at Friday 2pm")
+    assert clarify_choice("now") == "now"
+    assert clarify_choice("now and again on Friday") == "both"
+    assert clarify_choice("at 2pm") == "later"
+    assert clarify_choice("Friday") == "later"
+    assert clarify_choice("thanks") is None
+
+
+def test_split_target_fuzzy_matches_a_name():
+    from mini_reid.slack_bot import split_target
+
+    assert split_target("xiey he owes me the deck", USERS, "URIDHA",
+                        bare_name=True) == (None, "xiey he owes me the deck")
+    users = {"xieyi": "UXIEYI"}
+    assert split_target("xiey he owes me the deck", users, "URIDHA",
+                        bare_name=True) == ("UXIEYI", "he owes me the deck")
+
+
+def test_deliver_pending_reminder_can_send_now_and_again(monkeypatch):
+    from mini_reid import notify, slack_bot
+
+    calls = []
+
+    def fake_send(env, to, what, at=None):
+        calls.append("now" if at is None else "later")
+        return ("S1", "scheduled") if at else ("", "sent")
+
+    monkeypatch.setattr(slack_bot, "send_reminder", fake_send)
+    monkeypatch.setattr(notify, "log_reminder", lambda *a, **k: None)
+    pending = {"to": "UX", "to_name": "xieyi", "what": "the deck",
+               "at": "2026-11-06T14:00:00+08:00", "asked_by": "UA",
+               "asked_by_name": "arman", "channel": "C1"}
+    reply = slack_bot.deliver_pending_reminder({}, pending, "both", now=NOW)
+    assert calls == ["now", "later"]
+    assert "xieyi" in reply and "now" in reply
+
+
+def test_reminder_buttons_are_valid_and_distinct():
+    from mini_reid.slack_bot import reminder_blocks
+
+    at = datetime(2026, 11, 6, 14, 0, tzinfo=MYT)
+    blocks = reminder_blocks("D1:U1", at, "xieyi")
+    buttons = blocks[1]["elements"]
+    ids = [b["action_id"] for b in buttons]
+    assert ids == ["remind_now", "remind_later", "remind_both"]
+    assert len(set(ids)) == 3  # Slack rejects duplicate action_ids in one block
+    assert [b["value"].rsplit("|", 1)[-1] for b in buttons] == [
+        "now", "later", "both"]
+
+
+def test_remind_button_click_resolution():
+    from mini_reid.slack_bot import resolve_remind_button
+
+    state = {"pending_remind": {"D1:U1": {"user": "U1"}}}
+    assert resolve_remind_button(state, "D1:U1|both", "U1", "OWNER")[:2] == (
+        "D1:U1", "both")
+    # The owner may answer on someone else's behalf.
+    assert resolve_remind_button(state, "D1:U1|now", "OWNER", "OWNER")[:2] == (
+        "D1:U1", "now")
+    assert resolve_remind_button(state, "D1:U1|later", "U2", "OWNER") is None
+    assert resolve_remind_button(state, "D1:U1|sideways", "U1", "OWNER") is None
+    assert resolve_remind_button({}, "D1:U1|now", "U1", "OWNER") is None
+
+
+def test_explicit_now_and_again_skips_the_question():
+    from mini_reid.slack_bot import asks_now_and_again, needs_reminder_clarification
+
+    body = "he owes me the gameplan now and again on Friday 2pm"
+    assert asks_now_and_again(body)
+    assert not needs_reminder_clarification(body)
+
+
+def test_deliver_pending_reminder_now_only_and_later_only(monkeypatch):
+    from mini_reid import notify, slack_bot
+
+    made = []
+
+    def fake_send(env, to, what, at=None):
+        made.append(at)
+        return ("S1", "scheduled") if at else ("", "sent")
+
+    monkeypatch.setattr(slack_bot, "send_reminder", fake_send)
+    monkeypatch.setattr(notify, "log_reminder", lambda *a, **k: None)
+    pending = {"to": "UX", "to_name": "xieyi", "what": "the deck",
+               "at": "2026-11-06T14:00:00+08:00", "asked_by": "UA",
+               "asked_by_name": "arman", "channel": "C1"}
+    assert "now" in slack_bot.deliver_pending_reminder({}, pending, "now", now=NOW)
+    assert made == [None]
+    made.clear()
+    reply = slack_bot.deliver_pending_reminder({}, pending, "later", now=NOW)
+    assert made and made[0] is not None and "at Fri 06 Nov 14:00" in reply

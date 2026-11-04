@@ -14,6 +14,10 @@ bot.out.log
 bot.err.log
 model.log
 ledger*.json
+users.json
+directory.json
+accounts.json
+data/
 corrections.json
 expected.txt
 scorecard.md
@@ -21,6 +25,7 @@ kb.json
 kb.log
 bot_state.json
 watcher_state.json
+reminder_log.json
 meeting_reminders.json
 dm_poll_state.json
 calendar_ignores.json

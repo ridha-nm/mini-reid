@@ -2,115 +2,486 @@
   "ioi": {
     "name": "IOI Properties",
     "group": "direct",
-    "domains": ["ioiproperties.com.my"],
-    "aliases": ["IOI", "IOIPG"],
-    "slack_channels": ["ioi-properties-working-group", "C050LSCDK28"]
+    "domains": [
+      "ioiproperties.com.my"
+    ],
+    "aliases": [
+      "IOI",
+      "IOIPG"
+    ],
+    "slack_channels": [
+      "ioi-properties-working-group",
+      "C050LSCDK28"
+    ]
   },
   "knight-frank": {
     "name": "Knight Frank",
     "group": "direct",
-    "domains": ["my.knightfrank.com", "knightfrank.com.my"],
-    "aliases": ["Knight Frank", "KF"],
-    "slack_channels": ["knight-frank-wg", "C09M744N8GY"]
+    "domains": [
+      "my.knightfrank.com",
+      "knightfrank.com.my"
+    ],
+    "aliases": [
+      "Knight Frank",
+      "KF"
+    ],
+    "slack_channels": [
+      "knight-frank-wg",
+      "C09M744N8GY"
+    ]
   },
   "gamuda": {
     "name": "Gamuda",
     "group": "direct",
-    "domains": ["gamuda.com.my", "gamudaland.com.my", "gamuda.com.au", "srslrt.com.my"],
-    "aliases": ["Gamuda", "Gamuda Land", "SRSL"],
-    "slack_channels": ["gamuda", "C07M2H54MNE"],
+    "domains": [
+      "gamuda.com.my",
+      "gamudaland.com.my",
+      "gamuda.com.au",
+      "srslrt.com.my"
+    ],
+    "aliases": [
+      "Gamuda",
+      "Gamuda Land",
+      "SRSL"
+    ],
+    "slack_channels": [
+      "gamuda",
+      "C07M2H54MNE"
+    ],
     "cycle": "gamuda-biweekly",
     "cadence_days": 14
   },
   "eupe": {
     "name": "Eupe",
     "group": "direct",
-    "domains": ["eupe.com.my"],
-    "aliases": ["Eupe"],
-    "slack_channels": ["eupe-working-group", "C09HF2YMW91"]
+    "domains": [
+      "eupe.com.my"
+    ],
+    "aliases": [
+      "Eupe"
+    ],
+    "slack_channels": [
+      "eupe-working-group",
+      "C09HF2YMW91"
+    ]
   },
   "kelington": {
     "name": "Kelington",
     "group": "direct",
-    "domains": ["kelingtongroup.com"],
-    "aliases": ["Kelington"],
+    "domains": [
+      "kelingtongroup.com"
+    ],
+    "aliases": [
+      "Kelington"
+    ],
     "slack_channels": []
   },
   "tmk": {
     "name": "TMK",
     "group": "direct",
-    "domains": ["tmkchemical.com"],
-    "aliases": ["TMK", "TMK Chemical"],
+    "domains": [
+      "tmkchemical.com"
+    ],
+    "aliases": [
+      "TMK",
+      "TMK Chemical"
+    ],
     "slack_channels": []
   },
   "sfia": {
     "name": "SFIA",
     "group": "safe",
     "domains": [],
-    "aliases": ["SFIA"],
-    "slack_channels": ["sfia-working-group"]
+    "aliases": [
+      "SFIA"
+    ],
+    "slack_channels": [
+      "sfia-working-group"
+    ],
+    "portfolio": "safe"
   },
   "suslab": {
     "name": "Suslab",
     "group": "safe",
-    "domains": ["suslab.net"],
-    "aliases": ["Suslab", "Sustainable Lab"],
-    "slack_channels": []
+    "domains": [
+      "suslab.net"
+    ],
+    "aliases": [
+      "Suslab",
+      "Sustainable Lab"
+    ],
+    "slack_channels": [],
+    "portfolio": "safe"
   },
   "dti": {
     "name": "DTI",
     "group": "safe",
-    "domains": ["dtinfrastructure.com.au"],
-    "aliases": ["DTI", "DT Infrastructure"],
-    "slack_channels": []
+    "domains": [
+      "dtinfrastructure.com.au"
+    ],
+    "aliases": [
+      "DTI",
+      "DT Infrastructure"
+    ],
+    "slack_channels": [],
+    "portfolio": "safe"
   },
   "bank-rakyat": {
     "name": "Bank Rakyat",
     "group": "ghb",
-    "domains": [],
-    "aliases": ["Bank Rakyat"],
-    "slack_channels": []
+    "domains": [
+      "bankrakyat.com.my"
+    ],
+    "aliases": [
+      "Bank Rakyat"
+    ],
+    "slack_channels": [],
+    "portfolio": "ghb"
   },
   "agrobank": {
     "name": "Agrobank",
     "group": "ghb",
-    "domains": [],
-    "aliases": ["Agrobank"],
-    "slack_channels": []
+    "domains": [
+      "agrobank.com.my"
+    ],
+    "aliases": [
+      "Agrobank"
+    ],
+    "slack_channels": [],
+    "portfolio": "ghb"
   },
   "maybank": {
     "name": "Maybank",
     "group": "ghb",
-    "domains": [],
-    "aliases": ["Maybank"],
-    "slack_channels": []
+    "domains": [
+      "maybank.com",
+      "maybank2u.com.my"
+    ],
+    "aliases": [
+      "Maybank"
+    ],
+    "slack_channels": [],
+    "portfolio": "ghb"
   },
   "exim": {
     "name": "EXIM Bank",
     "group": "ghb",
-    "domains": ["exim.com.my"],
-    "aliases": ["EXIM", "EXIM Bank"],
-    "slack_channels": []
+    "domains": [
+      "exim.com.my"
+    ],
+    "aliases": [
+      "EXIM",
+      "EXIM Bank"
+    ],
+    "slack_channels": [],
+    "portfolio": "ghb"
   },
   "kossan": {
     "name": "Kossan",
     "group": "gvc",
-    "domains": ["kossan.com.my"],
-    "aliases": ["Kossan"],
-    "slack_channels": []
+    "domains": [
+      "kossan.com.my"
+    ],
+    "aliases": [
+      "Kossan"
+    ],
+    "slack_channels": [],
+    "portfolio": "gvc"
   },
   "pos-malaysia": {
     "name": "POS Malaysia",
     "group": "gvc",
-    "domains": ["pos.com.my"],
-    "aliases": ["POS Malaysia", "POS"],
-    "slack_channels": ["pos-malaysia-working-group", "C0646H8JD1S"]
+    "domains": [
+      "pos.com.my"
+    ],
+    "aliases": [
+      "POS Malaysia",
+      "POS"
+    ],
+    "slack_channels": [
+      "pos-malaysia-working-group",
+      "C0646H8JD1S"
+    ],
+    "portfolio": "gvc"
   },
   "ajinomoto": {
     "name": "Ajinomoto",
     "group": "gvc",
-    "domains": [],
-    "aliases": ["Ajinomoto"],
+    "domains": [
+      "ajinomoto.com.my"
+    ],
+    "aliases": [
+      "Ajinomoto"
+    ],
+    "slack_channels": [],
+    "portfolio": "gvc"
+  },
+  "pnb-enterprise": {
+    "name": "PNB - Enterprise",
+    "group": "direct",
+    "domains": [
+      "pnb.com.my"
+    ],
+    "aliases": [
+      "PNB",
+      "PNB Enterprise"
+    ],
+    "slack_channels": []
+  },
+  "kwap": {
+    "name": "KWAP",
+    "group": "direct",
+    "domains": [
+      "kwap.gov.my"
+    ],
+    "aliases": [
+      "KWAP"
+    ],
+    "slack_channels": []
+  },
+  "dnex": {
+    "name": "DNex",
+    "group": "direct",
+    "domains": [
+      "dnex.com.my"
+    ],
+    "aliases": [
+      "DNex"
+    ],
+    "slack_channels": []
+  },
+  "bintulu": {
+    "name": "Bintulu",
+    "group": "direct",
+    "domains": [
+      "bintuluport.com.my"
+    ],
+    "aliases": [
+      "Bintulu"
+    ],
+    "slack_channels": []
+  },
+  "allianz": {
+    "name": "Allianz",
+    "group": "direct",
+    "domains": [
+      "allianz.com.my"
+    ],
+    "aliases": [
+      "Allianz"
+    ],
+    "slack_channels": []
+  },
+  "berjaya-property-berhad": {
+    "name": "Berjaya Property Berhad",
+    "group": "direct",
+    "domains": [
+      "berjaya.com.my"
+    ],
+    "aliases": [
+      "Berjaya Property Berhad"
+    ],
+    "slack_channels": []
+  },
+  "datai": {
+    "name": "Datai",
+    "group": "direct",
+    "domains": [
+      "thedatai.com"
+    ],
+    "aliases": [
+      "Datai"
+    ],
+    "slack_channels": []
+  },
+  "dxn": {
+    "name": "DXN",
+    "group": "direct",
+    "domains": [
+      "dxn2u.com"
+    ],
+    "aliases": [
+      "DXN"
+    ],
+    "slack_channels": []
+  },
+  "edotco": {
+    "name": "Edotco",
+    "group": "direct",
+    "domains": [
+      "edotcogroup.com"
+    ],
+    "aliases": [
+      "Edotco"
+    ],
+    "slack_channels": []
+  },
+  "mbmr": {
+    "name": "MBMR",
+    "group": "direct",
+    "domains": [
+      "mbmr.com.my"
+    ],
+    "aliases": [
+      "MBMR"
+    ],
+    "slack_channels": []
+  },
+  "mey-chern": {
+    "name": "Mey Chern",
+    "group": "direct",
+    "domains": [
+      "meychern.com.my"
+    ],
+    "aliases": [
+      "Mey Chern"
+    ],
+    "slack_channels": []
+  },
+  "might": {
+    "name": "Might",
+    "group": "direct",
+    "domains": [
+      "might.org.my"
+    ],
+    "aliases": [
+      "Might"
+    ],
+    "slack_channels": []
+  },
+  "pkt-logistics": {
+    "name": "PKT Logistics",
+    "group": "direct",
+    "domains": [
+      "pktgroup.com"
+    ],
+    "aliases": [
+      "PKT Logistics"
+    ],
+    "slack_channels": []
+  },
+  "setia": {
+    "name": "Setia",
+    "group": "direct",
+    "domains": [
+      "spsetia.com"
+    ],
+    "aliases": [
+      "SP Setia",
+      "S P Setia",
+      "Setia"
+    ],
+    "slack_channels": []
+  },
+  "sime-darby-property": {
+    "name": "Sime Darby Property",
+    "group": "direct",
+    "domains": [
+      "simedarbyproperty.com"
+    ],
+    "aliases": [
+      "Sime Darby Property"
+    ],
+    "slack_channels": []
+  },
+  "ambank-fe": {
+    "name": "AmBank FE",
+    "group": "direct",
+    "domains": [
+      "ambankgroup.com"
+    ],
+    "aliases": [
+      "AmBank FE"
+    ],
+    "slack_channels": []
+  },
+  "ambank-ee": {
+    "name": "AmBank EE",
+    "group": "direct",
+    "domains": [
+      "ambankgroup.com"
+    ],
+    "aliases": [
+      "AmBank EE"
+    ],
+    "slack_channels": []
+  },
+  "aemulus": {
+    "name": "Aemulus",
+    "group": "direct",
+    "domains": [
+      "aemulus.com"
+    ],
+    "aliases": [
+      "Aemulus"
+    ],
+    "slack_channels": []
+  },
+  "canon": {
+    "name": "Canon",
+    "group": "direct",
+    "domains": [
+      "canon.com.my"
+    ],
+    "aliases": [
+      "Canon"
+    ],
+    "slack_channels": []
+  },
+  "ghb": {
+    "name": "GHB",
+    "group": "portfolio",
+    "portfolio_children": [
+      "bank-rakyat",
+      "agrobank",
+      "maybank",
+      "exim"
+    ],
+    "domains": [
+      "agrobank.com.my",
+      "bankrakyat.com.my",
+      "exim.com.my",
+      "maybank.com",
+      "maybank2u.com.my"
+    ],
+    "aliases": [
+      "GHB"
+    ],
+    "slack_channels": []
+  },
+  "gvc": {
+    "name": "GVC",
+    "group": "portfolio",
+    "portfolio_children": [
+      "kossan",
+      "pos-malaysia",
+      "ajinomoto"
+    ],
+    "domains": [
+      "ajinomoto.com.my",
+      "kossan.com.my",
+      "pos.com.my"
+    ],
+    "aliases": [
+      "GVC"
+    ],
+    "slack_channels": []
+  },
+  "safe": {
+    "name": "SAFE",
+    "group": "portfolio",
+    "portfolio_children": [
+      "sfia",
+      "suslab",
+      "dti"
+    ],
+    "domains": [
+      "dtinfrastructure.com.au",
+      "suslab.net"
+    ],
+    "aliases": [
+      "SAFE"
+    ],
     "slack_channels": []
   }
 }

@@ -20,13 +20,33 @@ Gmail, Jira and Google Calendar.
   not part of.
 - **Bot** (`@minireid`): add, assign, reassign, note, tonote/convert, status, priority,
   combine, uncombine, undo, done, due, edit, snooze, waiting, drop, not, remind, find,
-  list, notes, ask, help. `banter on/off/status` controls temporary silly replies.
+  list, notes, ask, clients, help. `clients` shows the email filter;
+  `clients: Eupe, Gamuda` replaces it. Portfolios GHB/GVC/SAFE are accepted.
+  `banter on/off/status` controls sassy replies; only tagged abuse triggers one.
+  Untagged messages are always ignored. Banter is allowed only in `#ee-leads-only`
+  and `#probies`.
   `list` prints a stable short id per row; `185045` or `id:185045` works in every
   command; `undo:` reverses the last change. Priority 1-5 sorts the digest and list.
   Successful `add:` reacts ➕; `note:` / `tonote:` react 📝; `remind:` reacts ⏰.
-  Your command replies go to your DM, not the channel. Only you can change the ledger.
+  Your command replies go to your DM, not the channel. Only you can change your ledger.
   Anyone can set a private
   reminder for themselves or a teammate — those never enter your ledger.
+  Tagged messages work in plain language too (`please mark the deck done`,
+  `can you remind xieyi he owes me the gameplan`), with typo-tolerant commands
+  and names. An ambiguous `by Friday 2pm` asks **Now / At Friday / Both** with
+  buttons; `now and again Friday 2pm` sends both without asking. `reminders`
+  lists the audit log: pending, sent, and how many replies the DM got.
+- **Teammates**: Ridha runs `allow: @Charanya`. The bot creates an isolated profile,
+  DMs a one-time setup link, and starts capture for that member. Their commands, ledger,
+  Slack mention alerts, reminders, meeting reminders and 09:15 digest stay private.
+  Jira activates automatically from the shared workspace token, scoped to their Jira
+  account. Gmail uses a hosted Google OAuth page: one click, consent, done. The Cloud
+  Run relay holds the code for seconds and the Mac picks it up. A profile's `clients`
+  list filters member Gmail to those clients by domain or text; `allow:` fills it from
+  the BD Command Centre roster. Slack coverage is only channels the bot has been invited
+  to. `python -m mini_reid.directory` rebuilds Slack → email → Jira;
+  `python -m mini_reid.accounts` rebuilds email → client accounts from the
+  stocktake-hub config.
 - **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
   local documents. `ask:` returns passages from your own writing, with sources.
 
@@ -50,12 +70,16 @@ watcher pass.
 ## Slack app
 
 Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
-`message.groups` (manifest: `slack-app-manifest.yaml`). The two message subscriptions
-exist so an edited mention can be acknowledged with ✅; every other channel message is
-ignored unless it addresses the bot. Each message id is answered once; `bot_state.json`
-tracks handled ids across restarts. Tags from `bd-triager-agent` are ignored. Slack sends
-no events from DMs the bot is not in, so the watcher polls them for `remind` commands
-with the user token.
+`message.groups` (manifest: `slack-app-manifest.yaml`). Interactivity is on for the
+reminder clarification buttons. The two message subscriptions exist so an edited
+mention can be acknowledged with ✅; every other channel message is ignored unless it
+addresses the bot. Each message id is answered once; `bot_state.json` tracks handled
+ids across restarts. On startup, catch-up replays missed channel mentions and DMs —
+every command type, not only questions. Tags from `bd-triager-agent` are ignored.
+Slack sends no events from DMs the bot is not in, so the watcher polls them for
+`remind` commands with the user token.
+
+Setting up another person or your own instance: see `SETUP.md`.
 
 ## Agents
 
@@ -75,6 +99,10 @@ Check them with `launchctl list | grep minireid`.
 |---|---|
 | `.env` | secrets, mode 600, never committed |
 | `ledger.json` | the commitments, local only |
+| `users.json` | allowlist and per-user paths, local only |
+| `directory.json` | Slack id → name, email and Jira account, local only |
+| `accounts.json` | work email → client slugs from the BD roster, local only |
+| `data/<slack_id>/` | a teammate's ledger, digest and Google/Jira credentials |
 | `digest.md` | last rendered digest |
 | `clients.json` | client names, domains, Slack channels |
 | `kb.json` | knowledge index, local only |
@@ -91,10 +119,22 @@ the Jira API token and `SLACK_OWNER_ID`. Rotate the Slack user token if it is ev
 exposed; it can read every DM. The Google token carries Gmail scopes plus
 `calendar.readonly`; `mini_reid.google_auth` re-adds the Calendar scope.
 
+Member Google setup runs through the Cloud Run relay `mini-reid-setup`
+(`cloud/relay.py`, project `rij-agent-march2026`, region `asia-southeast1`). Links look
+like `{RELAY_URL}/setup?state=…`. Google redirects to `{RELAY_URL}/callback`; the relay
+holds the code in memory and the bot polls `/take` every 5 seconds with `RELAY_KEY`.
+`RELAY_URL` and `RELAY_KEY` live in `.env`. The relay reads its client ID from an env var
+and its client secret from Secret Manager.
+
+The OAuth client is a **Web application** type whose JSON is at `SETUP_GOOGLE_CREDS`
+(mode 600) with redirect URI `{RELAY_URL}/callback`. Consent type is **Internal**, so
+tokens are long-lived and no verification is needed. Member secrets live in
+`data/<slack_id>/` with mode 600.
+
 ## Known limits
 
 - The local 3B model is used only to reword tasks. It is not trusted to decide what is
   a commitment, because it deleted real asks and kept jokes.
 - 8B local is unusable on 8 GB: about five minutes per answer.
 - Answers are extractive. They quote your own writing; they do not compose prose.
-- Nothing runs while the Mac sleeps. Catch-up answers questions on wake, late.
+- Nothing runs while the Mac sleeps. Catch-up replays missed commands on wake, late.

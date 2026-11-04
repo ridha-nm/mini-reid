@@ -148,9 +148,33 @@ stalled status counts as overdue; undated rows stay in No date.
 `edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
 ignores that title), `remind` (absolute or `in 2 minutes`),
-`ask:`, `find:`, `list`, `notes`, `banter on|off|status`, `help`.
+`ask:`, `find:`, `list`, `notes`, `allow: @Name`, `banter on|off|status`, `help`.
 
-- Only Ridha mutates the ledger.
+- The owner mutates `ledger.json`; an allowlisted member mutates only their own
+  `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
+- `allow: @Name` is owner-only. It writes `users.json`, creates the member's isolated
+  paths, and DMs a one-time setup link. Re-running it resends the link until setup is
+  complete. Non-allowlisted users keep the old note-to-Ridha path; they cannot use
+  ledger commands.
+- The member watcher reads mentions in channels the bot is in, plus their own Gmail and
+  Jira. Jira uses the shared workspace token, queried by the member's Jira account id;
+  Gmail uses the member's own OAuth token. Their reminders, meeting reminders, overdue
+  nudge and 09:15 digest go only to their DM.
+- `directory.json` (gitignored, mode 600) maps Slack id → name, email and Jira account.
+  Rebuild with `python -m mini_reid.directory`. `allow:` reads it first, so any Pantas
+  member can be set up without typing their email or Jira id.
+- A profile may carry `clients`, a list of `clients.json` slugs. Member Gmail is kept
+  only when the sender domain or message text matches one of them. Slack and Jira are
+  not filtered by this list. `accounts.json` (from the BD Command Centre / stocktake-hub
+  roster) maps work email → clients; `allow:` fills the profile from it. Members can
+  override it with `clients: Eupe, Gamuda` or inspect it with `clients`. Portfolios
+  GHB/GVC/SAFE match their member-company domains; a child match also satisfies its
+  portfolio. Charanya is overridden to Knight Frank, Allianz, Setia and Eupe.
+- Setup page: `{RELAY_URL}/setup?state=<setup-token>` on Cloud Run. Google redirects to
+  `{RELAY_URL}/callback`; the relay holds the code in memory and the bot polls
+  `/take` with `RELAY_KEY`. Google consent is one-time and offline; the refresh token
+  lives in the member's data directory. Jira is automatic and the form is only a
+  fallback.
 - Anyone who tags or DMs the bot can set a reminder for themselves or any teammate in
   the Pantas workspace: `remind me …`, `remind @Arman …`, `remind Arman Rahman …`,
   `add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed
@@ -175,12 +199,11 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 - Bot-addressed small talk ("hi", "you there?", "thanks") gets a default reply naming
   `add:`, `note:` and `ask:`; it is not stored.
 - Praise or kindness ("good bot", "loving mini-reid") gets a short kind reply back.
-- Banter mode is **off** by default. Any mean or hostile message in a channel opens a
-  **five-minute** window for that channel; repeated meanness does not extend it. Within
-  the window only mean messages get a rotating sassy reply; neutral chatter is silent.
-  `banter on 2h [@person|all]`, `banter off`, `banter status` still control it manually.
-  The watcher announces and clears the window at expiry. Outside banter, the bot only
-  answers messages that address it: a real mention, literal `@mini-reid`, or a DM.
+- Banter is manual-only and **off** by default. `banter on 2h [@person|all]`,
+  `banter off`, `banter status` control it; the watcher announces expiry. Only a message
+  that both addresses the bot and is mean gets a sassy line. Untagged messages never get
+  a reply, mean or not. Banter can only be enabled in `#ee-leads-only` and `#probies`;
+  every other channel is rejected.
 - Any other message from someone else gets a ✅ and, if they write something, a note
   plus an instant DM to Ridha. No reply to them.
 - Plain sentences from Ridha become notes; questions go to the knowledge base; due or

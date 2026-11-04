@@ -2,6 +2,112 @@
 
 Append-only. Newest first.
 
+## 2026-11-04 (reminder clarifications, natural language, catch-up)
+
+- Reminder ambiguity: `by Friday 2pm` asks **Now / At Friday / Both** with Slack
+  buttons (unique action ids; text reply `now` / `later` / `both` also works).
+  `now and again …` sends both without asking.
+- `reminder_log.json` audit: pending, sent, replies. `reminders` command lists it.
+- Plain language after a tag: politeness prefixes, typo-tolerant verbs and names,
+  and mappings for done/drop/note/find/assign/waiting/due/snooze.
+- Catch-up now replays every command type across channel mentions and all bot DMs,
+  not only `ask:`; pending clarifications survive restarts.
+- Explicit day+month (`thursday nov 12`) now beats the weekday in due parsing.
+- Setup docs for new operators and teammates (`SETUP.md`), `requirements.txt`,
+  complete `.env.example`; interactivity enabled in the manifest. 228 tests passing.
+
+## 2026-11-03 (banter channel allowlist)
+
+- Banter can only be enabled in `#ee-leads-only` and `#probies`. Every other channel is
+  rejected at the command and at reply time.
+- `software-related-issues` cannot banter. 213 tests passing.
+
+## 2026-11-03 (no untagged replies)
+
+- Deleted the bot's untagged sassy message in `software-related-issues`
+  (`1793718297.690999`). No ledger row was created by it.
+- Removed auto-banter and the untagged reply path entirely. Untagged channel messages
+  now get no reply, mean or not.
+- Manual `banter on` now only affects messages that address the bot and are mean.
+- 213 tests passing.
+
+## 2026-11-03 (members declare their accounts)
+
+- Added `clients:` / `accounts:` command. Members can inspect or override their email
+  filter: `clients: Eupe, Gamuda`. Unknown names are rejected.
+- Setup-complete DM now states the active filter or asks the member to set one.
+- `allow:` DM now includes numbered setup steps and the `clients` commands.
+- Charanya's override now includes Eupe: Knight Frank, Allianz, Setia, Eupe.
+- 213 tests passing.
+
+## 2026-11-03 (per-person client accounts)
+
+- Added `mini_reid/accounts.py` + `accounts.json` (gitignored, 600): work email → client
+  slugs, built from the live BD Command Centre / stocktake-hub roster
+  (`config-live.json`). `allow:` fills the profile's `clients` from it. GHB/GVC/SAFE are
+  portfolios and skipped.
+- Charanya's override: Knight Frank, Allianz, Setia, Eupe.
+- Expanded `clients.json` from 16 to 38 entries using the live roster: 35 clients plus
+  GHB/GVC/SAFE portfolios. Added Allianz, Setia, DNex, KWAP, PNB Enterprise, Edotco,
+  Sime Darby Property, AmBank FE/EE, Aemulus and Canon. Portfolio domains are the union
+  of their member companies; child clients carry a `portfolio` tag.
+- Gmail filter now keeps only mail matching the member's accounts. One-day check:
+  Charanya 52 messages → 5 Setia/Knight Frank/Allianz.
+- 212 tests passing.
+
+## 2026-11-03 (hosted Gmail setup)
+
+- Added `cloud/relay.py`, deployed to Cloud Run `mini-reid-setup` in
+  `rij-agent-march2026` (asia-southeast1, min/max 1). Fixed HTTPS setup page and Google
+  callback; codes and Jira form held in memory only.
+- Bot polls the relay every 5s with `RELAY_KEY` and finishes the token exchange.
+- Created Internal Web-application OAuth client with redirect
+  `https://mini-reid-setup-355354179016.asia-southeast1.run.app/callback`; JSON at
+  `~/.minireid-oauth-web.json`, client secret in Secret Manager.
+- Setup links now point at the relay. No paste, no Tailscale, no inbound to the Mac.
+- Refresh tokens are bound to the OAuth client that issued them. Each profile stores
+  `google_client`; Charanya stays on the original Desktop client, relay users use the
+  new Web client. Fixed a 401 caused by refreshing her token with the wrong client.
+- Per-profile `clients` filter. Gmail is kept only when sender domain or text matches
+  one of those clients. Charanya: POS Malaysia, Gamuda, Agrobank, Kossan, Knight Frank,
+  Bank Rakyat, Eupe. 52 messages in one day → 9 kept.
+- 210 tests passing.
+
+## 2026-11-03 (member directory + shared Jira)
+
+- `python -m mini_reid.directory` builds `directory.json` (gitignored, 600): Slack id,
+  name, email and Jira account id for every active Pantas member. Current build: 39
+  people, 36 emails, 36 Jira ids.
+- `allow:` uses the directory, so Jira is active immediately from the shared workspace
+  token queried by the member's account id. No member Jira token needed.
+- `assign:` now mirrors the task into the assignee's ledger and DMs them.
+- `setup <redirected-url>` completes Gmail OAuth by DM, without the setup page.
+- Fixed `allow:` re-send raising `UnboundLocalError` instead of DMing the link.
+- 209 tests passing.
+
+## 2026-11-03 (multi-user activation)
+
+- `allow: @Name` now creates the profile, issues a 24-hour setup token and DMs the
+  member a setup link. Re-running `allow:` resends the link until setup completes.
+- Per-member watcher: mentions in channels the bot is in, own Gmail and Jira when
+  connected, reminders, meeting reminders, overdue nudge and 09:15 digest.
+- Setup page on `SETUP_PORT` (8765): Google one-time OAuth plus Jira API-token form.
+  Google uses the HTTPS callback when `SETUP_BASE_URL` is HTTPS; otherwise it uses the
+  registered loopback redirect and the member pastes the redirected URL back once.
+- Member Google tokens and Jira credentials live under `data/<slack_id>/`, mode 600.
+- `members --digest` added to the 09:15 job. 206 tests passing.
+
+## 2026-11-03 (multi-user phase 1)
+
+- Owner-only `allow: @Name` writes `users.json` and creates an isolated
+  `data/<slack_id>/ledger.json` for that member.
+- Allowlisted members run the same commands against their own ledger; replies go to their
+  DM. Non-allowlisted users keep the note-to-Ridha path.
+- A member's `add:` with no recipient stays in their ledger instead of becoming a
+  reminder. `users.json` and `data/` are gitignored.
+- Per-user watcher, digest, Gmail, Jira and self-serve setup remain later phases.
+- 202 tests passing.
+
 ## 2026-11-03 (remind emoji ack)
 
 - A successful `remind` now gets an ⏰ reaction on the command message instead of a text

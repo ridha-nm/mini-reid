@@ -74,6 +74,16 @@ def test_jira_maps_issue_key_due_and_status():
     assert item["status"] == "To Do"
 
 
+def test_jira_member_sees_the_other_person_as_asker():
+    data = {"issues": [{"id": "1", "key": "BO-1", "fields": {
+        "summary": "x", "status": {"name": "To Do"},
+        "assignee": {"displayName": "Charanya Nair"},
+        "reporter": {"displayName": "Kasib"},
+        "project": {"key": "BO"}}}]}
+    item = parse_jira_issues(data, "https://x", me="Charanya")[0]
+    assert item["author"] == "Kasib"
+
+
 def test_jira_auto_assigned_item_names_the_board():
     data = {"issues": [{"id": "1", "key": "BO-1", "fields": {
         "summary": "x", "status": {"name": "To Do"},
