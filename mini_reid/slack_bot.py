@@ -106,6 +106,44 @@ def guardrail_reply(text: str) -> str | None:
     return GUARDRAIL_LINES[len(text or "") % len(GUARDRAIL_LINES)]
 
 
+PLAY_LINES = {
+    "hug": "🤗 *{who}* gets a hug.",
+    "high five": "🙌 *{who}* — up high.",
+    "fist bump": "👊 *{who}* — bump.",
+    "pat on the back": "👏 *{who}* — well deserved.",
+}
+_PLAY_WHO = r"(?P<who><@[A-Z0-9]+(?:\|[^>]*)?>|@[A-Za-z0-9._'-]+)"
+_PLAY_WHAT = r"(?P<what>hug|high[ -]?five|fist[ -]?bump|pat on the back)"
+PLAY_GIVE = re.compile(
+    r"\b(?:give|send)\s+" + _PLAY_WHO + r"\s+(?:a\s+)?" + _PLAY_WHAT, re.I)
+PLAY_TO = re.compile(
+    r"^\s*(?:can\s+you\s+|could\s+you\s+|please\s+)?(?:give\s+)?(?:a\s+)?"
+    + _PLAY_WHAT + r"\s+(?:to\s+)?" + _PLAY_WHO + r"\s*[.!]?\s*$", re.I)
+
+
+def _play_uid(who: str, users: dict[str, str]) -> str | None:
+    m = re.match(r"<@([A-Z0-9]+)", who or "")
+    if m:
+        return m.group(1)
+    return users.get((who or "").lstrip("@").lower())
+
+
+def play_reply(text: str, users: dict[str, str]) -> str | None:
+    """Silly but harmless: 'give @Raj a hug', 'high five @Raj'."""
+    for pattern in (PLAY_GIVE, PLAY_TO):
+        m = pattern.search(text or "")
+        if not m:
+            continue
+        uid = _play_uid(m.group("who"), users)
+        if not uid:
+            return None
+        what = re.sub(r"[-\s]+", " ", m.group("what").lower())
+        line = PLAY_LINES.get(what)
+        if line:
+            return line.format(who=f"<@{uid}>")
+    return None
+
+
 HANDLED_MAX = 1000
 
 
@@ -548,6 +586,7 @@ HELP = """*Mini-Reid commands*
 • `remind me to send the deck tomorrow at 3pm` — a timed DM; no time means now
 • `remind @Arman to send the deck at 3pm` — DM someone else (anyone can set these)
 • `reminders` — audit log of reminders sent, pending, and whether the DM got replies
+• `give @Name a hug` / `high five @Name` — silly, no ledger row
 • `ask: what did we agree with Eupe on waste` — answer from your own writing, with sources
 • `find: eupe` — search the ledger
 • `list` — numbered open items; `#1` works with done, due, drop, edit and snooze
@@ -1636,6 +1675,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 web.chat_postMessage(channel=channel, text=guard)
             except Exception as ex:  # noqa: BLE001 - guardrail is best effort
                 print(f"  guardrail post failed: {type(ex).__name__}", flush=True)
+            _mark(ts)
+            return
+
+        play = play_reply(text, users)
+        if play:
+            try:
+                web.chat_postMessage(channel=channel, text=play)
+            except Exception as ex:  # noqa: BLE001 - fun is best effort
+                print(f"  play post failed: {type(ex).__name__}", flush=True)
             _mark(ts)
             return
 

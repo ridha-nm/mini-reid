@@ -976,3 +976,17 @@ def test_deliver_pending_reminder_now_only_and_later_only(monkeypatch):
     made.clear()
     reply = slack_bot.deliver_pending_reminder({}, pending, "later", now=NOW)
     assert made and made[0] is not None and "at Fri 06 Nov 14:00" in reply
+
+
+def test_play_reply_hugs_and_high_fives():
+    from mini_reid.slack_bot import play_reply
+
+    assert play_reply("give <@U1> a hug", {}) == "🤗 *<@U1>* gets a hug."
+    assert play_reply("can you give @Raj a hug", {"raj": "U2"}) == (
+        "🤗 *<@U2>* gets a hug.")
+    assert play_reply("give a hug to @Raj", {"raj": "U2"}) == (
+        "🤗 *<@U2>* gets a hug.")
+    assert play_reply("high five <@U1>", {}) == "🙌 *<@U1>* — up high."
+    assert play_reply("fist bump @Raj", {"raj": "U2"}) == "👊 *<@U2>* — bump."
+    assert play_reply("give @Nobody a hug", {}) is None
+    assert play_reply("give the deck a hug", {}) is None
