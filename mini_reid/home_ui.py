@@ -145,22 +145,32 @@ def home_blocks(rows: list[dict], now: datetime,
     counts = _counts(rows, now)
     focus = _focus(rows, now)
     stats = [
-        ("Open", counts["open"]), ("Overdue", counts["overdue"]),
-        ("Due today", counts["today"]), ("This week", counts["week"]),
-        ("In progress", counts["in_progress"]), ("Blocked", counts["blocked"]),
-        ("Waiting on others", counts["waiting"]), ("Done 7d", counts["done_week"]),
-        ("Inbox", counts["inbox"]), ("Notes", counts["notes"]),
+        ("📋 Open", counts["open"]), ("🔴 Overdue", counts["overdue"]),
+        ("📅 Due today", counts["today"]), ("🗓️ This week", counts["week"]),
+        ("🚧 In progress", counts["in_progress"]), ("⛔ Blocked", counts["blocked"]),
+        ("⏳ Waiting", counts["waiting"]), ("✅ Done 7d", counts["done_week"]),
+        ("📥 Inbox", counts["inbox"]), ("📝 Notes", counts["notes"]),
     ]
+    rows = []
+    for i in range(0, len(stats), 2):
+        left = stats[i]
+        right = stats[i + 1] if i + 1 < len(stats) else ("", 0)
+        rows.append([
+            {"type": "raw_text", "text": left[0]},
+            {"type": "raw_number", "value": left[1], "text": str(left[1])},
+            {"type": "raw_text", "text": right[0]},
+            {"type": "raw_number", "value": right[1], "text": str(right[1])},
+        ])
     blocks: list[dict] = [
         {"type": "header",
          "text": {"type": "plain_text", "text": "Mini-Reid"}},
         {"type": "context",
          "elements": [{"type": "mrkdwn",
                        "text": f"{now:%a %d %b %Y} · your day at a glance"}]},
-        {"type": "section", "fields": [
-            {"type": "mrkdwn", "text": f"*{label}*\n{value}"}
-            for label, value in stats
-        ]},
+        {"type": "table",
+         "column_settings": [{"align": "left"}, {"align": "right"},
+                             {"align": "left"}, {"align": "right"}],
+         "rows": rows},
     ]
     if meetings:
         lines = []

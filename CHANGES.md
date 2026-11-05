@@ -4,8 +4,9 @@ Append-only. Newest first.
 
 ## 2026-11-05 (App Home dashboard)
 
-- Mini-Reid's Home tab is a per-person dashboard: 10 stats (open, overdue, due
-  today, this week, in progress, blocked, waiting, done 7d, Inbox, notes),
+- Mini-Reid's Home tab is a per-person dashboard: a native Block Kit **table**
+  with 10 stats (open, overdue, due today, this week, in progress, blocked,
+  waiting, done 7d, Inbox, notes),
   today's meetings, top 3 focus items, **Open Slack List**, **Triage Inbox**,
   **Refresh** and **What I can do**. It no longer dumps the whole task list.
   Members see their own ledger plus a **What I can do** block; anyone not

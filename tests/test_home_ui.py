@@ -12,8 +12,10 @@ def test_home_shows_stats_focus_and_buttons():
              "created_at": "2026-11-05T09:00:00+08:00"}]
     blocks = home_blocks(rows, NOW, "https://slack/lists/T1/F1")
     text = str(blocks)
-    assert "*Open*\\n1" in text
-    assert "This week" in text and "Waiting on others" in text
+    table = next(b for b in blocks if b.get("type") == "table")
+    assert table["rows"][0][0]["text"].endswith("Open")
+    assert table["rows"][0][1]["value"] == 1
+    assert "This week" in text and "Waiting" in text
     assert "Send the deck" in text
     assert "Open Slack List" in text
     assert "Triage Inbox" in text
@@ -39,8 +41,9 @@ def test_home_shows_only_three_focus_items():
 
 def test_home_survives_an_empty_ledger():
     blocks = home_blocks([], NOW)
+    table = next(b for b in blocks if b.get("type") == "table")
+    assert table["rows"][0][1]["value"] == 0
     assert "Nothing urgent." in str(blocks)
-    assert "*Open*\\n0" in str(blocks)
 
 
 def test_access_request_carries_details_and_authorise_button():
