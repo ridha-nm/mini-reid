@@ -2634,7 +2634,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             ch = (m.get("channel") or {}).get("id")
             user = m.get("user")
             text = m.get("text") or ""
-            if ch and user:
+            if (ch and user and user != me_id and not m.get("bot_id")
+                    and not m.get("subtype")):
                 process(ch, user, text, m["ts"], late=True)
                 late += 1
         # DMs carry no literal mention, so search never returns them. Read every

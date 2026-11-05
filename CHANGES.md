@@ -6,8 +6,10 @@ Append-only. Newest first.
 
 - `not the time` no longer fuzzy-matches `note` and becomes a note; plain
   `not …` is unrecognised text unless it uses `not:`.
-- The bot ignores its own posted messages (some arrive without `bot_id`),
-  so a play reply cannot be processed as a new request.
+- The bot ignores its own posted messages (some arrive without `bot_id`), in
+  live socket events and in the catch-up search. A self-hug reply after a
+  restart had been replayed as a stranger's message and answered with the
+  default line.
 - Removed the stray "the time" note.
 - 287 tests passing.
 
