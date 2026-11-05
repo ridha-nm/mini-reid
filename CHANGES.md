@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (select all in the triage modal)
+
+- The triage modal has **Select all** and **Clear** buttons. Select all rebuilds
+  the modal with every selectable row pre-ticked; the chosen status is kept.
+  Slack checkboxes have no shift-select, so this is the supported shortcut.
+- 282 tests passing.
+
 ## 2026-11-05 (multiline `not:` and pasted-list edge cases)
 
 - Fixed a multiline `not:` being parsed as `note` (and answering "Noted.")

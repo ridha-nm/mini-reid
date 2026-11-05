@@ -2346,6 +2346,28 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
+                if action_id in {"triage_select_all", "triage_clear"}:
+                    from .triage_ui import triage_modal
+
+                    view = payload.get("view") or {}
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target = ledger_for_viewer(clicker)
+                    if not target or not view.get("id"):
+                        continue
+                    values = (view.get("state") or {}).get("values") or {}
+                    choice = ((values.get("verdict") or {}).get("value") or {}) \
+                        .get("selected_option") or {}
+                    try:
+                        web.views_update(
+                            view_id=view["id"],
+                            view=triage_modal(
+                                load(target), datetime.now(MYT),
+                                select_all=action_id == "triage_select_all",
+                                default_verdict=choice.get("value")))
+                    except Exception as ex:  # noqa: BLE001 - user can retry
+                        print(f"  triage select failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
                 if action_id == "triage_open":
                     trigger = payload.get("trigger_id") or ""
                     clicker = (payload.get("user") or {}).get("id") or ""
