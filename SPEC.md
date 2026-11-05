@@ -149,8 +149,8 @@ uses the same row renderer as the digest, link included. Only a real past due da
 stalled status counts as overdue; undated rows stay in No date.
 
 New items do not enter a digest bucket until confirmed. The capture DM carries one
-section per item with **Add to list** / **Not a task** (at most ten per DM); the rest
-wait in the list Inbox. The header counts unanswered rows as `N to confirm`.
+section per item with the sender, `via`, an **open source** link and **Add to list** /
+**Not a task** (at most ten per DM); the rest wait in the list Inbox. The header counts unanswered rows as `N to confirm`.
 
 A stale nudge runs at 18:00: open, in progress, blocked and stalled rows with no
 activity today are DMed, up to five at a time, each with an inline status picker. A row

@@ -44,7 +44,8 @@ def test_list_blocks_offer_a_triage_button():
 def test_confirm_blocks_offer_add_and_dismiss_per_item():
     from mini_reid.triage_ui import confirm_blocks
 
-    rows = [_row("aaaa11", "Send the deck", asker="Kasib", due="2026-11-06"),
+    rows = [_row("aaaa11", "Send the deck", asker="Kasib", due="2026-11-06",
+                 source_link="https://mail.google.com/mail/u/0/#all/abc"),
             _row("bbbb22", "Maybe a task")]
     blocks = confirm_blocks(rows)
     actions = [b for b in blocks if b.get("type") == "actions"]
@@ -52,8 +53,10 @@ def test_confirm_blocks_offer_add_and_dismiss_per_item():
     first = actions[0]["elements"]
     assert [b["action_id"] for b in first] == ["confirm_task", "reject_task"]
     assert [b["value"] for b in first] == ["aaaa11", "aaaa11"]
-    assert "Send the deck" in blocks[1]["text"]["text"]
-    assert "Kasib" in blocks[1]["text"]["text"]
+    text = blocks[1]["text"]["text"]
+    assert "Send the deck" in text
+    assert "Kasib" in text
+    assert "<https://mail.google.com/mail/u/0/#all/abc|open source>" in text
 
 
 def test_confirm_blocks_cap_the_batch_and_point_at_the_inbox():
