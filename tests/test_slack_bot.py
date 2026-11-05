@@ -1015,6 +1015,19 @@ def test_owner_reminders_use_slack_scheduling_now():
     assert should_schedule_reminder("remind", "URIDHA", "URIDHA", None)
 
 
+def test_reminder_is_added_to_the_receivers_list(tmp_path):
+    from mini_reid.slack_bot import add_reminder_row
+
+    ledger = str(tmp_path / "ledger.json")
+    add_reminder_row(ledger, "send the resume folder",
+                     {"due": None, "remind_at": "2026-11-05T15:00:00+08:00"}, NOW)
+    row = load(ledger)[0]
+    assert row["kind"] == "reminder"
+    assert row["status"] == "open"
+    assert row["reminded"] is True
+    assert row["what"] == "send the resume folder"
+
+
 def test_remind_ack_reacts_and_falls_back_to_a_reply():
     from mini_reid.slack_bot import EMOJI_ACKS, react_ack
 

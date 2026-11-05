@@ -2,6 +2,15 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (reminders appear on the list)
+
+- A reminder — yours or one someone sets for you — is now added to the
+  recipient's ledger as `kind: reminder`, `status: open`, so it appears in
+  `list` and the digest. It is marked `reminded` because Slack owns delivery,
+  so the watcher cannot send a second copy.
+- The resume/assessment-folder reminder was added to Ridha's list.
+- 293 tests passing.
+
 ## 2026-11-05 (`not:` works on notes)
 
 - A pasted list after `not:` now matches open **notes** as well as tasks. It
