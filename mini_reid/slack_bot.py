@@ -2685,20 +2685,25 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         return ledger_for(people, user_id, ledger_path) if user_id in people else None
 
     def publish_home(viewer: str) -> None:
+        if not viewer:
+            return
         from .home_ui import home_blocks, public_home_blocks
         from .slack_lists import list_url
 
         target = ledger_for_viewer(viewer)
-        try:
-            blocks = (home_blocks(load(target), datetime.now(MYT),
-                                  list_url(env, viewer))
-                      if target else public_home_blocks())
-            web.views_publish(
-                user_id=viewer,
-                view={"type": "home", "blocks": blocks})
-        except Exception as ex:  # noqa: BLE001 - Home is best effort
-            print(f"  home publish failed: {type(ex).__name__}: {ex}",
-                  flush=True)
+        blocks = (home_blocks(load(target), datetime.now(MYT),
+                              list_url(env, viewer))
+                  if target else public_home_blocks())
+        for attempt in range(2):
+            try:
+                web.views_publish(
+                    user_id=viewer,
+                    view={"type": "home", "blocks": blocks})
+                return
+            except Exception as ex:  # noqa: BLE001 - Home is best effort
+                if attempt:
+                    print(f"  home publish failed: {type(ex).__name__}: {ex}",
+                          flush=True)
 
     def handle(_socket_client, req):
         client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
