@@ -11,6 +11,8 @@ Gmail, Jira and Google Calendar.
 
 - **Morning digest** (09:15, Slack DM): counts, a short brief, today's meetings with
   join links, then Overdue, Today, This week, Waiting on others, No date, Notes.
+  If delivery fails (no DNS at 09:15), the watcher rebuilds and delivers after 09:30,
+  retrying every 10 minutes until Slack accepts it.
 - **Watcher** (every 2 min): new Slack mentions, DMs to you, inbox mail including
   already-read mail, and Jira issues assigned to you. Every new item waits as Inbox and
   gets a DM with **Add to list** / **Not a task**; the click updates that DM with the
@@ -43,7 +45,8 @@ Gmail, Jira and Google Calendar.
   Your command replies go to your DM, not the channel; channel replies to anyone else
   stay in the triggering thread. Only you can change your ledger.
   Anyone can set a private
-  reminder for themselves or a teammate — those never enter your ledger.
+  reminder for themselves or a teammate — it never becomes a task for the sender;
+  the recipient gets it on their own list as a reminder row.
   Tagged messages work in plain language too (`please mark the deck done`,
   `can you remind xieyi he owes me the gameplan`), with typo-tolerant commands
   and names. An ambiguous `by Friday 2pm` asks **Now / At Friday / Both** with

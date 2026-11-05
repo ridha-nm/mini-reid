@@ -140,6 +140,10 @@ join link, and "Are you attending?". Reply `yes`, `no <reason>`, or `moved` /
 recorded in `meeting_reminders.json` and confirmed in the DM. Slack keeps the schedule,
 so a sleeping Mac does not lose it. Each meeting is reminded once.
 
+The 09:15 job writes `digest_delivered.json` only after Slack accepts the DM. If it
+failed (DNS down, Mac asleep), the watcher rebuilds and delivers after 09:30, retrying
+every 10 minutes until the marker is today's.
+
 A separate overdue nudge runs once a day, on the first watcher cycle after 09:00, and
 uses the same row renderer as the digest, link included. Only a real past due date or a
 stalled status counts as overdue; undated rows stay in No date.
@@ -226,8 +230,9 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
 - Anyone who tags or DMs the bot can set a reminder for themselves or any teammate in
   the Pantas workspace: `remind me …`, `remind @Arman …`, `remind Arman Rahman …`,
   `add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed
-  reminders are scheduled in Slack (server-side), stay private, and never enter Ridha's
-  ledger or digest. An unknown name gets a reply, never a silent reminder to the sender.
+  reminders are scheduled in Slack (server-side). Only the recipient gets the reminder
+  row; it is not a task for the sender. An unknown name gets a reply, never a silent
+  reminder to the sender.
   A successful reminder is acknowledged with a ⏰ reaction on the command message.
 - `list` numbers open items; `#N` works with `combine`, `done`, `due`, `snooze`, `drop`,
   `waiting`, `not`, `status` and `edit`. Each row also carries a stable short id
@@ -296,7 +301,7 @@ Rebuild nightly at 02:00, incremental.
 | P3 Slack bot, acknowledgements | done |
 | P4 closure proposals | partial: proposals exist, confirmation via `done:` |
 | P5 grounded Q&A | done, extractive |
-| P6 learning from corrections | done: `not:` feeds the prompt |
+| P6 learning from corrections | done: `not:` feeds the local classifier |
 | P7 stock-take hub | not started |
 
 ## Acceptance criteria
