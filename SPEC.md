@@ -161,7 +161,8 @@ row ticked or none; Slack has no shift-select.
 
 ## Bot commands
 
-`add:`, `task:`, `todo:`, `assign: <person> <what>`, `reassign: <item> to <person>`,
+`add:`, `task:`, `todo:`, `assign: <person> <what>` (a row ref such as
+`eb8263` or `#7` reassigns that row), `reassign: <item> to <person>`,
 `note that`, `status: <item> in progress | blocked | open`,
 `priority: <item> 1-5 | high | medium | low | none`, `tonote: <item>` (or `convert:`),
 `combine: <duplicate> into <keep>`, `uncombine: <keep>`, `undo:`, `done:`, `due:`,

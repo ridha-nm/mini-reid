@@ -2,6 +2,15 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (assign by row id no longer creates id-titled tasks)
+
+- `assign: @Person eb8263` (or `#7`, `id:abc1`) now reassigns the matching
+  existing row instead of creating a task literally titled `eb8263`. An unknown
+  id gets an error and creates nothing.
+- Removed the four junk rows this produced in the owner and Charanya ledgers;
+  the two intended rows (`eb8263`, `1290b3`) are now assigned to Charanya.
+- 284 tests passing.
+
 ## 2026-11-05 (select all in the triage modal)
 
 - The triage modal has **Select all** and **Clear** buttons. Select all rebuilds

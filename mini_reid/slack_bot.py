@@ -1389,6 +1389,20 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
             return "Use: assign: @Kasib send the deck by Friday"
         person = _person_name(m.group(1), users)
         what = m.group(2).strip()
+        # `assign: @X 1290b3` on an existing row is a reassignment, not a new
+        # task titled with the id. Never create an id-titled row.
+        if re.fullmatch(r"(?:#\d+|(?:id:)?[0-9a-f]{4,40})", what, re.I):
+            row, _err = _pick(rows, what)
+            if not row:
+                return (f"No open item matches {what}. "
+                        f"For a new task use: assign: @{person} <task>")
+            row["direction"] = "owed_to_me"
+            row["assigned_to"] = person[:40]
+            row["asker"] = person[:40]
+            row["via"] = "reassigned"
+            row["last_activity"] = now.isoformat()
+            save(ledger_path, rows)
+            return f"Reassigned to {person}: {row['what'][:80]}"
         due, confidence = parse_due(what, now)
         row = {
             "id": commitment_id("manual", f"assign:{body}".lower(), what),
