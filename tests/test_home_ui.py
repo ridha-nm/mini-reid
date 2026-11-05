@@ -34,12 +34,17 @@ def test_home_survives_an_empty_ledger():
     assert "0 open" in str(blocks)
 
 
-def test_access_request_carries_an_authorise_button():
-    blocks = access_request_blocks("U2")
-    assert "Access request" in str(blocks)
-    button = blocks[1]["elements"][0]
+def test_access_request_carries_details_and_authorise_button():
+    blocks = access_request_blocks("U2", {
+        "name": "Charanya Nair", "email": "charanya@pantas.com",
+        "jira": "charanya"})
+    text = str(blocks)
+    assert "Charanya Nair" in text
+    assert "charanya@pantas.com" in text
+    button = blocks[2]["elements"][0]
     assert button["action_id"] == "approve_access"
     assert button["value"] == "U2"
+    assert "setup" in button["text"]["text"]
 
 
 def test_public_home_explains_setup_and_offers_access():

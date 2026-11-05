@@ -9,9 +9,10 @@ Append-only. Newest first.
   **Refresh** and quick commands. It no longer dumps the whole task list.
   Members see their own ledger; anyone not authorised sees a capabilities page
   with **Request access** and **Message Ridha**. Request access DMs Ridha with
-  an **Authorise** button; one click runs the normal `allow:` setup and sends
-  the requester their link. The requester also gets a confirmation. No other
-  ledger is exposed.
+  the captured Slack/name/email/Jira details and an **Authorise and send setup**
+  button; one click runs the normal `allow:` setup and sends the requester their
+  link. The requester gets a confirmation, and Ridha gets a second DM when
+  Google setup actually completes. No other ledger is exposed.
 - `app_home_opened` event subscribed; the owner Home view is published now.
 - 335 tests passing.
 

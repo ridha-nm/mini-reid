@@ -2840,9 +2840,18 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     clicker = (payload.get("user") or {}).get("id") or ""
                     if clicker and env.get("SLACK_OWNER_ID"):
                         try:
+                            from .directory import lookup as directory_lookup
+
+                            info = directory_lookup(clicker)
+                            details = {
+                                "name": info.get("real_name") or info.get("name"),
+                                "email": info.get("email"),
+                                "jira": info.get("jira_name"),
+                            }
                             send_dm_to(env, env["SLACK_OWNER_ID"],
                                        f"Access request from <@{clicker}>",
-                                       blocks=access_request_blocks(clicker))
+                                       blocks=access_request_blocks(clicker,
+                                                                    details))
                             send_dm_to(env, clicker,
                                        "Request sent. Ridha will set you up.")
                         except Exception as ex:  # noqa: BLE001 - best effort

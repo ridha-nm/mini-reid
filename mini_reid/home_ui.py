@@ -49,15 +49,26 @@ def _focus_line(row: dict, now: datetime) -> str:
     return f"• *{title}*" + (f" — {when}" if when else "") + tail
 
 
-def access_request_blocks(user: str) -> list[dict]:
+def access_request_blocks(user: str, details: dict | None = None) -> list[dict]:
+    details = details or {}
+    fields = [
+        {"type": "mrkdwn", "text": f"*Slack*\n<@{user}>"},
+        {"type": "mrkdwn",
+         "text": f"*Name*\n{details.get('name') or 'unknown'}"},
+        {"type": "mrkdwn",
+         "text": f"*Email*\n{details.get('email') or 'not in directory'}"},
+        {"type": "mrkdwn",
+         "text": f"*Jira*\n{details.get('jira') or 'not in directory'}"},
+    ]
     return [
         {"type": "section",
          "text": {"type": "mrkdwn",
                   "text": f"*Access request*\n<@{user}> is asking for their own "
-                          "Mini-Reid."}},
+                          "Mini-Reid. Details captured below."}},
+        {"type": "section", "fields": fields},
         {"type": "actions", "elements": [{
             "type": "button", "action_id": "approve_access", "value": user,
-            "text": {"type": "plain_text", "text": "Authorise"},
+            "text": {"type": "plain_text", "text": "Authorise and send setup"},
             "style": "primary",
         }]},
     ]
