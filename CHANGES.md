@@ -17,7 +17,7 @@ Append-only. Newest first.
 - Rules only: no model, no network. The model still only rewrites the title and
   never decides. Existing rows are not migrated. The owner and every allowlisted
   member run the same rules against their own ledger.
-- 373 tests passing.
+- 378 tests passing.
 
 ## 2026-11-05 (link unfurls)
 
