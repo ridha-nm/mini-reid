@@ -179,7 +179,8 @@ ledger), `reassign: <item> to <person>`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
 ignores that title), `remind` (absolute or `in 2 minutes`),
 `ask:` (pending/open/due/task questions use the ledger with a client filter;
-otherwise owner tries live Slack Real-time Search, then the local KB),
+then ingested Slack files; then owner live Slack Real-time Search; then the
+local KB),
 `find:`, `list`, `notes`, `meet: @Name about <topic>`, `allow: @Name`,
 `banter on|off|status`, `help`, `/mini-reid` (list/help ephemeral, other commands
 in DM). `meet:` accepts one or more attendees

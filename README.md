@@ -79,8 +79,8 @@ Gmail, Jira and Google Calendar.
   stocktake-hub config.
 - **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
   local documents. `ask:` answers pending/open/due questions from the ledger first,
-  filtered by client; other questions use live Slack Real-time Search (channel,
-  text, permalink), then fall back to the local passages.
+  then ingested Slack files (PDF, DOCX, XLSX, text), then live Slack Real-time
+  Search, then the local passages.
 - **App Home**: per-person dashboard with a table of 10 task stats, today's
   meetings, top 3 focus items, Open Slack List, Triage Inbox and Refresh. Non-authorised users get a capabilities page with
   **Request access** (DMs you an **Authorise** button) and **Message Ridha**,

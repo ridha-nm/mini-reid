@@ -2405,6 +2405,20 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             except Exception as ex:  # noqa: BLE001 - fall through to search/KB
                 print(f"  ledger ask failed: {type(ex).__name__}: {ex}",
                       flush=True)
+            if not reply:
+                try:
+                    from .files import search as file_search
+
+                    file_hits = file_search(body)
+                    if file_hits:
+                        reply = "*From files*\n" + "\n".join(
+                            f"• *{h['name']}*: {h['text'][:300]}" +
+                            (f" — <{h['permalink']}|open>"
+                             if h.get("permalink") else "")
+                            for h in file_hits)
+                except Exception as ex:  # noqa: BLE001 - files are optional
+                    print(f"  file ask failed: {type(ex).__name__}: {ex}",
+                          flush=True)
             if not reply and user == owner:
                 try:
                     from .slack_search import format_hits, search as slack_search
@@ -3244,6 +3258,17 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                                              thread_ts=msg_ts or None)
             return
         event = (req.payload or {}).get("event") or {}
+        if event.get("type") == "file_shared":
+            from .files import ingest
+
+            try:
+                record = ingest(env, event.get("file_id") or "")
+                if record:
+                    print(f"  file ingested: {record['name']}", flush=True)
+            except Exception as ex:  # noqa: BLE001 - file must not stop the bot
+                print(f"  file ingest failed: {type(ex).__name__}: {ex}",
+                      flush=True)
+            return
         if event.get("type") == "app_home_opened":
             publish_home(event.get("user") or "")
             return

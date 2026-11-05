@@ -2,6 +2,18 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (Slack file ingestion)
+
+- `file_shared` events download the file, extract text and save it under
+  `data/slack_files/` for the KB and `ask:` search.
+- Parsers: plain text/markdown/CSV/JSON, PDF via `pdftotext`, DOCX and XLSX via
+  their XML. Unsupported types are skipped.
+- `ask:` checks ingested files before live Slack search and the local KB, with
+  file name, snippet and Slack permalink.
+- Bot scope `files:read`; event `file_shared`. Live upload test ingested and
+  searched correctly, then cleaned up.
+- 356 tests passing.
+
 ## 2026-11-05 (Do Not Disturb quiet hours)
 
 - Overdue nudges, stale nudges and local reminders can check Slack DND for the
