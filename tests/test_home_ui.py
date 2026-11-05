@@ -6,19 +6,31 @@ MYT = timezone(timedelta(hours=8))
 NOW = datetime(2026, 11, 5, 19, 0, tzinfo=MYT)
 
 
-def test_home_shows_tasks_and_buttons():
+def test_home_shows_counts_focus_and_buttons():
     rows = [{"id": "a1", "what": "Send the deck", "status": "open",
              "created_at": "2026-11-05T09:00:00+08:00"}]
     blocks = home_blocks(rows, NOW, "https://slack/lists/T1/F1")
     text = str(blocks)
+    assert "1 open" in text
     assert "Send the deck" in text
     assert "Open Slack List" in text
+    assert "Triage Inbox" in text
     assert "home_refresh" in text
+
+
+def test_home_shows_only_three_focus_items():
+    rows = [{"id": f"a{i}", "what": f"Task {i}", "status": "open",
+             "due": "2026-11-01", "created_at": "2026-11-05T09:00:00+08:00"}
+            for i in range(5)]
+    text = str(home_blocks(rows, NOW))
+    assert "Task 0" in text and "Task 2" in text
+    assert "Task 3" not in text
 
 
 def test_home_survives_an_empty_ledger():
     blocks = home_blocks([], NOW)
-    assert "Nothing open." in str(blocks)
+    assert "Nothing urgent." in str(blocks)
+    assert "0 open" in str(blocks)
 
 
 def test_public_home_explains_setup_without_exposing_a_ledger():

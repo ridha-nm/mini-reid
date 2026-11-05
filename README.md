@@ -78,8 +78,8 @@ Gmail, Jira and Google Calendar.
   local documents. `ask:` answers pending/open/due questions from the ledger first,
   filtered by client; other questions use live Slack Real-time Search (channel,
   text, permalink), then fall back to the local passages.
-- **App Home**: opening Mini-Reid shows your tasks, Inbox, Notes, an Open Slack List
-  link and Refresh. Non-authorised users get a setup page, never another ledger.
+- **App Home**: per-person dashboard with counts, top 3 focus items, Open Slack List,
+  Triage Inbox and Refresh. Non-authorised users get a setup page, never another ledger.
 - **Slack List mirror**: each user's ledger is mirrored into a native Slack List with
   title, status, due and source; created once and updated every watcher cycle.
   `list` includes an **Open Slack List** button. Edits in the List flow back to
