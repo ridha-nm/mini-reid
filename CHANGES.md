@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (new assignments no longer fall off `list`)
+
+- `list` cut at 25 rows; a new undated assignment sat at position 28 and was
+  invisible. Limit is now 40 and undated rows are newest-first. Charanya's
+  resume/assessment assignment now shows in the list.
+- 295 tests passing.
+
 ## 2026-11-05 (reminders appear on the list)
 
 - A reminder — yours or one someone sets for you — is now added to the

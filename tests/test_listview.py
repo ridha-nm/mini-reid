@@ -79,6 +79,22 @@ def test_due_dates_read_relative():
     assert "in 2d" in text
 
 
+def test_new_undated_item_is_not_cut_from_a_long_list():
+    rows = [_row(f"old{i:02d}", f"Old thing {i}",
+                 created_at=f"2026-10-{i + 1:02d}T09:00:00+08:00")
+            for i in range(30)]
+    rows.append(_row("new1", "New assignment", created_at="2026-11-05T15:28:00+08:00"))
+    text = format_list(rows, NOW)
+    assert "[new1] New assignment" in text
+    assert "… and" not in text
+
+
+def test_undated_items_are_newest_first():
+    rows = [_row("old", "Old", created_at="2026-10-01T09:00:00+08:00"),
+            _row("new", "New", created_at="2026-11-05T09:00:00+08:00")]
+    assert [r["id"] for r in ordered_rows(rows, NOW)] == ["new", "old"]
+
+
 def test_list_line_shows_client_and_priority():
     rows = [_row("a1", "Send the deck", client="eupe", priority=1)]
     line = format_list(rows, NOW)
