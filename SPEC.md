@@ -177,8 +177,9 @@ ledger), `reassign: <item> to <person>`,
 ignores that title), `remind` (absolute or `in 2 minutes`),
 `ask:`, `find:`, `list`, `notes`, `meet: @Name about <topic>`, `allow: @Name`,
 `banter on|off|status`, `help`. `meet:` reads owner + attendee freeBusy, proposes five
-30-minute slots over five working days, then creates the Google event with a Meet link
-and invites the attendee. Requires `calendar.events` consent.
+30-minute slots over five working days with a formal Title/With/Duration block and a
+busy snapshot of both calendars, then creates the Google event with a Meet link and
+invites the attendee. Refresh and Cancel buttons; requires `calendar.events` consent.
 `help` is a topic picker (Capture, Update, Close, Find, Inbox, Reminders, Team,
 Fun) with **My list** and **Triage inbox** buttons, not a command dump.
 

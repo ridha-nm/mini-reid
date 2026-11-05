@@ -2111,8 +2111,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 say(f"I don't have a work email for {attendee}.")
                 _mark(ts)
                 return
+            busy: dict = {}
             try:
-                slots = propose_slots(env, [email])
+                slots = propose_slots(env, [email], busy_out=busy)
             except Exception as ex:  # noqa: BLE001 - tell the owner why
                 say(f"Could not read calendars: {type(ex).__name__}: {ex}")
                 _mark(ts)
@@ -2133,7 +2134,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 state_now["pending_meet"] = dict(list(pending.items())[-50:])
             Path(STATE).write_text(json.dumps(state_now))
             say(f"Free slots with {attendee}:",
-                blocks=slot_blocks(token, topic, attendee, slots))
+                blocks=slot_blocks(token, topic, attendee, slots, email, busy))
             _mark(ts)
             return
 
@@ -2551,6 +2552,45 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
+                if action_id in {"meet_refresh", "meet_cancel"}:
+                    from .meeting_ui import slot_blocks
+                    from .meetings import propose_slots
+
+                    token = action.get("value") or ""
+                    state_now = _state()
+                    pending = (state_now.get("pending_meet") or {}).get(token)
+                    if not pending:
+                        continue
+                    container = payload.get("container") or {}
+                    channel = container.get("channel_id") or ""
+                    msg_ts = container.get("message_ts") or ""
+                    if action_id == "meet_cancel":
+                        state_now["pending_meet"].pop(token, None)
+                        Path(STATE).write_text(json.dumps(state_now))
+                        if channel and msg_ts:
+                            web.chat_update(channel=channel, ts=msg_ts,
+                                            text="Meeting proposal cancelled.")
+                        continue
+                    busy: dict = {}
+                    try:
+                        slots = propose_slots(env, pending["emails"],
+                                              busy_out=busy)
+                    except Exception as ex:  # noqa: BLE001 - keep old message
+                        if channel and msg_ts:
+                            web.chat_update(
+                                channel=channel, ts=msg_ts,
+                                text=f"Could not refresh: {type(ex).__name__}: {ex}")
+                        continue
+                    pending["slots"] = slots
+                    Path(STATE).write_text(json.dumps(state_now))
+                    if channel and msg_ts:
+                        blocks = slot_blocks(
+                            token, pending["topic"], pending["attendee"],
+                            slots, pending["emails"][0], busy)
+                        web.chat_update(channel=channel, ts=msg_ts,
+                                        text=f"Free slots with {pending['attendee']}",
+                                        blocks=blocks)
+                    continue
                 if action_id == "meet_slot":
                     from .meeting_ui import confirmation_blocks
                     from .meetings import create_event

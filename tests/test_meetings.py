@@ -46,9 +46,31 @@ def test_slot_and_confirmation_blocks():
     slots = [{"start": "2026-11-06T11:00:00+08:00",
               "end": "2026-11-06T11:30:00+08:00"}]
     blocks = slot_blocks("tok", "BD Command Centre", "Kasib", slots)
-    assert blocks[1]["accessory"]["action_id"] == "meet_slot"
-    assert blocks[1]["accessory"]["value"] == "tok|2026-11-06T11:00:00+08:00"
-    assert "11:00–11:30" in blocks[1]["text"]["text"]
+    pick = next(b for b in blocks if b.get("accessory"))
+    assert pick["accessory"]["action_id"] == "meet_slot"
+    assert pick["accessory"]["value"] == "tok|2026-11-06T11:00:00+08:00"
+    assert "11:00–11:30" in pick["text"]["text"]
+    assert "BD Command Centre" in str(blocks[1])
+    controls = next(b for b in blocks if b.get("type") == "actions")
+    assert [e["action_id"] for e in controls["elements"]] == [
+        "meet_refresh", "meet_cancel"]
     done = confirmation_blocks("BD Command Centre", slots[0]["start"],
                                slots[0]["end"], "https://meet.google.com/x")
     assert "<https://meet.google.com/x|join>" in done[0]["text"]["text"]
+
+
+def test_slot_blocks_show_both_calendars_busy():
+    from datetime import datetime
+
+    slots = [{"start": "2026-11-06T11:00:00+08:00",
+              "end": "2026-11-06T11:30:00+08:00"}]
+    busy = {
+        "ridha@pantas.com": [(datetime(2026, 11, 6, 9, 0, tzinfo=MYT),
+                              datetime(2026, 11, 6, 10, 0, tzinfo=MYT))],
+        "kasib@pantas.com": [(datetime(2026, 11, 6, 10, 0, tzinfo=MYT),
+                             datetime(2026, 11, 6, 11, 0, tzinfo=MYT))],
+    }
+    text = str(slot_blocks("tok", "BD Command Centre", "Kasib", slots,
+                           "kasib@pantas.com", busy))
+    assert "Availability snapshot" in text
+    assert "09:00–10:00" in text and "10:00–11:00" in text
