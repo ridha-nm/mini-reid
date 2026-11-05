@@ -152,6 +152,9 @@ New items do not enter a digest bucket until confirmed. The capture DM carries o
 section per item with the sender, `via`, an **open source** link and **Add to list** /
 **Not a task** (at most ten per DM); the rest wait in the list Inbox. The header counts unanswered rows as `N to confirm`.
 
+Overdue, stale and local reminder DMs check Slack DND and wait while the
+recipient is in Do Not Disturb.
+
 A stale nudge runs at 18:00: open, in progress, blocked and stalled rows with no
 activity today are DMed, up to five at a time, each with an inline status picker. A row
 is nudged at most three times; a status change through triage or the picker resets the

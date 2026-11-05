@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 346 tests pass.
+overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 350 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
@@ -59,6 +59,8 @@ recorded in `docs/MEMBER_PARITY.md`.
 2026-11-05: `ask:` routes pending/open/due/task questions to the ledger first,
 with count, due and links, filtered by client name; other questions use live
 Slack search then the KB.
+2026-11-05: overdue nudges, stale nudges and local reminders check Slack DND
+(`dnd:read`) and wait while the recipient is in Do Not Disturb.
 2026-11-05: `/mini-reid` slash command: list/help ephemeral; add/remind/meet run
 the normal command path in DM. Registered in Slack.
 2026-11-05: App Home is a per-person dashboard: a Block Kit table with 10 stats,
@@ -313,7 +315,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-346 tests passing as of 2026-11-05.
+350 tests passing as of 2026-11-05.
 
 ## Next, agreed
 

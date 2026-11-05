@@ -123,8 +123,13 @@ def format_alert(rows: list[dict]) -> str:
 
 def fire_reminders(env: dict, ledger_path: str, now: datetime,
                    user_id: str | None = None) -> int:
+    from .quiet import dnd_active
+
     rows = load(ledger_path)
     fired = 0
+    recipient = user_id or env.get("SLACK_OWNER_ID", "")
+    if dnd_active(env, recipient):
+        return 0
     for r in rows:
         if r.get("kind") != "reminder" or r.get("reminded"):
             continue
@@ -429,10 +434,14 @@ def nudge_stale(env: dict, ledger_path: str, now: datetime,
     from .ledger import save
     from .triage_ui import stale_blocks
 
+    from .quiet import dnd_active
+
     state = Path(state_path)
     today = now.date().isoformat()
     seen = json.loads(state.read_text()) if state.exists() else {}
     if now.hour < STALE_NUDGE_HOUR or seen.get("stale_date") == today:
+        return 0
+    if dnd_active(env, user_id or env.get("SLACK_OWNER_ID", "")):
         return 0
     rows = stale_rows(load(ledger_path), now)
     state.write_text(json.dumps({**seen, "stale_date": today}))
@@ -468,10 +477,14 @@ def nudge_overdue(env: dict, ledger_path: str, now: datetime,
     """Once a day after 09:00, restate what is overdue. Silence is how things rot."""
     from .render import _line
 
+    from .quiet import dnd_active
+
     state = Path(state_path)
     today = now.date().isoformat()
     seen = json.loads(state.read_text()) if state.exists() else {}
     if now.hour < 9 or seen.get("overdue_date") == today:
+        return 0
+    if dnd_active(env, user_id or env.get("SLACK_OWNER_ID", "")):
         return 0
     rows = overdue_today(load(ledger_path), now)
     if rows:

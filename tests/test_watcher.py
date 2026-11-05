@@ -133,6 +133,23 @@ def test_stale_nudge_can_go_to_a_member(tmp_path, monkeypatch):
     assert sent[0][2]
 
 
+def test_stale_nudge_waits_out_do_not_disturb(tmp_path, monkeypatch):
+    from mini_reid import watcher as w
+    from mini_reid.ledger import load, save
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("mini_reid.quiet.dnd_active", lambda env, user: True)
+    sent = []
+    monkeypatch.setattr(w, "send_dm", lambda env, text, blocks=None: sent.append(text))
+    save("ledger.json", [{"id": "a", "what": "Old thing", "status": "open",
+                          "last_activity": "2026-10-28T09:00:00+08:00"}])
+    state = str(tmp_path / "state.json")
+    assert w.nudge_stale({}, "ledger.json", NOW.replace(hour=19), state) == 0
+    assert sent == []
+    assert not (tmp_path / "state.json").exists()
+    assert load("ledger.json")[0].get("nudges", 0) == 0
+
+
 def test_stale_nudge_asks_once_a_day_and_counts_up(tmp_path, monkeypatch):
     from mini_reid import watcher as w
     from mini_reid.ledger import load, save
