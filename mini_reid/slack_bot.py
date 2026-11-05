@@ -25,7 +25,7 @@ LEADING_MENTION = re.compile(
 COMMANDS = {"add", "note", "notes", "assign", "reassign", "done", "drop", "due",
             "snooze", "waiting", "find", "list", "not", "remind", "edit", "status",
             "priority", "prio", "combine", "uncombine", "convert", "tonote", "undo",
-            "allow", "setup", "clients", "reminders"}
+            "allow", "setup", "clients", "reminders", "meet"}
 MUTATING = {"add", "note", "assign", "reassign", "done", "drop", "due", "snooze",
             "waiting", "not", "remind", "edit", "status", "priority", "prio",
             "combine", "uncombine", "convert", "tonote"}
@@ -636,6 +636,7 @@ HELP = """*Mini-Reid commands*
 • Every `list` row has a stable id: `abc123` or `id:abc123` works in every command
 • `drop: Eupe waste` — remove it quietly (`remove:` and `delete:` work too)
 • `not: anything that is not part c` — wrong item, teach it to ignore this kind
+• `meet: @Kasib about BD Command Centre` — free slots, then create the event
 • `remind me to send the deck tomorrow at 3pm` — a timed DM; no time means now
 • `remind @Arman to send the deck at 3pm` — DM someone else (anyone can set these)
 • `reminders` — audit log of reminders sent, pending, and whether the DM got replies
@@ -702,6 +703,20 @@ def split_target(body: str, users: dict[str, str], sender: str,
             rest = re.sub(r"^that\s+", "", rest, flags=re.I)
             return users[hit[0]], rest.strip()
     return None, text
+
+
+def parse_meeting(body: str, users: dict[str, str],
+                  sender: str) -> tuple[str | None, str]:
+    """'Kasib to discuss BD' -> (slack id, 'BD')."""
+    text = re.sub(r"^with\s+", "", (body or "").strip(), flags=re.I)
+    target, rest = split_target(text, users, sender, bare_name=True)
+    if not target:
+        return None, ""
+    topic = re.sub(r"^(?:to\s+)?(?:discuss|talk\s+about|review|about|re)\s*:?\s*",
+                   "", rest or "", flags=re.I).strip()
+    if not topic:
+        topic = f"Meeting with {_person_name(target, users)}"
+    return target, topic[:200]
 
 
 def unresolved_recipient(body: str, users: dict[str, str]) -> str | None:
@@ -991,7 +1006,7 @@ def parse_command(text: str, bot_user_id: str = "") -> tuple[str, str]:
     m = re.match(
         r"^(add|task|todo|to-do|note|assign|reassign|done|drop|remove|delete|due|"
         r"snooze|waiting|"
-        r"find|not|remind|ask|edit|status|priority|prio|combine|uncombine|"
+        r"find|not|remind|meet|ask|edit|status|priority|prio|combine|uncombine|"
         r"convert|tonote|undo|allow)\s*:\s*(.*)$", body, re.I | re.S)
     if m:
         act = m.group(1).lower()
@@ -1014,6 +1029,11 @@ def parse_command(text: str, bot_user_id: str = "") -> tuple[str, str]:
     m = re.match(r"^note\s+(?:that\s+)?(.+)$", body, re.I)
     if m:
         return "note", m.group(1).strip()
+    m = re.match(
+        r"^(?:set\s+up\s+|schedule\s+|set\s+)?(?:a\s+)?(?:meeting|meet)\s+with\s+(.+)$",
+        body, re.I)
+    if m:
+        return "meet", m.group(1).strip()
 
     natural = natural_command(body)
     if natural:
@@ -2071,6 +2091,52 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         # Catch-up replays missed commands too, not only questions. Each
         # message is claimed once in bot_state.json, so a replay cannot repeat.
 
+        if action == "meet":
+            if user != owner:
+                say("Only Ridha can schedule meetings.")
+                _mark(ts)
+                return
+            target, topic = parse_meeting(body, users, user)
+            if not target:
+                say("Use: meet: @Kasib about BD Command Centre")
+                _mark(ts)
+                return
+            from .directory import lookup as directory_lookup
+            from .meeting_ui import slot_blocks
+            from .meetings import propose_slots
+
+            attendee = _person_name(target, users)
+            email = (directory_lookup(target).get("email") or "").lower()
+            if not email:
+                say(f"I don't have a work email for {attendee}.")
+                _mark(ts)
+                return
+            try:
+                slots = propose_slots(env, [email])
+            except Exception as ex:  # noqa: BLE001 - tell the owner why
+                say(f"Could not read calendars: {type(ex).__name__}: {ex}")
+                _mark(ts)
+                return
+            if not slots:
+                say(f"No common free slot with {attendee} in the next 5 working days.")
+                _mark(ts)
+                return
+            from secrets import token_hex
+
+            token = token_hex(6)
+            state_now = _state()
+            pending = state_now.setdefault("pending_meet", {})
+            pending[token] = {"topic": topic, "emails": [email],
+                              "attendee": attendee, "slots": slots,
+                              "user": user, "channel": channel}
+            if len(pending) > 50:
+                state_now["pending_meet"] = dict(list(pending.items())[-50:])
+            Path(STATE).write_text(json.dumps(state_now))
+            say(f"Free slots with {attendee}:",
+                blocks=slot_blocks(token, topic, attendee, slots))
+            _mark(ts)
+            return
+
         if action == "setup":
             if user == owner:
                 say("Use `allow: Name` to set someone else up.")
@@ -2485,6 +2551,48 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
+                if action_id == "meet_slot":
+                    from .meeting_ui import confirmation_blocks
+                    from .meetings import create_event
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    value = action.get("value") or ""
+                    token, _, start = value.partition("|")
+                    state_now = _state()
+                    pending = (state_now.get("pending_meet") or {}).get(token)
+                    if not pending or clicker != pending.get("user"):
+                        continue
+                    slot = next((s for s in pending["slots"]
+                                 if s["start"] == start), None)
+                    container = payload.get("container") or {}
+                    channel = container.get("channel_id") or ""
+                    msg_ts = container.get("message_ts") or ""
+                    if not slot:
+                        continue
+                    try:
+                        event = create_event(env, pending["topic"],
+                                             slot["start"], slot["end"],
+                                             pending["emails"])
+                    except Exception as ex:  # noqa: BLE001 - report, do not crash
+                        message = (f"Could not create the meeting: "
+                                   f"{type(ex).__name__}: {ex}\n"
+                                   "If this is a permission error, run "
+                                   "`.venv/bin/python -m mini_reid.google_auth` "
+                                   "and try again.")
+                        if channel and msg_ts:
+                            web.chat_update(channel=channel, ts=msg_ts,
+                                            text=message)
+                        continue
+                    state_now["pending_meet"].pop(token, None)
+                    Path(STATE).write_text(json.dumps(state_now))
+                    link = event.get("hangoutLink") or event.get("htmlLink") or ""
+                    blocks = confirmation_blocks(
+                        pending["topic"], slot["start"], slot["end"], link)
+                    text = blocks[0]["text"]["text"]
+                    if channel and msg_ts:
+                        web.chat_update(channel=channel, ts=msg_ts,
+                                        text=text, blocks=blocks)
+                    continue
                 if action_id in {"help_topic", "help_home"}:
                     from .help_ui import home_blocks, topic_blocks, topic_text
 

@@ -44,6 +44,9 @@ picker, at most three times. `done`/`not` accept bulk refs (`7, 9`, `#7 #9`,
 are replayed; live messages still advance `last_ts`. Remaining build phases are in
 `SPEC.md`: P2 cycles, P4 closure confirmation, P7 stock-take hub.
 
+2026-11-05: `meet:` (or plain "set meeting with X to discuss Y") checks both
+calendars with freeBusy, offers five 30-minute slots, and creates the Google event
+with a Meet link and attendee invite. Requires `calendar.events` consent.
 2026-11-05: `help` is a topic picker with My list / Triage buttons; every channel
 reply stays in the triggering thread; pasted `done:`/`not:` lists match tasks and
 notes (including notes that start with `9. [abc123]`); a reminder adds an open

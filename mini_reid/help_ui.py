@@ -48,6 +48,14 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
          "**Select all** / **Clear** in the triage modal",
          "Unanswered rows wait in the Inbox section of `list`"],
     ),
+    "meet": (
+        "Schedule a meeting",
+        "I read both calendars and offer free slots, then create the event and invite.",
+        ["`meet: @Kasib about BD Command Centre`",
+         "or just `set meeting with Kasib to discuss BD Command Centre`",
+         "I propose five 30-minute slots in the next five working days",
+         "Pick a slot — Google Calendar event + Meet link + invite sent"],
+    ),
     "remind": (
         "Reminders and meetings",
         "Timed DMs, other people, and meeting replies.",

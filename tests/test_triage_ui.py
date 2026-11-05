@@ -161,9 +161,11 @@ def test_stale_value_round_trips_row_and_status():
 def test_stale_blocks_offer_a_status_picker_per_task():
     from mini_reid.triage_ui import stale_blocks
 
-    blocks = stale_blocks([_row("aaaa11", "Send the deck", due="2026-11-01")])
+    blocks = stale_blocks([_row("aaaa11", "Send the deck", due="2026-11-01",
+                                source_link="https://x/1")])
     picker = blocks[0]["accessory"]
     assert picker["action_id"] == "stale_set"
+    assert "<https://x/1|open source>" in blocks[0]["text"]["text"]
     assert picker["options"][0]["value"] == "aaaa11|open"
     assert [o["value"].split("|")[1] for o in picker["options"]] == [
         "open", "in progress", "done", "blocked", "dropped"]

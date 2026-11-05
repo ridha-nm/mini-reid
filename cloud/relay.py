@@ -19,6 +19,7 @@ SCOPES = " ".join([
     "openid", "email",
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/calendar.readonly",
+    "https://www.googleapis.com/auth/calendar.events",
 ])
 STORE: dict[str, dict] = {}
 LOCK = threading.Lock()
