@@ -13,6 +13,10 @@ Append-only. Newest first.
   (last 50).
 - `list` replies now carry an **Open Slack List** button that deep-links to that
   user's native list next to **Triage & update**.
+- Two-way sync: editing title, status or due in the Slack List updates the
+  ledger on the next watcher cycle. Deleting a row in Slack, or setting it to
+  Not a task, drops the ledger row. Dropped and Inbox rows are deleted from the
+  Slack List, not shown.
 - Bot scopes `lists:read` / `lists:write`; live list created for Ridha.
 - 329 tests passing.
 

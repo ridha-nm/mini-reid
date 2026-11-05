@@ -79,7 +79,8 @@ Gmail, Jira and Google Calendar.
   permalink), then falls back to the local passages.
 - **Slack List mirror**: each user's ledger is mirrored into a native Slack List with
   title, status, due and source; created once and updated every watcher cycle.
-  `list` includes an **Open Slack List** button.
+  `list` includes an **Open Slack List** button. Edits in the List flow back to
+  the ledger; deleting a row there drops the task; non-tasks are removed.
 
 ## Run
 
