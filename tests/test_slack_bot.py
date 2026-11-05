@@ -632,8 +632,9 @@ def test_owner_can_speak_plainly_but_questions_stay_questions():
 def test_plain_sentence_becomes_a_note():
     from mini_reid.slack_bot import other_note
 
-    note = other_note("unknown", "please remind ridha to send the deck", "U999")
-    assert note == "from <@U999>: please remind ridha to send the deck"
+    assert other_note("unknown", "please remind ridha to send the deck",
+                      "U999") is None
+    assert other_note("unknown", "drive the car", "U999") is None
 
 
 def test_help_lists_commands(tmp_path):
@@ -1186,6 +1187,8 @@ def test_play_reply_hugs_and_high_fives():
     assert play_reply("give @Nobody a hug", {}) is None
     assert play_reply("@mini-reid high-five @Julian", {"julian": "U9"}) == (
         "🙌 *<@U9>* — up high.")
+    assert play_reply("<@UBOT> pls give ridha a hug", {"ridha": "U1"}) == (
+        "🤗 *<@U1>* gets a hug.")
     assert play_reply("give the deck a hug", {}) is None
 
 

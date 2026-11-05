@@ -2,6 +2,16 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (bare-name play, and chatter is not noted)
+
+- `give ridha a hug` now works without an `@` or a Slack mention; the play
+  matcher accepts bare names known from the workspace.
+- Bot-addressed chatter from other people ("drive the car") is answered with the
+  default line and no longer copied into Ridha's ledger as a note. Only explicit
+  commands from others are relayed.
+- Removed the stale notes created by the hug and drive-the-car messages.
+- 286 tests passing.
+
 ## 2026-11-05 (play requests work when tagged)
 
 - `@mini-reid high-five @Julian` now works. The play matcher sees the mention

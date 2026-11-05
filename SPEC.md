@@ -187,6 +187,8 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
   The list's **Triage & update** modal can settle unanswered rows.
 - The owner mutates `ledger.json`; an allowlisted member mutates only their own
   `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
+- Bot-addressed chatter from a non-owner is answered with the default line and never
+  stored as a note. Only an explicit command from someone else is relayed to Ridha.
 - `allow: @Name` is owner-only. It writes `users.json`, creates the member's isolated
   paths, and DMs a one-time setup link. Re-running it resends the link until setup is
   complete. Non-allowlisted users keep the old note-to-Ridha path; they cannot use
