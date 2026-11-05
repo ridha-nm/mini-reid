@@ -2,6 +2,15 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (meeting moved replies)
+
+- A meeting reminder can now be answered with `moved`, `rescheduled`,
+  `postponed`, `time changed`, or a phrase such as "it might have moved to
+  3pm". The meeting is marked `moved`, the note is stored, and the DM confirms.
+- The reminder text lists `yes`, `no <reason>` and `moved`.
+- Same parser and member state path for the owner and every authorised member.
+- 276 tests passing.
+
 ## 2026-11-05 (mass done from a pasted list)
 
 - `done:` and `not:` accept a pasted digest/list: one bullet per line, metadata

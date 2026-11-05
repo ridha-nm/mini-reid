@@ -14,7 +14,7 @@ Everything runs locally on the Mac. Nothing is stored in the cloud.
 ## Resume here
 
 2026-11-03: 09:15 digest includes today's meetings; the watcher sends 10-minute meeting
-DMs (reply `yes` or `no <reason>`), polls DMs the bot is not in for `remind`, and ignores
+DMs (reply `yes`, `no <reason>` or `moved`), polls DMs the bot is not in for `remind`, and ignores
 `bd-triager-agent`. Tasks carry `open` / `in progress` / `blocked`, priority 1-5, stable
 ids, combine/uncombine and 10-deep undo. Notes have their own list; `assign:` and
 `reassign:` track what others owe. Banter is off by default and auto-arms for five
@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Knight Frank, Allianz, Setia and Eupe. 274 tests pass.
+overridden to Knight Frank, Allianz, Setia and Eupe. 276 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
@@ -180,7 +180,8 @@ client name, relative due, sender and channel, source time, link. Email senders 
 their address; a rewritten Slack title quotes the original message.
 
 The watcher schedules a DM 10 minutes before each meeting with the join link and "Are
-you attending?". Reply `yes` or `no <reason>`; it is recorded in
+you attending?". Reply `yes`, `no <reason>`, or `moved` / `rescheduled` /
+`postponed` (a note like "moved to 3pm" is kept); it is recorded in
 `meeting_reminders.json` and confirmed in the DM. Slack keeps the schedule, so the Mac
 can sleep. A single-instance lock (`.watcher.lock`) stops overlapping runs from
 scheduling duplicates.
@@ -263,7 +264,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-274 tests passing as of 2026-11-05.
+276 tests passing as of 2026-11-05.
 
 ## Next, agreed
 

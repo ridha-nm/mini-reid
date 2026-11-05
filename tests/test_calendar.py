@@ -90,6 +90,38 @@ def test_meeting_reply_records_yes_and_no_with_reason(tmp_path):
     assert saved["reason"] == "client call"
 
 
+def test_meeting_reply_records_moved_with_a_note(tmp_path):
+    import json
+
+    from mini_reid.watcher import record_meeting_reply
+
+    state = {"date": "2026-11-02", "meetings": {
+        "m1": {"title": "Eupe catch-up", "status": "scheduled",
+               "start": "2026-11-02T09:10:00+08:00"}}}
+    path = tmp_path / "meetings.json"
+    path.write_text(json.dumps(state))
+    assert record_meeting_reply("it might have moved to 3pm", NOW, str(path)) == (
+        "Marked as moved: Eupe catch-up — to 3pm")
+    saved = json.loads(path.read_text())["meetings"]["m1"]
+    assert saved["status"] == "moved"
+    assert saved["note"] == "to 3pm"
+
+
+def test_meeting_reply_understands_rescheduled_and_postponed(tmp_path):
+    import json
+
+    from mini_reid.watcher import record_meeting_reply
+
+    for text in ("rescheduled", "postponed to tomorrow"):
+        state = {"date": "2026-11-02", "meetings": {
+            "m1": {"title": "Eupe catch-up", "status": "scheduled",
+                   "start": "2026-11-02T09:10:00+08:00"}}}
+        path = tmp_path / "meetings.json"
+        path.write_text(json.dumps(state))
+        assert record_meeting_reply(text, NOW, str(path)).startswith(
+            "Marked as moved: Eupe catch-up")
+
+
 def test_meeting_reply_ignores_text_with_no_nearby_meeting(tmp_path):
     from mini_reid.watcher import record_meeting_reply
 
