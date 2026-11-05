@@ -6,7 +6,8 @@ Append-only. Newest first.
 
 - `meet: @Kasib about BD Command Centre`, or plain `set meeting with Kasib to
   discuss BD Command Centre`, reads both calendars and offers five 30-minute
-  slots in the next five working days, 09:00–18:00 MYT.
+  slots in the next five working days, 09:00–18:00 MYT, as Pick buttons in the
+  DM ("both free" per slot).
 - Picking a slot creates the Google Calendar event, adds a Meet link and invites
   the attendee (`sendUpdates=all`).
 - `calendar.events` added to owner consent and the member relay.
