@@ -154,7 +154,7 @@ is nudged at most three times; a status change through triage or the picker rese
 count. Inbox rows are never nudged as stale or overdue.
 
 `list` is grouped as In progress / Blocked / Overdue / Due today / This week / Later /
-No date, followed by Inbox and Notes. The reply carries a **Triage & update** button that opens a
+No date (newest first), followed by Inbox and Notes, up to 40 rows. The reply carries a **Triage & update** button that opens a
 modal: select rows (checkboxes chunked ten per Slack block, at most forty selectable),
 choose one status, apply once. **Select all** / **Clear** rebuild the modal with every
 row ticked or none; Slack has no shift-select. Long lists split across section

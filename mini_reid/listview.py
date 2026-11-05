@@ -42,8 +42,10 @@ def ordered_rows(rows: list[dict], now: datetime) -> list[dict]:
     live = [r for r in rows if (r.get("status") or "open").lower() in LIVE
             and r.get("kind") != "note"]
     order = [key for key, _ in BUCKETS]
-    # No id tiebreak: the sort stays stable, so equal rows keep ledger order.
-    return sorted(live, key=lambda r: (
+    # Newest first inside a bucket; the stable sort keeps that tie-break.
+    # Without this, a new undated assignment sits at the end and gets cut.
+    newest = sorted(live, key=lambda r: r.get("created_at") or "", reverse=True)
+    return sorted(newest, key=lambda r: (
         order.index(_bucket(r, now.date())),
         r.get("priority") if isinstance(r.get("priority"), int) else 99,
         r.get("due") or "9999-12-31",
@@ -90,7 +92,7 @@ def _line(number: int, row: dict, today: date) -> str:
     return " ".join(parts) + _ref(row)
 
 
-def format_list(rows: list[dict], now: datetime, limit: int = 25) -> str:
+def format_list(rows: list[dict], now: datetime, limit: int = 40) -> str:
     """Numbered, grouped text version. Same numbering as `ordered_rows`."""
     ordered = ordered_rows(rows, now)
     inbox = [r for r in rows if (r.get("status") or "").lower() == "inbox"]
