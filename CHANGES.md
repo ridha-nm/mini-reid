@@ -4,11 +4,12 @@ Append-only. Newest first.
 
 ## 2026-11-05 (Do Not Disturb quiet hours)
 
-- Overdue nudges, stale nudges and local reminders now check Slack DND for the
-  recipient and stay silent while it is on. The date marker is not written, so
-  the nudge retries after DND ends.
+- Overdue nudges, stale nudges and local reminders can check Slack DND for the
+  recipient and stay silent while it is on. The gate is **off by default** now;
+  set `RESPECT_DND=1` to enable. When on, the date marker is not written, so the
+  nudge retries after DND ends.
 - Bot scope `dnd:read`; installed.
-- 350 tests passing.
+- 351 tests passing.
 
 ## 2026-11-05 (`/mini-reid` slash command)
 

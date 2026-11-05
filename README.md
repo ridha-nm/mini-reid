@@ -45,8 +45,8 @@ Gmail, Jira and Google Calendar.
   `/mini-reid` opens the list ephemerally; `/mini-reid add: …`, `remind …`,
   `meet: …` run in DM.
   Open rows untouched for a day get an evening DM (max 3 per row) with an inline
-  status picker. Overdue/stale nudges and local reminders wait while you are in
-  Slack Do Not Disturb.
+  status picker. Optional DND quiet hours for nudges/reminders: `RESPECT_DND=1`
+  (off by default).
   Successful `add:` reacts ➕; `note:` / `tonote:` react 📝; `remind:` reacts ⏰.
   Your command replies go to your DM, not the channel; channel replies to anyone else
   stay in the triggering thread. Only you can change your ledger.

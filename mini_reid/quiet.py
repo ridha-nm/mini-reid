@@ -5,7 +5,12 @@ from .sources import _get_json
 
 
 def dnd_active(env: dict, user: str) -> bool:
-    """True while Slack says this user is in Do Not Disturb."""
+    """True while Slack says this user is in Do Not Disturb.
+
+    Off unless RESPECT_DND is truthy; messages keep flowing by default.
+    """
+    if (env.get("RESPECT_DND") or "0").lower() not in {"1", "true", "yes"}:
+        return False
     token = env.get("SLACK_BOT_TOKEN")
     if not token or not user:
         return False
