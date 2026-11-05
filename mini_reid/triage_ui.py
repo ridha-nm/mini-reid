@@ -125,41 +125,58 @@ def confirmation_update_blocks(settled: dict, verdict: str,
     return blocks
 
 
-def triage_modal(rows: list[dict], now: datetime | None = None) -> dict:
+def triage_modal(rows: list[dict], now: datetime | None = None,
+                 select_all: bool = False,
+                 default_verdict: str | None = None) -> dict:
     now = now or datetime.now()
     rows = _selectable(rows, now)
     blocks: list[dict] = [{
         "type": "section",
         "text": {"type": "mrkdwn",
-                 "text": "Tick the rows, choose what they become, apply once."},
+                 "text": "Tick the rows, choose what they become, apply once. "
+                         "Slack has no shift-select: use Select all, then untick."},
+    }, {
+        "type": "actions",
+        "elements": [
+            {"type": "button", "action_id": "triage_select_all",
+             "text": {"type": "plain_text", "text": "Select all"}},
+            {"type": "button", "action_id": "triage_clear",
+             "text": {"type": "plain_text", "text": "Clear"}},
+        ],
     }]
     for start in range(0, len(rows), CHUNK):
         chunk = rows[start:start + CHUNK]
+        options = [{
+            "text": {"type": "mrkdwn",
+                     "text": f"[{r.get('id', '')[:6]}] {_title(r)[:70]}"},
+            "value": r.get("id", ""),
+        } for r in chunk]
+        element = {"type": "checkboxes", "action_id": "items", "options": options}
+        if select_all:
+            element["initial_options"] = options
         blocks.append({
             "type": "input",
             "block_id": f"sel_{start // CHUNK}",
             "label": {"type": "plain_text", "text": "Select rows"},
-            "element": {
-                "type": "checkboxes",
-                "action_id": "items",
-                "options": [{
-                    "text": {"type": "mrkdwn",
-                             "text": f"[{r.get('id', '')[:6]}] {_title(r)[:70]}"},
-                    "value": r.get("id", ""),
-                } for r in chunk],
-            },
+            "element": element,
             "optional": True,
         })
+    select = {
+        "type": "static_select",
+        "action_id": "value",
+        "options": [{"text": {"type": "plain_text", "text": label},
+                     "value": value} for value, label in VERDICTS],
+    }
+    if default_verdict in dict(VERDICTS):
+        select["initial_option"] = {
+            "text": {"type": "plain_text", "text": dict(VERDICTS)[default_verdict]},
+            "value": default_verdict,
+        }
     blocks.append({
         "type": "input",
         "block_id": "verdict",
         "label": {"type": "plain_text", "text": "Set selected to"},
-        "element": {
-            "type": "static_select",
-            "action_id": "value",
-            "options": [{"text": {"type": "plain_text", "text": label},
-                         "value": value} for value, label in VERDICTS],
-        },
+        "element": select,
     })
     return {
         "type": "modal",

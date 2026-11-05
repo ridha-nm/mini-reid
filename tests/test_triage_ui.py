@@ -92,6 +92,30 @@ def test_confirmation_update_removes_buttons_when_done():
     assert "Nothing left" in blocks[-1]["text"]["text"]
 
 
+def test_triage_modal_offers_select_all_and_clear():
+    modal = triage_modal([_row("a", "One")])
+    buttons = [b for b in modal["blocks"] if b.get("type") == "actions"][0]
+    assert [e["action_id"] for e in buttons["elements"]] == [
+        "triage_select_all", "triage_clear"]
+
+
+def test_select_all_preselects_every_option():
+    modal = triage_modal([_row("a", "One"), _row("b", "Two")], select_all=True)
+    boxes = [b for b in modal["blocks"]
+             if b.get("type") == "input"
+             and b["element"].get("type") == "checkboxes"][0]
+    assert [o["value"] for o in boxes["element"]["initial_options"]] == ["a", "b"]
+
+
+def test_select_all_keeps_the_chosen_verdict():
+    modal = triage_modal([_row("a", "One")], select_all=True,
+                         default_verdict="dropped")
+    select = [b for b in modal["blocks"]
+              if b.get("type") == "input"
+              and b["element"].get("type") == "static_select"][0]
+    assert select["element"]["initial_option"]["value"] == "dropped"
+
+
 def test_triage_modal_chunks_more_than_ten_items():
     rows = [_row(f"id{i:02d}", f"Task {i}", status="inbox") for i in range(23)]
     modal = triage_modal(rows)
