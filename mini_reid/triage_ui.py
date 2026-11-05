@@ -233,6 +233,9 @@ def stale_blocks(rows: list[dict]) -> list[dict]:
     blocks: list[dict] = []
     for row in rows:
         due = f" · due {row['due']}" if row.get("due") else ""
+        link = row.get("source_link")
+        if link:
+            due += f"\n<{link}|open source>"
         blocks.append({
             "type": "section",
             "text": {"type": "mrkdwn",

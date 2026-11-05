@@ -2,6 +2,16 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (schedule meetings from free/busy)
+
+- `meet: @Kasib about BD Command Centre`, or plain `set meeting with Kasib to
+  discuss BD Command Centre`, reads both calendars and offers five 30-minute
+  slots in the next five working days, 09:00–18:00 MYT.
+- Picking a slot creates the Google Calendar event, adds a Meet link and invites
+  the attendee (`sendUpdates=all`).
+- `calendar.events` added to owner consent and the member relay.
+- 298 tests passing.
+
 ## 2026-11-05 (source link on every confirmation DM)
 
 - Each **Add to list / Not a task** item now shows `<source|open source>`

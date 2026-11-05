@@ -1,6 +1,7 @@
-"""One-time consent to add Google Calendar read access.
+"""One-time consent to add Google Calendar access.
 
-Keeps the existing refresh token and Gmail scopes; adds calendar.readonly.
+Keeps the existing refresh token and Gmail scopes; adds calendar.readonly and
+calendar.events (create meetings and invite attendees).
 Run: .venv/bin/python -m mini_reid.google_auth
 """
 from __future__ import annotations
@@ -21,6 +22,7 @@ from pathlib import Path
 from .sources import load_env
 
 CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
+CALENDAR_WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.events"
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 
@@ -32,8 +34,9 @@ def _paths(env: dict) -> tuple[Path, Path]:
 
 def _scopes(token: dict) -> list[str]:
     scopes = (token.get("scope") or "").split()
-    if CALENDAR_SCOPE not in scopes:
-        scopes.append(CALENDAR_SCOPE)
+    for scope in (CALENDAR_SCOPE, CALENDAR_WRITE_SCOPE):
+        if scope not in scopes:
+            scopes.append(scope)
     return scopes
 
 

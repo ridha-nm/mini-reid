@@ -175,7 +175,10 @@ ledger), `reassign: <item> to <person>`,
 `edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
 ignores that title), `remind` (absolute or `in 2 minutes`),
-`ask:`, `find:`, `list`, `notes`, `allow: @Name`, `banter on|off|status`, `help`.
+`ask:`, `find:`, `list`, `notes`, `meet: @Name about <topic>`, `allow: @Name`,
+`banter on|off|status`, `help`. `meet:` reads owner + attendee freeBusy, proposes five
+30-minute slots over five working days, then creates the Google event with a Meet link
+and invites the attendee. Requires `calendar.events` consent.
 `help` is a topic picker (Capture, Update, Close, Find, Inbox, Reminders, Team,
 Fun) with **My list** and **Triage inbox** buttons, not a command dump.
 

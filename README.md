@@ -24,8 +24,9 @@ Gmail, Jira and Google Calendar.
   The watcher also polls Ridha's DMs for `remind` commands in conversations the bot is
   not part of.
 - **Bot** (`@minireid`): add, assign, reassign, note, tonote/convert, status, priority,
-  combine, uncombine, undo, done, due, edit, snooze, waiting, drop, not, remind, find,
-  list, notes, ask, clients, help. `clients` shows the email filter;
+  combine, uncombine, undo, done, due, edit, snooze, waiting, drop, not, remind,
+  meet, find, list, notes, ask, clients, help. `meet: @Kasib about X` checks both
+  calendars, offers free slots and creates the invite. `clients` shows the email filter;
   `clients: Eupe, Gamuda` replaces it. Portfolios GHB/GVC/SAFE are accepted.
   `banter on/off/status` controls sassy replies; only tagged abuse triggers one.
   Untagged messages are always ignored. Banter is allowed only in `#ee-leads-only`
