@@ -868,6 +868,52 @@ def test_pasted_title_matches_without_its_jira_tag(tmp_path):
     assert "Closed 2" in reply
 
 
+def test_multiline_not_parses_as_not_and_uses_short_ids(tmp_path):
+    from mini_reid.slack_bot import parse_command
+    from mini_reid.ledger import save
+
+    ledger = str(tmp_path / "ledger.json")
+    save(ledger, [
+        {"id": "aaaaaa111111", "what": "Same title", "status": "open",
+         "kind": "email", "what_else": ""},
+        {"id": "bbbbbb222222", "what": "Same title", "status": "open",
+         "kind": "email"},
+    ])
+    body = ("1. [aaaaaa] Same title — 1d overdue — from A — open\n"
+            "2. [bbbbbb] Same title — 1d overdue — from B — open")
+    assert parse_command("not: " + body)[0] == "not"
+    clients = load_clients("clients.json")
+    reply = apply_command("not", body, NOW, clients, ledger)
+    assert "Removed 2" in reply
+    assert [r["status"] for r in load(ledger)] == ["dropped", "dropped"]
+
+
+def test_pasted_list_skips_a_row_already_dropped(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Still open", NOW, clients, ledger)
+    apply_command("add", "Already gone", NOW, clients, ledger)
+    apply_command("not", "Already gone", NOW, clients, ledger)
+    body = ("• Still open — open\n• Already gone — open")
+    reply = apply_command("not", body, NOW, clients, ledger)
+    rows = {r["what"]: r["status"] for r in load(ledger)}
+    assert rows["Still open"] == "dropped"
+    assert rows["Already gone"] == "dropped"
+    assert "No open item" not in reply
+
+
+def test_pasted_list_unescapes_slack_html_entities(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Meeting Materials & IFRS 2 Gap Analysis",
+                  NOW, clients, ledger)
+    apply_command("add", "Keep this open", NOW, clients, ledger)
+    body = ("• Meeting Materials &amp; IFRS 2 Gap Analysis — 1d overdue — open\n"
+            "• Keep this open — open")
+    reply = apply_command("done", body, NOW, clients, ledger)
+    assert "Closed 2" in reply
+
+
 def test_pasted_list_with_one_unknown_title_changes_nothing(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")

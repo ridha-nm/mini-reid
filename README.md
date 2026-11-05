@@ -33,7 +33,8 @@ Gmail, Jira and Google Calendar.
   items awaiting confirmation; its **Triage & update** button lets you set a status
   on several rows at once. `185045` or `id:185045` works in every command;
   `done`/`not` also take bulk refs (`done 7, 9`) or a pasted list, one bullet per
-  line, closing every matched title at once.
+  line; the `[abc123]` ids in the paste pick the exact rows, and titles are
+  matched as a fallback.
   `undo:` reverses the last change. Priority 1-5 sorts the digest and list.
   Open rows untouched for a day get an evening DM (max 3 per row) with an inline
   status picker.

@@ -1,6 +1,7 @@
 """Slack command parsing and the Socket Mode listener."""
 from __future__ import annotations
 
+import html
 import json
 import random
 import re
@@ -958,7 +959,7 @@ def parse_command(text: str, bot_user_id: str = "") -> tuple[str, str]:
         r"^(add|task|todo|to-do|note|assign|reassign|done|drop|remove|delete|due|"
         r"snooze|waiting|"
         r"find|not|remind|ask|edit|status|priority|prio|combine|uncombine|"
-        r"convert|tonote|undo|allow)\s*:\s*(.*)$", body, re.I)
+        r"convert|tonote|undo|allow)\s*:\s*(.*)$", body, re.I | re.S)
     if m:
         act = m.group(1).lower()
         if act in {"task", "todo", "to-do"}:
@@ -1125,44 +1126,80 @@ _LIST_BULLET = re.compile(r"^\s*(?:[•*\-–]|\d+[.)])\s+")
 _LIST_META = re.compile(r"\s+[—–]\s+")
 
 
-def _list_titles(body: str) -> list[str] | None:
-    """Titles from a pasted digest/list: one bullet per line, metadata cut off."""
+_LIST_ID = re.compile(r"^\[([0-9a-f]{6})\]\s+", re.I)
+
+
+def _list_entries(body: str) -> list[tuple[str, str]] | None:
+    """(title, ledger short id) from a pasted digest/list, metadata cut off."""
     lines = [line.strip() for line in (body or "").splitlines() if line.strip()]
     if len(lines) < 2:
         return None
-    titles = []
+    entries: list[tuple[str, str]] = []
     for line in lines:
+        line = html.unescape(line)
         line = re.sub(r"^(?:done|not)\s*:\s*", "", line, flags=re.I)
         line = _LIST_BULLET.sub("", line).strip()
         line = _LIST_META.split(line, maxsplit=1)[0].strip()
-        line = re.sub(r"^\[[0-9a-f]{6}\]\s+", "", line)  # ledger short id
+        short = ""
+        m = _LIST_ID.match(line)
+        if m:
+            short = m.group(1).lower()
+            line = _LIST_ID.sub("", line).strip()
         if line:
-            titles.append(line)
-    return titles or None
+            entries.append((line, short))
+    return entries or None
 
 
 def _pick_titles(rows: list[dict], body: str) -> tuple[list[dict] | None, str | None]:
     """Bulk by pasted titles. None = not a list. All-or-nothing like refs."""
-    titles = _list_titles(body)
-    if not titles:
+    entries = _list_entries(body)
+    if not entries:
         return None, None
-    items = _open_sorted(rows)
+    open_items = _open_sorted(rows)
+    all_items = [r for r in rows if r.get("kind") != "note"]
     picked: list[dict] = []
+    skipped: list[dict] = []
     errors: list[str] = []
-    for title in titles:
+    for title, short in entries:
+        if short:
+            id_hits = [r for r in all_items
+                       if (r.get("id") or "").lower().startswith(short)]
+            if len(id_hits) == 1:
+                row = id_hits[0]
+                if row.get("status") in {"done", "dropped"}:
+                    skipped.append(row)
+                else:
+                    picked.append(row)
+                continue
+            if len(id_hits) > 1:
+                errors.append(f"{short} matches more than one item.")
+                continue
         variants: list[str] = []
         for text in (title, re.sub(r"^(?:\[[^\]]+\]\s*)+", "", title)):
             want = normalize_what(text)
             if want and want not in variants:
                 variants.append(want)
-        titles_of = [normalize_what(r.get("action") or r.get("what"))
-                     for r in items]
-        exact = [r for r, norm in zip(items, titles_of) if norm in variants]
+
+        def find(pool: list[dict]) -> list[dict]:
+            norms = [normalize_what(r.get("action") or r.get("what"))
+                     for r in pool]
+            hit = [r for r, norm in zip(pool, norms) if norm in variants]
+            if hit:
+                return hit
+            return [r for r, norm in zip(pool, norms)
+                    if any(len(want) >= 8
+                           and (norm.startswith(want) or want.startswith(norm))
+                           for want in variants)]
+
+        exact = find(open_items)
         if not exact:
-            exact = [r for r, norm in zip(items, titles_of)
-                     if any(len(want) >= 8
-                            and (norm.startswith(want) or want.startswith(norm))
-                            for want in variants)]
+            # A row already done/dropped is not an error: pasted lists can be
+            # re-sent, and the same title is simply already handled.
+            terminal = [r for r in find(all_items)
+                        if r.get("status") in {"done", "dropped"}]
+            if len(terminal) == 1:
+                skipped.append(terminal[0])
+                continue
         if len(exact) == 1:
             picked.append(exact[0])
         elif exact:
@@ -1171,6 +1208,8 @@ def _pick_titles(rows: list[dict], body: str) -> tuple[list[dict] | None, str | 
             errors.append(f"No open item matches “{title[:60]}”.")
     if errors:
         return None, "\n".join(errors[:6])
+    if not picked and skipped:
+        return [], f"Already handled: {len(skipped)} item(s)."
     seen: set[str] = set()
     unique = []
     for row in picked:

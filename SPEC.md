@@ -172,8 +172,9 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 - `done` and `not` accept several refs at once: `done 7, 9`, `#7 #9`,
   `id:abc1, id:def2`. One bad ref rejects the whole batch and changes nothing.
 - Both also accept a pasted digest/list: one bullet per line, metadata after an
-  em dash ignored. Titles match normalised text, then a unique prefix. One
-  unknown or ambiguous title rejects the whole batch.
+  em dash ignored, `[abc123]` short id used when present. Titles match normalised
+  text, then a unique prefix; Slack HTML entities are unescaped. A row already
+  done/dropped is skipped. One unknown or ambiguous title rejects the batch.
 - A new item's DM offers **Add to list** / **Not a task** per item. Add sets the row
   `open` and ✅s the source Slack message; Not a task sets `dropped` /
   `not_commitment`. The click edits the DM to name the outcome and rebuilds buttons
