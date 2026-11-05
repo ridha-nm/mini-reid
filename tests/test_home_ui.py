@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from mini_reid.home_ui import home_blocks
+from mini_reid.home_ui import home_blocks, public_home_blocks
 
 MYT = timezone(timedelta(hours=8))
 NOW = datetime(2026, 11, 5, 19, 0, tzinfo=MYT)
@@ -19,3 +19,10 @@ def test_home_shows_tasks_and_buttons():
 def test_home_survives_an_empty_ledger():
     blocks = home_blocks([], NOW)
     assert "Nothing open." in str(blocks)
+
+
+def test_public_home_explains_setup_without_exposing_a_ledger():
+    text = str(public_home_blocks())
+    assert "not set up yet" in text
+    assert "allow: @You" in text
+    assert "Send the deck" not in text

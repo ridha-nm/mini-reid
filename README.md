@@ -77,8 +77,8 @@ Gmail, Jira and Google Calendar.
 - **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
   local documents. `ask:` tries live Slack Real-time Search first (channel, text,
   permalink), then falls back to the local passages.
-- **App Home**: opening Mini-Reid shows tasks, Inbox, Notes, an Open Slack List link
-  and Refresh.
+- **App Home**: opening Mini-Reid shows your tasks, Inbox, Notes, an Open Slack List
+  link and Refresh. Non-authorised users get a setup page, never another ledger.
 - **Slack List mirror**: each user's ledger is mirrored into a native Slack List with
   title, status, due and source; created once and updated every watcher cycle.
   `list` includes an **Open Slack List** button. Edits in the List flow back to

@@ -7,6 +7,23 @@ from .listview import format_list
 from .triage_ui import _sections
 
 
+def public_home_blocks() -> list[dict]:
+    """App Home for someone who has not been authorised yet."""
+    return [
+        {"type": "header",
+         "text": {"type": "plain_text", "text": "Mini-Reid"}},
+        {"type": "section",
+         "text": {"type": "mrkdwn",
+                  "text": "Your own task ledger is not set up yet."}},
+        {"type": "section",
+         "text": {"type": "mrkdwn",
+                  "text": "You can already DM me a reminder for yourself or a "
+                          "teammate:\n`remind me to send the deck at 2pm`\n\n"
+                          "For your own task list, Slack List mirror and daily "
+                          "digest, ask Ridha to run `allow: @You`."}},
+    ]
+
+
 def home_blocks(rows: list[dict], now: datetime,
                 list_url: str | None = None) -> list[dict]:
     blocks = [{

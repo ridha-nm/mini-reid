@@ -204,7 +204,8 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
 - The owner mutates `ledger.json`; an allowlisted member mutates only their own
   `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
 - The App Home tab publishes the user's tasks, Inbox, Notes, an Open Slack List
-  link and Refresh on `app_home_opened`.
+  link and Refresh on `app_home_opened`. A non-authorised viewer gets a setup
+  page with the reminder example; no other ledger is exposed.
 - Each user's ledger is mirrored into a native Slack List (“Mini-Reid — Name”)
   with title, status, due and source link. The list is created once and shared
   write with that user; the watcher creates/updates the latest 50 rows. The

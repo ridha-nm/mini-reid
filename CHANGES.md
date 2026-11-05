@@ -6,6 +6,8 @@ Append-only. Newest first.
 
 - Mini-Reid's Home tab now publishes tasks, Inbox, Notes, **Open Slack List**
   and **Refresh** blocks when opened or refreshed, instead of an empty page.
+  Members see their own ledger; anyone not authorised sees a setup page with the
+  reminder example, never Ridha's or another member's list.
 - `app_home_opened` event subscribed; the owner Home view is published now.
 - 335 tests passing.
 
