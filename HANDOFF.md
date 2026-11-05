@@ -30,8 +30,9 @@ Centre roster fills it at `allow:`; the member can correct it with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
 overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 361 tests pass.
 
-2026-11-04: every new candidate lands as `inbox` and waits for a click — the
-new-item DM has **Add to list** / **Not a task** per item. The model never decides;
+2026-11-04: a candidate that matches no auto rule lands as `inbox` and waits for a
+click — the new-item DM has **Add to list** / **Not a task** per item (matched
+candidates skip the click since 2026-11-05, below). The model never decides;
 it only rewrites the title. Confirm → `open` and ✅ on the source message; dismiss →
 `dropped`. The click edits the DM in place with the outcome, rebuilds buttons for
 remaining items, and refuses to toggle a row already settled. Unanswered rows stay in
@@ -88,6 +89,15 @@ are deleted from the List.
 Charanya's self-written list, with `benchmark: false` for tasks that have no
 Slack/Gmail/Jira signal. Her 7-task snapshot: 3 benchmarked, strict recall 0/3.
 Runbook in `docs/EVAL.md`. That zero is the reason for the auto-capture plan.
+2026-11-05 auto-capture: rules decide whether a candidate needs a click.
+`jira-assigned` (any assigned, non-Done, non-Epic Jira issue), `slack-direct-ask`
+(channel @mention with an explicit ask), `slack-dm-ask` (DM with an ask or a due
+date) and `email-direct-ask` (inbox mail addressed to the person, with an ask or a
+due date) stamp `capture: "auto"` and open the row straight away; the reason is
+kept in `capture_why`. Everything else stays `inbox` with **Add to list** /
+**Not a task**. Rules only — no model, no network; the model still only rewrites
+titles, existing rows are not migrated, and members run the same rules on their
+own ledger.
 
 ## Running now
 
@@ -247,9 +257,10 @@ The 09:15 job writes `digest_delivered.json` only after Slack accepts the DM. If
 it fails (no DNS on 2, 3 and 5 Nov), the watcher regenerates and delivers after
 09:30, retrying every 10 minutes until the marker says today is done.
 
-A new item does not enter any digest bucket until it is confirmed. The capture DM
-shows each item with **Add to list** / **Not a task**; unanswered items stay in the
-list Inbox and are counted as `N to confirm` in the digest header.
+An Inbox item does not enter any digest bucket until it is confirmed; an
+auto-captured row is already open and does. The capture DM shows each uncertain item
+with **Add to list** / **Not a task**; unanswered items stay in the list Inbox and
+are counted as `N to confirm` in the digest header.
 
 A stale nudge runs at 18:00 for open / in progress / blocked / stalled rows whose
 `last_activity` is older than today. It DMs up to five rows, each with an inline status
@@ -295,7 +306,8 @@ kept or a real ask was missed.
 ## Known limits
 
 - The 3B model only rewrites titles. It does not decide what is a task and cannot drop
-  a captured row; every candidate waits in the inbox for a person's click.
+  a captured row; the auto-capture rules decide whether a candidate needs a click, and
+  anything they do not match waits in the Inbox.
 - 8B local is unusable on 8 GB (about five minutes per answer).
 - Answers are extractive, not composed.
 - Untagged asks in channels and thread replies without a mention are not captured.
@@ -321,7 +333,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-367 tests passing as of 2026-11-05.
+373 tests passing as of 2026-11-05.
 ## Next, agreed
 
 1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's

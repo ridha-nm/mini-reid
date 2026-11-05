@@ -2,6 +2,23 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (auto-capture)
+
+- A new candidate that matches an auto rule now lands already open
+  (`capture: "auto"`) instead of waiting for a click. Everything else stays
+  `capture: "inbox"` with the **Add to list** / **Not a task** buttons. The
+  deciding rule is kept in `capture_why`.
+- `jira-assigned`: any assigned, non-Done, non-Epic Jira issue.
+- `slack-direct-ask`: a channel @mention with an explicit ask — can/could/would/
+  will you, please/pls/kindly/action required, we need/need you.
+- `slack-dm-ask`: a Slack DM with an explicit ask or a due date.
+- `email-direct-ask`: a Gmail inbox mail addressed to the person, with an
+  explicit ask or a due date.
+- Rules only: no model, no network. The model still only rewrites the title and
+  never decides. Existing rows are not migrated. The owner and every allowlisted
+  member run the same rules against their own ledger.
+- 373 tests passing.
+
 ## 2026-11-05 (link unfurls)
 
 - Gmail and Jira links shared in Slack unfurl into a Mini-Reid task card with
