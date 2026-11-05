@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (App Home dashboard)
+
+- Mini-Reid's Home tab now publishes tasks, Inbox, Notes, **Open Slack List**
+  and **Refresh** blocks when opened or refreshed, instead of an empty page.
+- `app_home_opened` event subscribed; the owner Home view is published now.
+- 335 tests passing.
+
 ## 2026-11-05 (live Slack search + native Slack List)
 
 - `ask:` for the owner now searches Slack first with the Real-time Search API

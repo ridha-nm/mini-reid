@@ -2684,6 +2684,23 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         people = load_profiles()
         return ledger_for(people, user_id, ledger_path) if user_id in people else None
 
+    def publish_home(viewer: str) -> None:
+        target = ledger_for_viewer(viewer)
+        if not target:
+            return
+        from .home_ui import home_blocks
+        from .slack_lists import list_url
+
+        try:
+            web.views_publish(
+                user_id=viewer,
+                view={"type": "home",
+                      "blocks": home_blocks(load(target), datetime.now(MYT),
+                                            list_url(env, viewer))})
+        except Exception as ex:  # noqa: BLE001 - Home is best effort
+            print(f"  home publish failed: {type(ex).__name__}: {ex}",
+                  flush=True)
+
     def handle(_socket_client, req):
         client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
         payload = req.payload or {}
@@ -2804,6 +2821,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
+                if action_id == "home_refresh":
+                    publish_home((payload.get("user") or {}).get("id") or "")
+                    continue
                 if action_id == "meet_edit":
                     from .meeting_ui import edit_modal
 
@@ -3085,6 +3105,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                                              thread_ts=msg_ts or None)
             return
         event = (req.payload or {}).get("event") or {}
+        if event.get("type") == "app_home_opened":
+            publish_home(event.get("user") or "")
+            return
         if event.get("type") == "reaction_added":
             parsed = capture_reaction(event,
                                       env.get("CAPTURE_REACTION", "pushpin"))

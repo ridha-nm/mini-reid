@@ -85,6 +85,7 @@ settings:
       - message.groups
       - message.im
       - reaction_added
+      - app_home_opened
   interactivity:
     is_enabled: true
   org_deploy_enabled: false
