@@ -2,6 +2,12 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (play requests work when tagged)
+
+- `@mini-reid high-five @Julian` now works. The play matcher sees the mention
+  first and gave up; it now strips the bot mention before matching.
+- 286 tests passing.
+
 ## 2026-11-05 (list links no longer cut off)
 
 - The list was placed in one Slack section capped at 3000 chars, which cut row

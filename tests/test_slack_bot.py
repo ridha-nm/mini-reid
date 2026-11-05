@@ -1184,6 +1184,8 @@ def test_play_reply_hugs_and_high_fives():
     assert play_reply("high five <@U1>", {}) == "🙌 *<@U1>* — up high."
     assert play_reply("fist bump @Raj", {"raj": "U2"}) == "👊 *<@U2>* — bump."
     assert play_reply("give @Nobody a hug", {}) is None
+    assert play_reply("@mini-reid high-five @Julian", {"julian": "U9"}) == (
+        "🙌 *<@U9>* — up high.")
     assert play_reply("give the deck a hug", {}) is None
 
 
