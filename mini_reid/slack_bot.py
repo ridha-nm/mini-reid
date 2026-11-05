@@ -1254,6 +1254,9 @@ def _pick(rows: list[dict], target: str) -> tuple[dict | None, str | None]:
     is stable across edits and reordering."""
     # People copy ids straight from `list`, brackets and all.
     t = (target or "").strip().strip("[]").strip()
+    if re.match(r"^(?:what'?s|whats|what is|show|list|any)\b", t, re.I) \
+            or t.endswith("?"):
+        return None, "That reads like a question. Use `list` or `find:` instead."
     m = re.fullmatch(r"(?:id:)?([0-9a-f]{4,40})", t, re.I)
     if m:
         prefix = m.group(1).lower()
@@ -1904,7 +1907,8 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
             learning.add(row.get("what", ""), reason=body,
                          source=row.get("source", ""))
             return f"Removed as not a commitment: {row['what'][:80]}"
-        if err and err.startswith("Which one?"):
+        if err and (err.startswith("Which one?")
+                    or "reads like a question" in err):
             return err
         learning.add(body, reason="manual correction", source="manual")
         return "Recorded. I will ignore similar messages from now on."

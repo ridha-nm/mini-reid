@@ -11,6 +11,8 @@ Append-only. Newest first.
   is added as a task and confirmed ephemerally. `whats on my to-do` and similar
   queries show the list instead of becoming tasks. Non-members get the allow
   prompt.
+- `not: whats on my to-do` now refuses as a question instead of fuzzy-matching
+  and dropping a real task. The wrongly dropped dashboard task was restored.
 - Registered in the Slack app and manifest.
 - 344 tests passing.
 

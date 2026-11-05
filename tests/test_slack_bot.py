@@ -1015,6 +1015,15 @@ def test_owner_reminders_use_slack_scheduling_now():
     assert should_schedule_reminder("remind", "URIDHA", "URIDHA", None)
 
 
+def test_not_rejects_a_question_instead_of_dropping_a_fuzzy_match(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Dashboard audit follow-up", NOW, clients, ledger)
+    reply = apply_command("not", "whats on my to-do", NOW, clients, ledger)
+    assert "reads like a question" in reply
+    assert [r["status"] for r in load(ledger)] == ["open"]
+
+
 def test_slash_command_routes_list_help_and_commands():
     from mini_reid.slack_bot import slash_route
 
