@@ -2,6 +2,18 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (multiline `not:` and pasted-list edge cases)
+
+- Fixed a multiline `not:` being parsed as `note` (and answering "Noted.")
+  because the command regex stopped at the first newline. Colon commands now
+  read the whole message.
+- Pasted list lines keep their `[abc123]` short id, so duplicate titles are
+  disambiguated by the id the list already shows.
+- A line whose row is already done/dropped is skipped instead of failing the
+  batch; other lines still apply.
+- Slack HTML entities (`&amp;`) are unescaped before title matching.
+- 279 tests passing.
+
 ## 2026-11-05 (meeting moved replies)
 
 - A meeting reminder can now be answered with `moved`, `rescheduled`,
