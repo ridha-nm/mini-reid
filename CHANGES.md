@@ -2,6 +2,15 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (`/mini-reid` slash command)
+
+- `/mini-reid` with no args or `list` returns the grouped list ephemerally with
+  Open Slack List and Triage buttons. `/mini-reid help` returns HELP.
+- `/mini-reid add: …`, `remind …`, `meet: …` run the normal command path and
+  reply in DM. Non-members get the allow prompt.
+- Registered in the Slack app and manifest.
+- 344 tests passing.
+
 ## 2026-11-05 (App Home dashboard)
 
 - Mini-Reid's Home tab is a per-person dashboard: a native Block Kit **table**

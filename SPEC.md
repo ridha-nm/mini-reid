@@ -178,7 +178,8 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 `ask:` (pending/open/due/task questions use the ledger with a client filter;
 otherwise owner tries live Slack Real-time Search, then the local KB),
 `find:`, `list`, `notes`, `meet: @Name about <topic>`, `allow: @Name`,
-`banter on|off|status`, `help`. `meet:` accepts one or more attendees
+`banter on|off|status`, `help`, `/mini-reid` (list/help ephemeral, other commands
+in DM). `meet:` accepts one or more attendees
 (`@Kasib and @Charanya`, comma/and-separated names), reads everyone's freeBusy, proposes five
 30-minute slots over five working days with a formal Title/With/Duration block and a
 busy snapshot of both calendars, then creates the Google event with a Meet link and

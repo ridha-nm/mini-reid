@@ -892,6 +892,16 @@ def capture_reaction(event: dict, name: str) -> tuple[str, str, str] | None:
     return (channel, ts, user) if channel and ts and user else None
 
 
+def slash_route(text: str) -> str:
+    """list, help, or command for /mini-reid arguments."""
+    value = (text or "").strip().lower()
+    if not value or value in {"list", "ls", "open"}:
+        return "list"
+    if value in {"help", "?"}:
+        return "help"
+    return "command"
+
+
 def member_quick_add(channel: str, action: str, member: bool,
                      text: str) -> bool:
     """A member's plain DM becomes a task; no `add:` prefix needed."""
@@ -2737,6 +2747,48 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
     def handle(_socket_client, req):
         client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
         payload = req.payload or {}
+        if payload.get("command") == "/mini-reid":
+            import urllib.request
+
+            user = payload.get("user_id") or ""
+            channel = payload.get("channel_id") or ""
+            text = (payload.get("text") or "").strip()
+            target = ledger_for_viewer(user)
+            response_url = payload.get("response_url") or ""
+
+            def respond(message: str, blocks: list[dict] | None = None) -> None:
+                if not response_url:
+                    return
+                body = {"response_type": "ephemeral", "text": message}
+                if blocks:
+                    body["blocks"] = blocks
+                request = urllib.request.Request(
+                    response_url, data=json.dumps(body).encode(),
+                    headers={"Content-Type": "application/json"})
+                try:
+                    urllib.request.urlopen(request, timeout=15).read()
+                except Exception as ex:  # noqa: BLE001 - best effort
+                    print(f"  slash reply failed: {type(ex).__name__}: {ex}",
+                          flush=True)
+
+            if not target:
+                respond("Ask Ridha to run `allow: @You` first.")
+                return
+            route = slash_route(text)
+            if route == "list":
+                from .slack_lists import list_url
+                from .triage_ui import list_blocks
+
+                now = datetime.now(MYT)
+                respond("Your list",
+                        list_blocks(load(target), now, list_url(env, user)))
+                return
+            if route == "help":
+                respond(HELP)
+                return
+            process(channel, user, text, f"slash:{payload.get('trigger_id') or user}")
+            respond("Sent to your DM.")
+            return
         if payload.get("type") == "message_action":
             if payload.get("callback_id") == "add_to_mini_reid":
                 msg = payload.get("message") or {}

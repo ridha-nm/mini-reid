@@ -3,6 +3,11 @@ display_information:
   description: Personal commitment ledger. Tag it to add, note or close a task.
   background_color: "#1f2937"
 features:
+  slash_commands:
+    - command: /mini-reid
+      description: Open your list, add a task, remind or book a meeting
+      usage_hint: "[list | add: ... | remind ... | meet: @Name about ...]"
+      should_escape: false
   shortcuts:
     - name: Add to Mini-Reid
       callback_id: add_to_mini_reid

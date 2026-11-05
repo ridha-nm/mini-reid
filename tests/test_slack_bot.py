@@ -1015,6 +1015,16 @@ def test_owner_reminders_use_slack_scheduling_now():
     assert should_schedule_reminder("remind", "URIDHA", "URIDHA", None)
 
 
+def test_slash_command_routes_list_help_and_commands():
+    from mini_reid.slack_bot import slash_route
+
+    assert slash_route("") == "list"
+    assert slash_route("list") == "list"
+    assert slash_route("help") == "help"
+    assert slash_route("add: send the deck") == "command"
+    assert slash_route("meet: @Kasib about the deck") == "command"
+
+
 def test_member_plain_dm_is_quick_added_but_questions_are_not():
     from mini_reid.slack_bot import member_quick_add
 
