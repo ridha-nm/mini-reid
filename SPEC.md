@@ -108,12 +108,13 @@ a channel mention. Channel mentions are always kept unless they are pure chatter
   questions with no ask ("do you have access?"), status updates ("Update: …"), other
   people's own plans ("I try to get … today"), Google boilerplate, URLs, newsletters.
 
-Rules capture. Every captured row starts as `status: inbox` and waits for a person.
-The optional local model only rewrites the title for readability; it is told every
-message is a candidate and returns one item per message. It cannot drop a row and has
-no commitment verdict. A row the model rewrote keeps the cleaner wording; a row it
-omitted or failed on keeps the rule text. Either way it stays in the inbox until
-confirmed (**Add to list**) or dismissed (**Not a task**).
+Rules capture. Rows matching an auto rule (`jira-assigned`, `slack-direct-ask`,
+`slack-dm-ask`, `email-direct-ask`) are added directly; the rest wait in Inbox with
+**Add to list** / **Not a task**. The optional local model only rewrites the title
+for readability; it is told every message is a candidate and returns one item per
+message. It cannot drop a row and has no commitment verdict. A row the model rewrote
+keeps the cleaner wording and the rule row's capture decision; a row it omitted or
+failed on keeps the rule text.
 
 A tiny Naive Bayes classifier (`mini_reid/classifier.py`) gives a second opinion on
 bot-addressed social text, trained from the ledger, `not:` corrections and seed

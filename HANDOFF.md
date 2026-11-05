@@ -89,6 +89,7 @@ are deleted from the List.
 Charanya's self-written list, with `benchmark: false` for tasks that have no
 Slack/Gmail/Jira signal. Her 7-task snapshot: 3 benchmarked, strict recall 0/3.
 Runbook in `docs/EVAL.md`. That zero is the reason for the auto-capture plan.
+
 2026-11-05 auto-capture: rules decide whether a candidate needs a click.
 `jira-assigned` (any assigned, non-Done, non-Epic Jira issue), `slack-direct-ask`
 (channel @mention with an explicit ask), `slack-dm-ask` (DM with an ask or a due
