@@ -18,8 +18,8 @@ from .profiles import load as load_profiles
 from .render import render
 from .sources import _get_json, fetch_gmail, fetch_jira, slack_user_name
 from .watcher import (_stamp_confirmation, fire_reminders, format_alert,
-                      new_rows, nudge_overdue, nudge_stale, polish_rows,
-                      remind_meetings)
+                      new_rows, nudge_overdue, nudge_stale, pending_rows,
+                      polish_rows, remind_meetings)
 
 MYT = timezone(timedelta(hours=8))
 IGNORE_CHANNELS = {"bd-triager-agent", "C0B59LA0X5M"}
@@ -204,8 +204,10 @@ def refresh(env: dict, user: str, profile: dict, days: int = 1) -> list[dict]:
         save(ledger_path, apply_stalled(merge(existing, fresh), now))
         from .triage_ui import confirm_blocks
 
-        sent = send_dm_to(env, user, format_alert(fresh), blocks=confirm_blocks(fresh))
-        _stamp_confirmation(ledger_path, {r["id"] for r in fresh}, sent)
+        pending = pending_rows(fresh)
+        sent = send_dm_to(env, user, format_alert(fresh),
+                          blocks=confirm_blocks(pending) if pending else None)
+        _stamp_confirmation(ledger_path, {r["id"] for r in pending}, sent)
     try:
         from .slack_lists import sync_user as sync_slack_list
 

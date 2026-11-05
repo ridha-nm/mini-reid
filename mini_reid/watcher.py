@@ -89,6 +89,11 @@ def triage_rows(fresh: list[dict], rewritten: list[dict]) -> list[dict]:
     return out
 
 
+def pending_rows(rows: list[dict]) -> list[dict]:
+    """Only uncertain captures get Add / Not a task buttons."""
+    return [r for r in rows if (r.get("status") or "") == "inbox"]
+
+
 def format_alert(rows: list[dict]) -> str:
     """One line per distinct item, even when one invite produced several emails."""
     from .render import _client_name, _source_quote, _when
@@ -642,8 +647,10 @@ def main() -> int:
         save(ledger_path, ledger)
         from .triage_ui import confirm_blocks
 
-        sent = send_dm(env, format_alert(fresh), blocks=confirm_blocks(fresh))
-        _stamp_confirmation(ledger_path, {r["id"] for r in fresh}, sent)
+        pending = pending_rows(fresh)
+        sent = send_dm(env, format_alert(fresh),
+                       blocks=confirm_blocks(pending) if pending else None)
+        _stamp_confirmation(ledger_path, {r["id"] for r in pending}, sent)
         print(f"[{now:%H:%M:%S}] asked to confirm {len(fresh)} new", flush=True)
     try:
         from .slack_lists import sync_user as sync_slack_list

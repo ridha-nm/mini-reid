@@ -334,6 +334,12 @@ def test_alert_is_compact_and_has_a_link():
     assert "https://x/1" in text
 
 
+def test_pending_rows_are_the_ones_needing_a_click():
+    from mini_reid.watcher import pending_rows
+    rows = [{"id": "a", "status": "open"}, {"id": "b", "status": "inbox"}]
+    assert [r["id"] for r in pending_rows(rows)] == ["b"]
+
+
 def test_slack_alert_shows_sender_time_link_and_source_quote():
     row = {"source": "slack", "what": "Get Gamuda file", "client": None, "due": None,
            "asker": "Kasib", "via": "DM", "source_link": "https://x/slack",
