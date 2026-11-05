@@ -7,8 +7,10 @@ Append-only. Newest first.
 - Mini-Reid's Home tab is a per-person dashboard: open/overdue/due-today/Inbox/
   notes counts, the top 3 focus items, **Open Slack List**, **Triage Inbox**,
   **Refresh** and quick commands. It no longer dumps the whole task list.
-  Members see their own ledger; anyone not authorised sees a setup page with the
-  reminder example, never Ridha's or another member's list.
+  Members see their own ledger; anyone not authorised sees a capabilities page
+  with **Request access** and **Message Ridha**. Request access DMs Ridha with
+  the person's mention and the exact `allow:` line; the requester gets a
+  confirmation. No other ledger is exposed.
 - `app_home_opened` event subscribed; the owner Home view is published now.
 - 335 tests passing.
 

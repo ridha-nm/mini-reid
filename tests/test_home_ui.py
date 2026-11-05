@@ -33,8 +33,10 @@ def test_home_survives_an_empty_ledger():
     assert "0 open" in str(blocks)
 
 
-def test_public_home_explains_setup_without_exposing_a_ledger():
-    text = str(public_home_blocks())
-    assert "not set up yet" in text
-    assert "allow: @You" in text
+def test_public_home_explains_setup_and_offers_access():
+    text = str(public_home_blocks("U1", "gopantas"))
+    assert "Available now" in text
+    assert "Once Ridha allows you" in text
+    assert "request_access" in text
+    assert "https://gopantas.slack.com/team/U1" in text
     assert "Send the deck" not in text

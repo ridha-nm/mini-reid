@@ -49,21 +49,39 @@ def _focus_line(row: dict, now: datetime) -> str:
     return f"• *{title}*" + (f" — {when}" if when else "") + tail
 
 
-def public_home_blocks() -> list[dict]:
+def public_home_blocks(owner: str = "", team: str = "gopantas") -> list[dict]:
     """App Home for someone who has not been authorised yet."""
-    return [
+    blocks = [
         {"type": "header",
          "text": {"type": "plain_text", "text": "Mini-Reid"}},
+        {"type": "context",
+         "elements": [{"type": "mrkdwn",
+                       "text": "A personal commitment assistant for Pantas."}]},
         {"type": "section",
          "text": {"type": "mrkdwn",
-                  "text": "Your own task ledger is not set up yet."}},
+                  "text": "*Available now*\n"
+                          "• `remind me to send the deck at 2pm`\n"
+                          "• `remind @Teammate to … at 2pm`\n"
+                          "• `help` for the command list"}},
         {"type": "section",
          "text": {"type": "mrkdwn",
-                  "text": "You can already DM me a reminder for yourself or a "
-                          "teammate:\n`remind me to send the deck at 2pm`\n\n"
-                          "For your own task list, Slack List mirror and daily "
-                          "digest, ask Ridha to run `allow: @You`."}},
+                  "text": "*Once Ridha allows you*\n"
+                          "• Your own task list and daily digest\n"
+                          "• A native Slack List mirror with status/date/source\n"
+                          "• Meeting scheduling with free/busy across calendars\n"
+                          "• Inbox triage and confirmation buttons"}},
     ]
+    elements = [{"type": "button", "action_id": "request_access",
+                 "text": {"type": "plain_text", "text": "Request access"},
+                 "style": "primary"}]
+    if owner:
+        elements.append({
+            "type": "button",
+            "url": f"https://{team}.slack.com/team/{owner}",
+            "text": {"type": "plain_text", "text": "Message Ridha"},
+        })
+    blocks.append({"type": "actions", "elements": elements})
+    return blocks
 
 
 def home_blocks(rows: list[dict], now: datetime,

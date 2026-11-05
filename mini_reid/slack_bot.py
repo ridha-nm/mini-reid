@@ -2700,7 +2700,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         target = ledger_for_viewer(viewer)
         blocks = (home_blocks(load(target), datetime.now(MYT),
                               list_url(env, viewer))
-                  if target else public_home_blocks())
+                  if target else public_home_blocks(
+                      env.get("SLACK_OWNER_ID", ""),
+                      env.get("SLACK_TEAM", "gopantas")))
         for attempt in range(2):
             try:
                 web.views_publish(
@@ -2832,6 +2834,21 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
+                if action_id == "request_access":
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    if clicker and env.get("SLACK_OWNER_ID"):
+                        try:
+                            send_dm_to(
+                                env, env["SLACK_OWNER_ID"],
+                                f"*Access request*\n<@{clicker}> is asking for "
+                                "their own Mini-Reid. Run "
+                                f"`allow: <@{clicker}>` to set them up.")
+                            send_dm_to(env, clicker,
+                                       "Request sent. Ridha will set you up.")
+                        except Exception as ex:  # noqa: BLE001 - best effort
+                            print(f"  access request failed: "
+                                  f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
                 if action_id == "home_refresh":
                     publish_home((payload.get("user") or {}).get("id") or "")
                     continue
