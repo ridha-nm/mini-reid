@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (channel replies stay in the thread)
+
+- Every channel reply now posts on the triggering message's `thread_ts`: default
+  line, guardrail, banter, play, help, list and reminder questions. It used to
+  reply in the main channel.
+- Deleted the stray main-chat default reply in `#bd-pipeline`.
+- 295 tests passing.
+
 ## 2026-11-05 (new assignments no longer fall off `list`)
 
 - `list` cut at 25 rows; a new undated assignment sat at position 28 and was

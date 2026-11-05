@@ -40,7 +40,8 @@ Gmail, Jira and Google Calendar.
   Open rows untouched for a day get an evening DM (max 3 per row) with an inline
   status picker.
   Successful `add:` reacts ➕; `note:` / `tonote:` react 📝; `remind:` reacts ⏰.
-  Your command replies go to your DM, not the channel. Only you can change your ledger.
+  Your command replies go to your DM, not the channel; channel replies to anyone else
+  stay in the triggering thread. Only you can change your ledger.
   Anyone can set a private
   reminder for themselves or a teammate — those never enter your ledger.
   Tagged messages work in plain language too (`please mark the deck done`,
