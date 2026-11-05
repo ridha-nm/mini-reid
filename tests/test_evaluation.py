@@ -64,6 +64,94 @@ def test_self_dm_lines_become_positive_labels():
     assert labels[0]["date"] == "2026-11-05"
 
 
+def test_self_dm_strips_nested_prefixes_and_emoji():
+    messages = [{"ts": "1793866425.785539",
+                 "text": "- [ ] markdown task\n☐ 1. numbered task\n✅ done marker\n"
+                         "📌 pinned task\n- [ ]\n"}]
+    labels = labels_from_self_dm(messages)
+    assert [l["text"] for l in labels] == [
+        "markdown task", "numbered task", "done marker", "pinned task"]
+
+
+def test_self_dm_deduplicates_the_same_task_on_the_same_day():
+    messages = [{"ts": "1793866425.785539", "text": "• send the deck"},
+                {"ts": "1793866426.000000", "text": "• Send the deck"}]
+    labels = labels_from_self_dm(messages)
+    assert [l["text"] for l in labels] == ["send the deck"]
+
+
+def test_ledger_dismissal_is_counted_as_a_false_task():
+    rows = [{"id": "a1", "what": "noise", "status": "dropped",
+             "closed_how": "not_commitment",
+             "created_at": "2026-11-05T09:00:00+08:00"}]
+    result = score(labels_from_ledger(rows), extracted_from_ledger(rows))
+    assert result["reviewed"] == 1
+    assert result["false_tasks"] == 1
+    assert result["meets_target"] is False
+
+
+def test_false_per_day_uses_the_evaluation_window():
+    labels = [
+        {"date": "2026-11-04", "text": "real task", "is_task": True, "id": ""},
+        {"date": "2026-11-04", "text": "noise", "is_task": False, "id": "x1"},
+    ]
+    extracted = [
+        {"date": "2026-11-04", "text": "real task", "status": "open", "id": "e1"},
+        {"date": "2026-11-05", "text": "noise", "status": "open", "id": "x1"},
+    ]
+    result = score(labels, extracted)
+    assert result["false_tasks"] == 1
+    assert result["false_per_day"] == 0.5
+
+
+def test_one_extracted_row_covers_only_one_label():
+    labels = [
+        {"date": "2026-11-05", "text": "send the deck", "is_task": True, "id": ""},
+        {"date": "2026-11-05", "text": "send the deck to Eupe",
+         "is_task": True, "id": ""},
+    ]
+    extracted = [{"date": "2026-11-05", "text": "send the deck to Eupe by Friday",
+                  "status": "open", "id": "e1"}]
+    result = score(labels, extracted)
+    assert result["covered"] == 1
+    assert result["recall"] == 0.5
+
+
+def test_duplicate_extracted_ids_count_once():
+    labels = [
+        {"date": "2026-11-05", "text": "first", "is_task": True, "id": ""},
+        {"date": "2026-11-05", "text": "second", "is_task": True, "id": ""},
+    ]
+    extracted = [
+        {"date": "2026-11-05", "text": "first", "status": "open", "id": "e1"},
+        {"date": "2026-11-05", "text": "second", "status": "open", "id": "e1"},
+    ]
+    result = score(labels, extracted)
+    assert result["covered"] == 1
+
+
+def test_idless_extracted_rows_are_kept_distinct():
+    labels = [
+        {"date": "2026-11-05", "text": "first", "is_task": True, "id": ""},
+        {"date": "2026-11-05", "text": "second", "is_task": True, "id": ""},
+    ]
+    extracted = [
+        {"date": "2026-11-05", "text": "first", "status": "open", "id": ""},
+        {"date": "2026-11-05", "text": "second", "status": "open", "id": ""},
+    ]
+    result = score(labels, extracted)
+    assert result["covered"] == 2
+    assert result["recall"] == 1.0
+
+
+def test_negative_label_without_an_id_is_not_a_false_task():
+    labels = [{"date": "2026-11-05", "text": "noise", "is_task": False}]
+    extracted = [{"date": "2026-11-05", "text": "noise", "status": "open", "id": "x1"}]
+    result = score(labels, extracted)
+    assert result["reviewed"] == 0
+    assert result["false_tasks"] == 0
+
+
 def test_ledger_dismissals_become_negative_labels_and_predictions():
     rows = [
         {"id": "a1", "what": "noise", "status": "dropped",

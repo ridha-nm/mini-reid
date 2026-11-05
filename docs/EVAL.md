@@ -11,9 +11,14 @@ Measures Mini-Reid's capture against Charanya's own Slack to-do list.
 {"messages": [{"ts": "1793866425.785539", "text": "• send the deck\n☐ review dashboard"}]}
 ```
 
+A full Slack workspace export is a zip of per-conversation/per-day JSON files,
+each shaped `{"messages": [...]}`. Merge the self-DM message lists into one
+`messages` array before running; this tool reads exactly one JSON object.
+
 2. Her member ledger at `data/U0AG8GF46CU/ledger.json`. Rows she dismissed with
-   **Not a task** become the negative labels; her open/extracted rows become the
-   predictions.
+   **Not a task** are captured predictions that were wrong, so they count as
+   false tasks. Every other non-note/non-reminder row counts as a captured
+   prediction.
 
 Both stay on this Mac. `data/eval/` is gitignored.
 

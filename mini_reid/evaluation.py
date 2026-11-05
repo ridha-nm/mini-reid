@@ -1,10 +1,13 @@
 """Measure capture against ground truth. Pure functions, no network."""
 from __future__ import annotations
 
+import argparse
 import json
+import re
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .ledger import normalize_what
+from .ledger import TERMINAL, normalize_what
 
 
 def task_tokens(text: str) -> set[str]:
@@ -25,27 +28,45 @@ def task_matches(label: str, extracted: str, threshold: float = 0.8) -> bool:
     return len(smaller) >= 3 and smaller <= larger
 
 
+def _unique_rows(extracted: list[dict]) -> list[dict]:
+    """Dedupe by id when there is one; id-less rows stay distinct."""
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for row in extracted:
+        rid = row.get("id") or ""
+        if rid:
+            if rid in seen:
+                continue
+            seen.add(rid)
+        rows.append(row)
+    return rows
+
+
 def score(labels: list[dict], extracted: list[dict],
           threshold: float = 0.8) -> dict:
     """Recall against positive labels; false tasks against reviewed dismissals."""
-    by_id: dict[str, dict] = {}
-    for row in extracted:
-        by_id.setdefault(row.get("id") or "", row)
-    predicted = [r for r in by_id.values()
-                 if r.get("status") not in {"done", "dropped"}]
+    rows = _unique_rows(extracted)
+    by_id = {r["id"]: r for r in rows if r.get("id")}
+    predicted = [r for r in rows if r.get("status") not in TERMINAL]
 
     positives = [l for l in labels if l.get("is_task")]
     misses: list[str] = []
     covered = 0
+    used: set[int] = set()
     for label in positives:
-        hit = any(
-            (not label.get("date") or not row.get("date")
-             or label.get("date") == row.get("date"))
-            and task_matches(label.get("text") or "", row.get("text") or "",
-                             threshold)
-            for row in predicted
-        )
-        if hit:
+        hit = None
+        for i, row in enumerate(predicted):
+            if i in used:
+                continue
+            if (label.get("date") and row.get("date")
+                    and label["date"] != row["date"]):
+                continue
+            if task_matches(label.get("text") or "", row.get("text") or "",
+                            threshold):
+                hit = i
+                break
+        if hit is not None:
+            used.add(hit)
             covered += 1
         elif len(misses) < 20:
             misses.append(label.get("text") or "")
@@ -54,8 +75,9 @@ def score(labels: list[dict], extracted: list[dict],
                  if not l.get("is_task") and l.get("id")]
     reviewed = [l for l in negatives if (l.get("id") or "") in by_id]
     false_rows = [l for l in reviewed
-                  if by_id[l["id"]].get("status") not in {"done", "dropped"}]
-    days = {l.get("date") for l in negatives if l.get("date")}
+                  if by_id[l["id"]].get("status") not in TERMINAL]
+    days = {l.get("date") for l in labels if l.get("date")}
+    days |= {r.get("date") for r in rows if r.get("date")}
     recall = (covered / len(positives)) if positives else None
     false_per_day = (len(false_rows) / len(days)) if days else 0.0
     return {
@@ -72,25 +94,33 @@ def score(labels: list[dict], extracted: list[dict],
     }
 
 
-SELF_DM_BULLET = __import__("re").compile(
-    r"^\s*(?:[•*\-–☐☑]|\[[ xX]\]|\d+[.)])\s*")
+SELF_DM_PREFIX = re.compile(r"^\s*(?:\[[ xX]\]|\d+[.)]|[^\w\s])\s*")
+MYT = timezone(timedelta(hours=8))
 
 
 def labels_from_self_dm(messages: list[dict]) -> list[dict]:
-    from datetime import datetime, timedelta, timezone
-
-    myt = timezone(timedelta(hours=8))
     labels: list[dict] = []
+    seen: set[tuple[str, str]] = set()
     for message in messages:
         try:
             date = datetime.fromtimestamp(float(message.get("ts") or 0),
-                                          myt).date().isoformat()
+                                          MYT).date().isoformat()
         except (TypeError, ValueError):
-            date = ""
+            continue
         for line in (message.get("text") or "").splitlines():
-            text = SELF_DM_BULLET.sub("", line).strip()
+            text = line
+            while True:
+                stripped = SELF_DM_PREFIX.sub("", text)
+                if stripped == text:
+                    break
+                text = stripped
+            text = text.strip()
             if len(text) < 3:
                 continue
+            key = (date, normalize_what(text))
+            if key in seen:
+                continue
+            seen.add(key)
             labels.append({"date": date, "text": text, "is_task": True,
                            "source": "self_dm", "id": ""})
     return labels
@@ -114,13 +144,14 @@ def labels_from_ledger(rows: list[dict]) -> list[dict]:
 
 
 def extracted_from_ledger(rows: list[dict]) -> list[dict]:
+    """Every captured row is a prediction; dismissal is measured separately."""
     out = []
     for row in rows:
         if row.get("kind") in {"note", "reminder"}:
             continue
         out.append({"id": row.get("id") or "", "date": _ledger_date(row),
                     "text": row.get("action") or row.get("what") or "",
-                    "status": row.get("status") or "open"})
+                    "status": "open"})
     return out
 
 
@@ -165,8 +196,6 @@ def format_report(result: dict) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    import argparse
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--self-dm")
     parser.add_argument("--ledger")
