@@ -7,9 +7,11 @@ Append-only. Newest first.
 - **Add to Mini-Reid** message shortcut: right-click any message, edit the
   prefilled title, submit. The task links back to the source message and gets ✅.
 - Reacting with 📌 (`CAPTURE_REACTION=pushpin`) adds that message to the reactor's
-  list with no modal. Owner and members resolve their own ledger.
+  list with no modal, then DMs `Added: <task>` with the source link. Shortcut and
+  reaction captures created today appear in a **Just added** section at the top of
+  `list`. Owner and members resolve their own ledger.
 - Slack app manifest: message shortcut, `reaction_added` event, `reactions:read`.
-- 323 tests passing.
+- 324 tests passing.
 
 ## 2026-11-05 (seamless member capture + benchmark flags)
 

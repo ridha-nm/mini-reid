@@ -3079,11 +3079,19 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 target = ledger_for_viewer(reactor)
                 text = fetch_message_text(env, channel, msg_ts) if target else ""
                 if target and text:
-                    add_slack_capture(
+                    row = add_slack_capture(
                         target, text, channel, msg_ts, reactor, users,
                         datetime.now(MYT),
                         team=env.get("SLACK_TEAM", "gopantas"),
                         via="reaction")
+                    try:
+                        send_dm_to(
+                            env, reactor,
+                            f"Added: {text[:160]}\n"
+                            f"<{row.get('source_link')}|open source>")
+                    except Exception as ex:  # noqa: BLE001 - capture is durable
+                        print(f"  reaction ack failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
             return
         if event.get("bot_id"):
             return

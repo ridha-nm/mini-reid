@@ -79,6 +79,17 @@ def test_due_dates_read_relative():
     assert "in 2d" in text
 
 
+def test_shortcut_capture_lands_at_the_top():
+    rows = [
+        _row("old", "Overdue thing", due="2026-11-01",
+             created_at="2026-11-01T09:00:00+08:00"),
+        _row("new", "Pinned task", via="reaction",
+             created_at="2026-11-04T18:00:00+08:00"),
+    ]
+    assert [r["id"] for r in ordered_rows(rows, NOW)] == ["new", "old"]
+    assert format_list(rows, NOW).splitlines()[0] == "*Just added*"
+
+
 def test_new_undated_item_is_not_cut_from_a_long_list():
     rows = [_row(f"old{i:02d}", f"Old thing {i}",
                  created_at=f"2026-10-{i + 1:02d}T09:00:00+08:00")

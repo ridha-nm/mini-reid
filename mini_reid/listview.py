@@ -9,6 +9,7 @@ from .render import _client_name
 # Rows a person still has to act on, in display order.
 LIVE = {"open", "stalled", "in progress", "blocked"}
 BUCKETS = [
+    ("recent", "Just added"),
     ("in progress", "In progress"),
     ("blocked", "Blocked"),
     ("overdue", "Overdue"),
@@ -21,6 +22,10 @@ BUCKETS = [
 
 def _bucket(row: dict, today: date) -> str:
     status = (row.get("status") or "open").lower()
+    created = _dt(row.get("created_at"))
+    if (row.get("via") in {"shortcut", "reaction"} and created
+            and created.date() == today):
+        return "recent"
     if status == "in progress":
         return "in progress"
     if status == "blocked":
