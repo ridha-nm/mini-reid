@@ -8,7 +8,9 @@ Append-only. Newest first.
   Open Slack List and Triage buttons. `/mini-reid help` returns HELP.
 - `/mini-reid add: …`, `remind …`, `meet: …` run the normal command path and
   reply in DM. Plain text with no command (`go to the doctor's office at 2pm`)
-  is added as a task and confirmed ephemerally. Non-members get the allow prompt.
+  is added as a task and confirmed ephemerally. `whats on my to-do` and similar
+  queries show the list instead of becoming tasks. Non-members get the allow
+  prompt.
 - Registered in the Slack app and manifest.
 - 344 tests passing.
 

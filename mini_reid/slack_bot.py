@@ -586,7 +586,8 @@ def format_reminders(rows: list[dict], pending: set[str],
 
 
 QUERY = re.compile(
-    r"^\s*(what|when|who|how|show|list|any|status|which)\b|\?\s*$", re.I)
+    r"^\s*(what|whats|when|who|how|show|list|any|status|which)\b|\?\s*$",
+    re.I)
 
 
 def owner_action(action: str, body: str) -> str:
@@ -900,6 +901,8 @@ def slash_route(text: str) -> str:
         return "list"
     if low in {"help", "?"}:
         return "help"
+    if re.search(r"^(?:what'?s|whats)\b.*\b(?:to-?do|to do)\b", low):
+        return "list"
     action, _ = parse_command(value)
     if (action in COMMANDS or action in {"ask", "find", "notes", "reminders"}
             or value.rstrip().endswith("?")):

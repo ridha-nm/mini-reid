@@ -1025,6 +1025,8 @@ def test_slash_command_routes_list_help_and_commands():
     assert slash_route("add go to the doctor's office at 2pm") == "command"
     assert slash_route("meet: @Kasib about the deck") == "command"
     assert slash_route("go to the doctor's office at 2pm") == "add"
+    assert slash_route("whats on my to-do") == "list"
+    assert slash_route("what's on my to-do") == "list"
     assert slash_route("what did we agree with Eupe?") == "command"
 
 
