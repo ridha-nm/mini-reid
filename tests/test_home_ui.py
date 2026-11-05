@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from mini_reid.home_ui import home_blocks, public_home_blocks
+from mini_reid.home_ui import (access_request_blocks, home_blocks,
+                               public_home_blocks)
 
 MYT = timezone(timedelta(hours=8))
 NOW = datetime(2026, 11, 5, 19, 0, tzinfo=MYT)
@@ -31,6 +32,14 @@ def test_home_survives_an_empty_ledger():
     blocks = home_blocks([], NOW)
     assert "Nothing urgent." in str(blocks)
     assert "0 open" in str(blocks)
+
+
+def test_access_request_carries_an_authorise_button():
+    blocks = access_request_blocks("U2")
+    assert "Access request" in str(blocks)
+    button = blocks[1]["elements"][0]
+    assert button["action_id"] == "approve_access"
+    assert button["value"] == "U2"
 
 
 def test_public_home_explains_setup_and_offers_access():

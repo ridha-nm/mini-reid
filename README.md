@@ -80,7 +80,8 @@ Gmail, Jira and Google Calendar.
   text, permalink), then fall back to the local passages.
 - **App Home**: per-person dashboard with counts, top 3 focus items, Open Slack List,
   Triage Inbox and Refresh. Non-authorised users get a capabilities page with
-  **Request access** (DMs you) and **Message Ridha**, never another ledger.
+  **Request access** (DMs you an **Authorise** button) and **Message Ridha**,
+  never another ledger.
 - **Slack List mirror**: each user's ledger is mirrored into a native Slack List with
   title, status, due and source; created once and updated every watcher cycle.
   `list` includes an **Open Slack List** button. Edits in the List flow back to

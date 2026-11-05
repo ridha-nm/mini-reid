@@ -2835,19 +2835,29 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
                 if action_id == "request_access":
+                    from .home_ui import access_request_blocks
+
                     clicker = (payload.get("user") or {}).get("id") or ""
                     if clicker and env.get("SLACK_OWNER_ID"):
                         try:
-                            send_dm_to(
-                                env, env["SLACK_OWNER_ID"],
-                                f"*Access request*\n<@{clicker}> is asking for "
-                                "their own Mini-Reid. Run "
-                                f"`allow: <@{clicker}>` to set them up.")
+                            send_dm_to(env, env["SLACK_OWNER_ID"],
+                                       f"Access request from <@{clicker}>",
+                                       blocks=access_request_blocks(clicker))
                             send_dm_to(env, clicker,
                                        "Request sent. Ridha will set you up.")
                         except Exception as ex:  # noqa: BLE001 - best effort
                             print(f"  access request failed: "
                                   f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
+                if action_id == "approve_access":
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target_user = action.get("value") or ""
+                    if clicker != owner or not target_user:
+                        continue
+                    container = payload.get("container") or {}
+                    process(container.get("channel_id") or "",
+                            owner, f"allow: <@{target_user}>",
+                            f"access:{target_user}")
                     continue
                 if action_id == "home_refresh":
                     publish_home((payload.get("user") or {}).get("id") or "")

@@ -49,6 +49,20 @@ def _focus_line(row: dict, now: datetime) -> str:
     return f"• *{title}*" + (f" — {when}" if when else "") + tail
 
 
+def access_request_blocks(user: str) -> list[dict]:
+    return [
+        {"type": "section",
+         "text": {"type": "mrkdwn",
+                  "text": f"*Access request*\n<@{user}> is asking for their own "
+                          "Mini-Reid."}},
+        {"type": "actions", "elements": [{
+            "type": "button", "action_id": "approve_access", "value": user,
+            "text": {"type": "plain_text", "text": "Authorise"},
+            "style": "primary",
+        }]},
+    ]
+
+
 def public_home_blocks(owner: str = "", team: str = "gopantas") -> list[dict]:
     """App Home for someone who has not been authorised yet."""
     blocks = [

@@ -207,7 +207,8 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
 - The App Home tab is a per-user dashboard: open/overdue/today/Inbox/notes
   counts, top 3 focus items, Open Slack List, Triage Inbox, Refresh and quick
   commands. A non-authorised viewer gets a capabilities page with **Request
-  access** (DMs Ridha the person and the `allow:` line) and **Message Ridha**;
+  access** (DMs Ridha an **Authorise** button that runs the normal `allow:`) and
+  **Message Ridha**;
   no other ledger is exposed.
 - Each user's ledger is mirrored into a native Slack List (“Mini-Reid — Name”)
   with title, status, due and source link. The list is created once and shared
