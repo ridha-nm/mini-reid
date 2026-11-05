@@ -52,6 +52,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
         "Schedule a meeting",
         "I read both calendars and offer free slots, then create the event and invite.",
         ["`meet: @Kasib about BD Command Centre`",
+         "`meet: @Kasib and @Charanya about the deck` — multiple people",
          "or just `set meeting with Kasib to discuss BD Command Centre`",
          "I propose five 30-minute slots in the next five working days",
          "Pick a slot — Google Calendar event + Meet link + invite sent"],

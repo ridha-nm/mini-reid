@@ -176,7 +176,8 @@ ledger), `reassign: <item> to <person>`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
 ignores that title), `remind` (absolute or `in 2 minutes`),
 `ask:`, `find:`, `list`, `notes`, `meet: @Name about <topic>`, `allow: @Name`,
-`banter on|off|status`, `help`. `meet:` reads owner + attendee freeBusy, proposes five
+`banter on|off|status`, `help`. `meet:` accepts one or more attendees
+(`@Kasib and @Charanya`, comma/and-separated names), reads everyone's freeBusy, proposes five
 30-minute slots over five working days with a formal Title/With/Duration block and a
 busy snapshot of both calendars, then creates the Google event with a Meet link and
 invites the attendee. Refresh and Cancel buttons; requires `calendar.events` consent.
