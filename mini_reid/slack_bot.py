@@ -2410,7 +2410,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             except Exception as ex:  # noqa: BLE001 - fall through to search/KB
                 print(f"  ledger ask failed: {type(ex).__name__}: {ex}",
                       flush=True)
-            if not reply:
+            if not reply and user == owner:
                 try:
                     from .files import search as file_search
 
