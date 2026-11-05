@@ -41,6 +41,15 @@ def test_list_blocks_offer_a_triage_button():
     assert "Triage" in action["text"]["text"]
 
 
+def test_list_blocks_link_to_the_native_slack_list():
+    blocks = list_blocks([_row("a1", "Real task")], NOW,
+                         list_url="https://slack/lists/T1/F1")
+    link = [e for b in blocks if b.get("type") == "actions"
+            for e in b["elements"] if e.get("url")][0]
+    assert link["url"] == "https://slack/lists/T1/F1"
+    assert link["text"]["text"] == "Open Slack List"
+
+
 def test_confirm_blocks_offer_add_and_dismiss_per_item():
     from mini_reid.triage_ui import confirm_blocks
 

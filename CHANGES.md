@@ -11,6 +11,8 @@ Append-only. Newest first.
   (“Mini-Reid — Name”): title, status, due and source link. The list is created
   once, shared with the user, and rows are created or updated incrementally
   (last 50).
+- `list` replies now carry an **Open Slack List** button that deep-links to that
+  user's native list next to **Triage & update**.
 - Bot scopes `lists:read` / `lists:write`; live list created for Ridha.
 - 329 tests passing.
 

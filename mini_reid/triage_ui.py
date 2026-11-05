@@ -48,20 +48,25 @@ def _sections(text: str, limit: int = SECTION_LIMIT) -> list[dict]:
             for chunk in chunks or [text or ""]]
 
 
-def list_blocks(rows: list[dict], now: datetime) -> list[dict]:
+def list_blocks(rows: list[dict], now: datetime,
+                list_url: str | None = None) -> list[dict]:
     blocks = _sections(format_list(rows, now))
     selectable = _selectable(rows, now)
-    if selectable:
-        blocks.append({
-            "type": "actions",
-            "elements": [{
-                "type": "button",
-                "action_id": "triage_open",
-                "text": {"type": "plain_text",
-                         "text": f"Triage & update ({len(selectable)})"},
-                "style": "primary",
-            }],
+    elements = []
+    if list_url:
+        elements.append({
+            "type": "button", "url": list_url,
+            "text": {"type": "plain_text", "text": "Open Slack List"},
         })
+    if selectable:
+        elements.append({
+            "type": "button", "action_id": "triage_open",
+            "text": {"type": "plain_text",
+                     "text": f"Triage & update ({len(selectable)})"},
+            "style": "primary",
+        })
+    if elements:
+        blocks.append({"type": "actions", "elements": elements})
     return blocks
 
 

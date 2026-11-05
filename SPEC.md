@@ -205,7 +205,8 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
 - Each user's ledger is mirrored into a native Slack List (“Mini-Reid — Name”)
   with title, status, due and source link. The list is created once and shared
-  write with that user; the watcher creates/updates the latest 50 rows.
+  write with that user; the watcher creates/updates the latest 50 rows. The
+  `list` reply includes an **Open Slack List** button with the deep link.
 - A member's plain DM to the bot becomes a task without an `add:` prefix;
   questions and channel messages keep their existing behaviour.
 - The **Add to Mini-Reid** message shortcut captures any message after a prefilled

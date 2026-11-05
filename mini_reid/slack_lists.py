@@ -41,6 +41,30 @@ def _save_state(path: str, state: dict) -> None:
     Path(path).write_text(json.dumps(state, indent=1))
 
 
+_TEAM_ID = ""
+
+
+def list_url(env: dict, user: str, state_path: str = STATE) -> str | None:
+    """Deep link to the user's Slack List."""
+    global _TEAM_ID
+    cfg = _state(state_path).get(user) or {}
+    list_id = cfg.get("list_id")
+    if not list_id:
+        return None
+    if not _TEAM_ID:
+        try:
+            token = env["SLACK_BOT_TOKEN"]
+            req = urllib.request.Request(
+                "https://slack.com/api/auth.test",
+                headers={"Authorization": f"Bearer {token}"})
+            with urllib.request.urlopen(req, timeout=15) as response:
+                _TEAM_ID = json.load(response).get("team_id") or ""
+        except Exception:  # noqa: BLE001 - link is optional
+            return None
+    team = env.get("SLACK_TEAM", "gopantas")
+    return f"https://{team}.slack.com/lists/{_TEAM_ID}/{list_id}"
+
+
 def ensure_list(env: dict, user: str, name: str,
                 state_path: str = STATE) -> dict:
     state = _state(state_path)

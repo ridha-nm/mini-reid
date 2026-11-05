@@ -2658,9 +2658,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         blocks = None
         if action == "list" and (user == owner or member):
             try:
+                from .slack_lists import list_url
                 from .triage_ui import list_blocks
 
-                blocks = list_blocks(load(user_ledger), datetime.now(MYT))
+                blocks = list_blocks(load(user_ledger), datetime.now(MYT),
+                                     list_url(env, user))
             except Exception as ex:  # noqa: BLE001 - plain text still works
                 print(f"  list blocks failed: {type(ex).__name__}", flush=True)
         if action == "help" and (user == owner or member):
