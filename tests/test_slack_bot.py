@@ -142,6 +142,27 @@ def test_assign_accepts_a_slack_mention(tmp_path):
     assert reply.startswith("Assigned to kasib:")
 
 
+def test_assign_with_a_row_id_reassigns_instead_of_creating_a_task(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Update Reviewer Role for Admins", NOW, clients, ledger)
+    row_id = load(ledger)[0]["id"][:6]
+    reply = apply_command("assign", f"@Charanya {row_id}", NOW, clients, ledger)
+    rows = load(ledger)
+    assert len(rows) == 1
+    assert rows[0]["what"] == "Update Reviewer Role for Admins"
+    assert rows[0]["assigned_to"] == "Charanya"
+    assert reply.startswith("Reassigned to Charanya:")
+
+
+def test_assign_with_an_unknown_id_creates_nothing(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    reply = apply_command("assign", "@Charanya deadbeef", NOW, clients, ledger)
+    assert load(ledger) == []
+    assert "No open item matches" in reply
+
+
 def test_reassign_moves_an_existing_task_to_waiting_on_others(tmp_path):
     from mini_reid.render import render
 
