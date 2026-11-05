@@ -43,7 +43,7 @@ def new_rows(items: list[dict], existing: list[dict], clients: dict, now: dateti
 
 def polish_rows(env: dict, items: list[dict], fresh: list[dict],
                 now: datetime, clients) -> list[dict]:
-    """Clean titles with the local model; every row still waits in the inbox."""
+    """Clean titles with the local model; the rule's stamp decides the status."""
     if not fresh:
         return fresh
     from .providers import OllamaProvider, extract_batch_safe
@@ -61,11 +61,13 @@ def polish_rows(env: dict, items: list[dict], fresh: list[dict],
 
 
 def triage_rows(fresh: list[dict], rewritten: list[dict]) -> list[dict]:
-    """Every rule-captured row waits for a person; the model only cleans the title.
+    """The rule's capture stamp decides the status; the model only cleans the title.
 
-    A row the model rewrote keeps its wording. A row the model omitted, rejected
-    or failed on keeps the rule text. Nothing is dropped here: confirming or
-    dismissing is the person's click, not the model's call.
+    A row the rules stamped ``capture == "auto"`` is already open. Any other
+    row waits in the inbox for a person. A row the model rewrote keeps its
+    wording. A row the model omitted, rejected or failed on keeps the rule
+    text. Nothing is dropped here: confirming or dismissing an inbox row is the
+    person's click, not the model's call — and the model never moves a row.
     """
     model_by_nid = {r["native_id"]: r for r in rewritten if r.get("native_id")}
     seen = {r.get("native_id") for r in fresh}
@@ -73,12 +75,15 @@ def triage_rows(fresh: list[dict], rewritten: list[dict]) -> list[dict]:
     for row in fresh:
         nid = row.get("native_id")
         better = model_by_nid.pop(nid, None)
+        status = "open" if row.get("capture") == "auto" else "inbox"
         if better:
-            out.append(dict(better, status="inbox",
+            out.append(dict(better, status=status,
+                            capture=row.get("capture", "inbox"),
+                            capture_why=row.get("capture_why", ""),
                             client=row.get("client"),
                             asker=row.get("asker") or better.get("asker")))
         else:
-            out.append(dict(row, status="inbox"))
+            out.append(dict(row, status=status))
     out.extend(dict(r, status="inbox") for nid, r in model_by_nid.items()
                if nid not in seen)
     return out
@@ -629,7 +634,7 @@ def main() -> int:
     existing = load(ledger_path)
     fresh = new_rows(items, existing, clients, now)
 
-    # Rules capture; the model only cleans titles. Every row waits for a click.
+    # Rules capture; the model only cleans titles. The stamp decides the status.
     fresh = polish_rows(env, items, fresh, now, clients)
 
     if fresh:

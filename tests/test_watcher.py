@@ -61,6 +61,23 @@ def test_triage_keeps_the_rule_client_and_asker():
     assert out[0]["asker"] == "Daniel"
 
 
+def test_triage_auto_capture_skips_the_click():
+    from mini_reid.watcher import triage_rows
+    fresh = [dict(_rule("m1"), capture="auto", capture_why="jira-assigned")]
+    out = triage_rows(fresh, [])
+    assert out[0]["status"] == "open"
+
+
+def test_model_rewrite_cannot_change_the_capture_decision():
+    from mini_reid.watcher import triage_rows
+    fresh = [dict(_rule("m1"), capture="auto")]
+    model = [dict(_rule("m1"), what="Review the deck")]
+    out = triage_rows(fresh, model)
+    assert out[0]["what"] == "Review the deck"
+    assert out[0]["status"] == "open"
+    assert out[0]["capture"] == "auto"
+
+
 def test_stamp_confirmation_links_rows_to_the_dm(tmp_path, monkeypatch):
     from mini_reid import watcher as w
     from mini_reid.ledger import load, save
