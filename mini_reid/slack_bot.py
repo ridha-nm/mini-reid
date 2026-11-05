@@ -141,8 +141,11 @@ def _play_uid(who: str, users: dict[str, str]) -> str | None:
 
 def play_reply(text: str, users: dict[str, str]) -> str | None:
     """Silly but harmless: 'give @Raj a hug', 'high five @Raj'."""
+    # The channel message starts with the bot's own mention; it is not part
+    # of the request. Without this, "@mini-reid high-five @Julian" never matched.
+    text = LEADING_MENTION.sub("", text or "")
     for pattern in (PLAY_GIVE, PLAY_TO):
-        m = pattern.search(text or "")
+        m = pattern.search(text)
         if not m:
             continue
         uid = _play_uid(m.group("who"), users)
