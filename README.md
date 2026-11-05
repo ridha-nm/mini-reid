@@ -34,7 +34,7 @@ Gmail, Jira and Google Calendar.
   set a status on several rows at once, with **Select all** / **Clear**. `185045` or `id:185045` works in every command;
   `done`/`not` also take bulk refs (`done 7, 9`) or a pasted list, one bullet per
   line; the `[abc123]` ids in the paste pick the exact rows, and titles are
-  matched as a fallback.
+  matched as a fallback. `not:` also matches notes.
   `undo:` reverses the last change. Priority 1-5 sorts the digest and list.
   `help` opens a topic picker grouped by intent, with My list and Triage buttons.
   Open rows untouched for a day get an evening DM (max 3 per row) with an inline

@@ -921,6 +921,32 @@ def test_multiline_not_parses_as_not_and_uses_short_ids(tmp_path):
     assert [r["status"] for r in load(ledger)] == ["dropped", "dropped"]
 
 
+def test_not_accepts_a_pasted_notes_list(tmp_path):
+    from mini_reid.ledger import save
+
+    ledger = str(tmp_path / "ledger.json")
+    save(ledger, [
+        {"id": "n1a819d8", "what": "take note that people hate reading",
+         "kind": "note", "status": "open"},
+        {"id": "n24164d2", "what": "assign <@U0AKPNGF7LH> *Register for New User*",
+         "kind": "note", "status": "open"},
+        {"id": "n3592bf8", "what": "AHAHHA <@U0CEE242B5E> remind <@U07A2C2H0RE> to go to bed!",
+         "kind": "note", "status": "open"},
+        {"id": "n483205c", "what": "9. [6bf89a] Follow-up: Meeting Materials &amp; IFRS 2 Gap Analysis — long",
+         "kind": "note", "status": "open"},
+        {"id": "n525abe4", "what": "GHB Invoicing — Nov 2026 cycle complete",
+         "kind": "note", "status": "open"},
+    ])
+    body = ("• take note that people hate reading\n"
+            "• assign @Azleena Register for New User\n"
+            "• AHAHHA @mini-reid remind @Eden to go to bed!\n"
+            "• 9. [6bf89a] Follow-up: Meeting Materials & IFRS 2 Gap Analysis — 1d overdue\n"
+            "• GHB Invoicing — Nov 2026 cycle complete")
+    reply = apply_command("not", body, NOW, {}, ledger)
+    assert "Removed 5" in reply
+    assert {r["status"] for r in load(ledger)} == {"dropped"}
+
+
 def test_pasted_list_skips_a_row_already_dropped(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")

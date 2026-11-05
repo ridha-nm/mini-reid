@@ -33,3 +33,6 @@ calendar_ignores.json
 banter.json
 .watcher.lock
 auth.log
+
+# digest delivery marker
+digest_delivered.json

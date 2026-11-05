@@ -179,8 +179,10 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   `id:abc1, id:def2`. One bad ref rejects the whole batch and changes nothing.
 - Both also accept a pasted digest/list: one bullet per line, metadata after an
   em dash ignored, `[abc123]` short id used when present. Titles match normalised
-  text, then a unique prefix; Slack HTML entities are unescaped. A row already
-  done/dropped is skipped. One unknown or ambiguous title rejects the batch.
+  text, then a unique prefix; Slack HTML entities are unescaped. `not:` also
+  matches notes, including note text that itself starts with `9. [abc123]`, and
+  tolerates Slack ids vs typed names. A row already done/dropped is skipped. One
+  unknown or ambiguous title rejects the batch.
 - A new item's DM offers **Add to list** / **Not a task** per item. Add sets the row
   `open` and ✅s the source Slack message; Not a task sets `dropped` /
   `not_commitment`. The click edits the DM to name the outcome and rebuilds buttons
