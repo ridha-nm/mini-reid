@@ -63,6 +63,8 @@ Gmail, Jira and Google Calendar.
   Slack mention alerts, reminders, meeting reminders and 09:15 digest stay private;
   new items get the same confirmation buttons, grouped list/triage and stale nudges.
   A member can DM the bot plain text and it becomes a task; no prefix needed.
+  Right-click any message and choose **Add to Mini-Reid**, or react with 📌, to
+  capture it without tagging the bot.
   Jira activates automatically from the shared workspace token, scoped to their Jira
   account. Gmail uses a hosted Google OAuth page: one click, consent, done. The Cloud
   Run relay holds the code for seconds and the Mac picks it up. A profile's `clients`

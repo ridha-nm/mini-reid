@@ -204,6 +204,9 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
 - A member's plain DM to the bot becomes a task without an `add:` prefix;
   questions and channel messages keep their existing behaviour.
+- The **Add to Mini-Reid** message shortcut captures any message after a prefilled
+  modal. Reacting with `CAPTURE_REACTION` (default `pushpin`) captures it without a
+  modal, into the reacting user's ledger. Both link back to the source message.
 - Bot-addressed chatter from a non-owner is answered with the default line in the
   triggering thread and never stored as a note. Only an explicit command from someone
   else is relayed to Ridha. Every channel reply uses the triggering `thread_ts`.

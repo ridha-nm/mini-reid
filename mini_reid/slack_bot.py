@@ -806,6 +806,92 @@ def add_reminder_row(ledger_path: str, what: str, fields: dict,
     return row
 
 
+def add_slack_capture(ledger_path: str, text: str, channel: str, ts: str,
+                      user: str, users: dict[str, str], now: datetime,
+                      permalink: str = "", team: str = "gopantas",
+                      via: str = "shortcut") -> dict:
+    """An explicit shortcut or reaction captures the message as an open task."""
+    clean = (text or "").strip()
+    link = permalink or (
+        f"https://{team}.slack.com/archives/{channel}/p{ts.replace('.', '')}")
+    row = {
+        "id": commitment_id("slack", f"{channel}:{ts}", clean),
+        "direction": "owed_by_me", "what": clean[:200],
+        "asker": _person_name(user, users) or None,
+        "via": via, "source": "slack", "native_id": f"{channel}:{ts}",
+        "kind": "mention", "source_link": link, "evidence": clean[:200],
+        "due": None, "due_confidence": 0.0, "cycle": None,
+        "status": "open", "stalled_since": None, "ack_policy": "bot_may_ack",
+        "closure": "open", "client": None,
+        "created_at": now.isoformat(), "last_activity": now.isoformat(),
+        "closed_at": None, "closed_how": None,
+    }
+    save(ledger_path, merge(load(ledger_path), [row]))
+    return row
+
+
+def capture_modal(text: str, metadata: dict) -> dict:
+    """Prefilled modal for the 'Add to Mini-Reid' message shortcut."""
+    blocks = [
+        {"type": "section",
+         "text": {"type": "mrkdwn",
+                  "text": "Turn this message into a task. Edit the title if needed."}},
+        {"type": "input", "block_id": "title",
+         "label": {"type": "plain_text", "text": "Task"},
+         "element": {"type": "plain_text_input", "action_id": "value",
+                     "initial_value": (text or "")[:200], "max_length": 200}},
+    ]
+    link = metadata.get("permalink") or ""
+    if link:
+        blocks.insert(1, {"type": "section",
+                          "text": {"type": "mrkdwn",
+                                   "text": f"<{link}|open source message>"}})
+    return {
+        "type": "modal", "callback_id": "mini_reid_capture",
+        "private_metadata": json.dumps(metadata)[:2900],
+        "title": {"type": "plain_text", "text": "Add to Mini-Reid"},
+        "submit": {"type": "plain_text", "text": "Add task"},
+        "close": {"type": "plain_text", "text": "Cancel"},
+        "blocks": blocks,
+    }
+
+
+def fetch_message_text(env: dict, channel: str, ts: str) -> str:
+    """Read the message behind a shortcut or reaction; bot token first."""
+    from .sources import _get_json
+
+    for key in ("SLACK_BOT_TOKEN", "SLACK_USER_TOKEN"):
+        token = env.get(key)
+        if not token:
+            continue
+        url = ("https://slack.com/api/conversations.history?"
+               + urllib.parse.urlencode({"channel": channel, "oldest": ts,
+                                         "latest": ts, "inclusive": "true",
+                                         "limit": 1}))
+        try:
+            d = _get_json(url, {"Authorization": f"Bearer {token}"})
+        except Exception:  # noqa: BLE001 - try the next token
+            continue
+        for message in d.get("messages") or []:
+            if message.get("ts") == ts and not message.get("bot_id"):
+                return (message.get("text") or "").strip()
+    return ""
+
+
+def capture_reaction(event: dict, name: str) -> tuple[str, str, str] | None:
+    """(channel, message ts, reacting user) for the capture emoji only."""
+    if event.get("type") != "reaction_added":
+        return None
+    if (event.get("reaction") or "").lower() != name.lower():
+        return None
+    item = event.get("item") or {}
+    if item.get("type") != "message":
+        return None
+    channel, ts = item.get("channel") or "", item.get("ts") or ""
+    user = event.get("user") or ""
+    return (channel, ts, user) if channel and ts and user else None
+
+
 def member_quick_add(channel: str, action: str, member: bool,
                      text: str) -> bool:
     """A member's plain DM becomes a task; no `add:` prefix needed."""
@@ -2587,8 +2673,57 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
     def handle(_socket_client, req):
         client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
         payload = req.payload or {}
+        if payload.get("type") == "message_action":
+            if payload.get("callback_id") == "add_to_mini_reid":
+                msg = payload.get("message") or {}
+                channel = (payload.get("channel") or {}).get("id") or ""
+                metadata = {
+                    "channel": channel,
+                    "ts": msg.get("ts") or "",
+                    "permalink": payload.get("permalink") or "",
+                    "author": msg.get("user") or "",
+                }
+                try:
+                    web.views_open(
+                        trigger_id=payload.get("trigger_id") or "",
+                        view=capture_modal(msg.get("text") or "", metadata))
+                except Exception as ex:  # noqa: BLE001 - user can retry
+                    print(f"  capture modal failed: {type(ex).__name__}: {ex}",
+                          flush=True)
+            return
         if payload.get("type") == "view_submission":
             view = payload.get("view") or {}
+            if view.get("callback_id") == "mini_reid_capture":
+                from .notify import react
+
+                clicker = (payload.get("user") or {}).get("id") or ""
+                target = ledger_for_viewer(clicker)
+                if not target:
+                    return
+                values = (view.get("state") or {}).get("values") or {}
+                title = ((values.get("title") or {}).get("value") or {}) \
+                    .get("value") or ""
+                metadata = json.loads(view.get("private_metadata") or "{}")
+                if title.strip():
+                    row = add_slack_capture(
+                        target, title.strip(), metadata.get("channel") or "",
+                        metadata.get("ts") or "", clicker, users,
+                        datetime.now(MYT),
+                        permalink=metadata.get("permalink") or "",
+                        team=env.get("SLACK_TEAM", "gopantas"),
+                        via="shortcut")
+                    if row.get("native_id"):
+                        channel_id, _, ts = row["native_id"].partition(":")
+                        try:
+                            react(env["SLACK_BOT_TOKEN"], channel_id, ts)
+                        except Exception:  # noqa: BLE001 - best effort
+                            pass
+                    try:
+                        send_dm_to(env, clicker,
+                                   f"Added: {title.strip()[:160]}")
+                    except Exception:  # noqa: BLE001 - best effort
+                        pass
+                return
             if view.get("callback_id") == "meet_edit":
                 from .meeting_ui import slot_blocks
                 from .meetings import propose_slots
@@ -2936,6 +3071,20 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                                              thread_ts=msg_ts or None)
             return
         event = (req.payload or {}).get("event") or {}
+        if event.get("type") == "reaction_added":
+            parsed = capture_reaction(event,
+                                      env.get("CAPTURE_REACTION", "pushpin"))
+            if parsed:
+                channel, msg_ts, reactor = parsed
+                target = ledger_for_viewer(reactor)
+                text = fetch_message_text(env, channel, msg_ts) if target else ""
+                if target and text:
+                    add_slack_capture(
+                        target, text, channel, msg_ts, reactor, users,
+                        datetime.now(MYT),
+                        team=env.get("SLACK_TEAM", "gopantas"),
+                        via="reaction")
+            return
         if event.get("bot_id"):
             return
         if event.get("subtype"):
