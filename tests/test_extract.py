@@ -244,11 +244,27 @@ def test_auto_capture_matrix():
     assert auto_reason(jira, "Audit data units", None, None) == "jira-assigned"
     assert auto_reason(slack, "can you review the deck", None, None) == "slack-direct-ask"
     assert auto_reason(slack, "the office is closed tomorrow", None, None) is None
+    # "please" alone is politeness, not an ask: it must not skip the click.
+    assert auto_reason(slack, "please note the office is closed tomorrow", None, None) is None
+    assert auto_reason(slack, "please review the deck", None, None) == "slack-direct-ask"
     assert auto_reason(dm, "send the deck", None, None) is None
     assert auto_reason(dm, "send the deck by Friday", "2026-11-06", None) == "slack-dm-ask"
     assert auto_reason(mail, "please confirm the mapping", None, "Ridha") == "email-direct-ask"
     alias = dict(mail, to="BD <bd@pantas.com>")
     assert auto_reason(alias, "please confirm the mapping", None, "Ridha") is None
+    # The alias mail is kept in Inbox by the body mention, but auto needs the To.
+    assert auto_reason(
+        alias, "Ridha will follow up. Please review the mapping.", None,
+        "Ridha") is None
+
+
+def test_uncertain_mention_is_stamped_inbox():
+    item = {"source": "slack", "native_id": "s2", "kind": "mention",
+            "author": "kasib", "text": "please note the office is closed tomorrow",
+            "link": "l", "ts": "2026-10-30T08:00:00+08:00"}
+    row = extract(item, None, NOW)[0]
+    assert row["capture"] == "inbox"
+    assert row["capture_why"] == ""
 
 
 def test_extract_stamps_capture_mode():

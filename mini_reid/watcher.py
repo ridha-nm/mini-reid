@@ -651,7 +651,7 @@ def main() -> int:
         sent = send_dm(env, format_alert(fresh),
                        blocks=confirm_blocks(pending) if pending else None)
         _stamp_confirmation(ledger_path, {r["id"] for r in pending}, sent)
-        print(f"[{now:%H:%M:%S}] asked to confirm {len(fresh)} new", flush=True)
+        print(f"[{now:%H:%M:%S}] asked to confirm {len(pending)} new", flush=True)
     try:
         from .slack_lists import sync_user as sync_slack_list
 

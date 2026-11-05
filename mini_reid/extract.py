@@ -17,8 +17,18 @@ REQUEST_POLITE = re.compile(
     r"\b(?:please|pls|plz|kindly|action required)\b", re.I)
 REQUEST_NEED = re.compile(
     r"\b(?:we\s+need|need\s+(?:you|your|the|a|an|it|this|that|by))\b", re.I)
+# A polite word alone is politeness, not an ask: "please note the office is
+# closed" must not skip the click. It needs a request verb in the same sentence.
+POLITE_REQUEST = re.compile(
+    r"\b(?:please|pls|plz|kindly)\b[^.!?\n]{0,60}?"
+    r"\b(?:can|could|would|will|send|share|provide|confirm|review|approve|update|"
+    r"check|prepare|draft|book|schedule|fix|add|remove|create|complete|finish|"
+    r"submit|sign|pay|call|join|reply|respond|get|start|do|make|write|build|test|"
+    r"read|open|close|look|take|follow|need)\b", re.I)
+ACTION_REQUIRED = re.compile(r"\baction required\b", re.I)
 EXPLICIT_ASK = re.compile(
-    REQUEST_MODAL.pattern + "|" + REQUEST_POLITE.pattern + "|" + REQUEST_NEED.pattern,
+    REQUEST_MODAL.pattern + "|" + REQUEST_NEED.pattern + "|"
+    + ACTION_REQUIRED.pattern + "|" + POLITE_REQUEST.pattern,
     re.I)
 IMPERATIVE = re.compile(
     r"^(?:please\s+)?(?:send|share|provide|confirm|review|approve|update|check|"
@@ -164,7 +174,9 @@ def auto_reason(item: dict, text: str, due: str | None,
         return "slack-dm-ask"
     if source == "gmail" and kind == "inbox":
         needle = (me or "Ridha").split("@")[0].lower()
-        direct = needle in (item.get("to") or "").lower() or needle in (text or "").lower()
+        # Stricter than the Inbox gate: a body mention is enough to keep the
+        # mail, but only a To: address may skip the click.
+        direct = needle in (item.get("to") or "").lower()
         if direct and (ask or due):
             return "email-direct-ask"
     return None
