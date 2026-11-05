@@ -2343,6 +2343,13 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 blocks = list_blocks(load(user_ledger), datetime.now(MYT))
             except Exception as ex:  # noqa: BLE001 - plain text still works
                 print(f"  list blocks failed: {type(ex).__name__}", flush=True)
+        if action == "help" and (user == owner or member):
+            try:
+                from .help_ui import home_blocks
+
+                blocks = home_blocks()
+            except Exception as ex:  # noqa: BLE001 - plain text still works
+                print(f"  help blocks failed: {type(ex).__name__}", flush=True)
         say(reply, blocks=blocks)
         _mark(ts)
 
@@ -2390,6 +2397,49 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
+                if action_id in {"help_topic", "help_home"}:
+                    from .help_ui import home_blocks, topic_blocks, topic_text
+
+                    container = payload.get("container") or {}
+                    channel = container.get("channel_id") or ""
+                    msg_ts = container.get("message_ts") or ""
+                    if not channel or not msg_ts:
+                        continue
+                    if action_id == "help_home":
+                        blocks, text = home_blocks(), "Mini-Reid help"
+                    else:
+                        key = ((action.get("selected_option") or {}).get("value")
+                               or "capture")
+                        blocks, text = topic_blocks(key), topic_text(key)
+                    try:
+                        web.chat_update(channel=channel, ts=msg_ts,
+                                        text=text, blocks=blocks)
+                    except Exception as ex:  # noqa: BLE001 - user can retry
+                        print(f"  help update failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
+                if action_id == "help_list":
+                    from .listview import format_list
+                    from .triage_ui import list_blocks
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target = ledger_for_viewer(clicker)
+                    if not target:
+                        continue
+                    container = payload.get("container") or {}
+                    channel = container.get("channel_id") or ""
+                    if not channel:
+                        continue
+                    rows = load(target)
+                    now = datetime.now(MYT)
+                    try:
+                        web.chat_postMessage(
+                            channel=channel, text=format_list(rows, now),
+                            blocks=list_blocks(rows, now))
+                    except Exception as ex:  # noqa: BLE001 - user can retry
+                        print(f"  help list failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
                 if action_id in {"triage_select_all", "triage_clear"}:
                     from .triage_ui import triage_modal
 

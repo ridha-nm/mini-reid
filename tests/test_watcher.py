@@ -92,6 +92,18 @@ def test_stale_rows_wait_for_a_day_without_activity():
     assert [r["id"] for r in stale_rows(rows, NOW)] == ["old"]
 
 
+def test_digest_due_waits_until_after_0930_and_todays_marker(tmp_path):
+    from mini_reid.watcher import digest_due
+
+    marker = tmp_path / "delivered.json"
+    assert not digest_due(NOW.replace(hour=9, minute=15), str(marker))
+    assert digest_due(NOW.replace(hour=9, minute=31), str(marker))
+    marker.write_text('{"date": "2026-10-29"}')
+    assert digest_due(NOW.replace(hour=10), str(marker))
+    marker.write_text('{"date": "2026-10-30"}')
+    assert not digest_due(NOW.replace(hour=10), str(marker))
+
+
 def test_polish_rows_rewrites_titles_and_still_waits(monkeypatch):
     from mini_reid import watcher as w
 

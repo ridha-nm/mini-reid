@@ -506,6 +506,60 @@ def _stamp_confirmation(ledger_path: str, ids: set[str], sent) -> None:
         save(ledger_path, rows)
 
 
+DIGEST_RETRY_HOUR = (9, 30)
+DIGEST_RETRY_SECONDS = 600
+
+
+def digest_due(now: datetime, marker_path: str = "digest_delivered.json") -> bool:
+    """A digest should exist today and, after 09:30, must have been delivered."""
+    if (now.hour, now.minute) < DIGEST_RETRY_HOUR:
+        return False
+    path = Path(marker_path)
+    if not path.exists():
+        return True
+    try:
+        return json.loads(path.read_text()).get("date") != now.date().isoformat()
+    except (json.JSONDecodeError, OSError):
+        return True
+
+
+def maybe_deliver_digest(now: datetime,
+                         state_path: str = "watcher_state.json") -> int:
+    """If the 09:15 digest never reached Slack, build and deliver it now.
+
+    The launchd job fails silently when the Mac has no DNS at 09:15 (it did on
+    2, 3 and 5 Nov). The watcher retries every 10 minutes until it succeeds.
+    """
+    if not digest_due(now):
+        return 0
+    state = Path(state_path)
+    seen = json.loads(state.read_text()) if state.exists() else {}
+    last = float(seen.get("digest_attempt") or 0)
+    if last and now.timestamp() - last < DIGEST_RETRY_SECONDS:
+        return 0
+    seen["digest_attempt"] = now.timestamp()
+    state.write_text(json.dumps(seen))
+
+    import subprocess
+    import sys
+
+    root = Path(__file__).resolve().parent.parent
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "mini_reid.cli", "--days", "1", "--deliver"],
+            cwd=root, capture_output=True, text=True, timeout=600)
+    except Exception as ex:  # noqa: BLE001 - retry on the next watcher cycle
+        print(f"[{now:%H:%M:%S}] digest retry failed: {type(ex).__name__}: {ex}",
+              flush=True)
+        return 0
+    if "delivered to Slack DM" in proc.stdout:
+        print(f"[{now:%H:%M:%S}] digest delivered late", flush=True)
+        return 1
+    tail = (proc.stderr or proc.stdout).strip().splitlines()[-2:]
+    print(f"[{now:%H:%M:%S}] digest retry failed: {' | '.join(tail)}", flush=True)
+    return 0
+
+
 def main() -> int:
     import fcntl
 
@@ -552,6 +606,11 @@ def main() -> int:
             print(f"[{now:%H:%M:%S}] stale nudge: {stale}", flush=True)
     except Exception as ex:  # noqa: BLE001 - a nudge must not stop capture
         print(f"[{now:%H:%M:%S}] stale nudge: {type(ex).__name__}: {ex}", flush=True)
+    try:
+        maybe_deliver_digest(now)
+    except Exception as ex:  # noqa: BLE001 - digest retry must not stop capture
+        print(f"[{now:%H:%M:%S}] digest check: {type(ex).__name__}: {ex}",
+              flush=True)
 
     items, errors = collect(days=1, offline=False)
     existing = load(ledger_path)

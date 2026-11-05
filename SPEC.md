@@ -172,6 +172,8 @@ ledger), `reassign: <item> to <person>`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
 ignores that title), `remind` (absolute or `in 2 minutes`),
 `ask:`, `find:`, `list`, `notes`, `allow: @Name`, `banter on|off|status`, `help`.
+`help` is a topic picker (Capture, Update, Close, Find, Inbox, Reminders, Team,
+Fun) with **My list** and **Triage inbox** buttons, not a command dump.
 
 - `done` and `not` accept several refs at once: `done 7, 9`, `#7 #9`,
   `id:abc1, id:def2`. One bad ref rejects the whole batch and changes nothing.
