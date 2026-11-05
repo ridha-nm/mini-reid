@@ -893,13 +893,18 @@ def capture_reaction(event: dict, name: str) -> tuple[str, str, str] | None:
 
 
 def slash_route(text: str) -> str:
-    """list, help, or command for /mini-reid arguments."""
-    value = (text or "").strip().lower()
-    if not value or value in {"list", "ls", "open"}:
+    """list, help, add (plain task text), or command for /mini-reid."""
+    value = (text or "").strip()
+    low = value.lower()
+    if not value or low in {"list", "ls", "open"}:
         return "list"
-    if value in {"help", "?"}:
+    if low in {"help", "?"}:
         return "help"
-    return "command"
+    action, _ = parse_command(value)
+    if (action in COMMANDS or action in {"ask", "find", "notes", "reminders"}
+            or value.rstrip().endswith("?")):
+        return "command"
+    return "add"
 
 
 def member_quick_add(channel: str, action: str, member: bool,
@@ -2785,6 +2790,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 return
             if route == "help":
                 respond(HELP)
+                return
+            if route == "add":
+                reply = _apply_command("add", text, datetime.now(MYT),
+                                       clients, target, users)
+                respond(reply)
                 return
             process(channel, user, text, f"slash:{payload.get('trigger_id') or user}")
             respond("Sent to your DM.")

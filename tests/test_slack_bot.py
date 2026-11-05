@@ -1022,7 +1022,10 @@ def test_slash_command_routes_list_help_and_commands():
     assert slash_route("list") == "list"
     assert slash_route("help") == "help"
     assert slash_route("add: send the deck") == "command"
+    assert slash_route("add go to the doctor's office at 2pm") == "command"
     assert slash_route("meet: @Kasib about the deck") == "command"
+    assert slash_route("go to the doctor's office at 2pm") == "add"
+    assert slash_route("what did we agree with Eupe?") == "command"
 
 
 def test_member_plain_dm_is_quick_added_but_questions_are_not():

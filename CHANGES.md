@@ -7,7 +7,8 @@ Append-only. Newest first.
 - `/mini-reid` with no args or `list` returns the grouped list ephemerally with
   Open Slack List and Triage buttons. `/mini-reid help` returns HELP.
 - `/mini-reid add: …`, `remind …`, `meet: …` run the normal command path and
-  reply in DM. Non-members get the allow prompt.
+  reply in DM. Plain text with no command (`go to the doctor's office at 2pm`)
+  is added as a task and confirmed ephemerally. Non-members get the allow prompt.
 - Registered in the Slack app and manifest.
 - 344 tests passing.
 
