@@ -45,3 +45,25 @@ def test_only_member_mentions_in_bot_channels(tmp_path, monkeypatch):
     monkeypatch.setattr(members, "_history", lambda env, channel, oldest: messages)
     assert members.slack_mentions(
         {"SLACK_BOT_TOKEN": "x"}, "U1", profile, 1, NOW) == []
+
+
+def test_member_refresh_keeps_the_auto_capture_decision(tmp_path, monkeypatch):
+    from mini_reid.ledger import load
+
+    profile = {"name": "Charanya", "ledger": str(tmp_path / "ledger.json")}
+    item = {"source": "jira", "native_id": "j1", "kind": "issue",
+            "author": "Bo", "text": "Audit data units", "link": "https://x/j1",
+            "ts": "2026-11-03T09:00:00+00:00"}
+    monkeypatch.setattr(members, "collect", lambda *a, **k: ([item], []))
+    monkeypatch.setattr("mini_reid.providers.extract_batch_safe",
+                        lambda items, provider, now, clients: ([], []))
+    monkeypatch.setattr(members, "send_dm_to",
+                        lambda env, uid, text, blocks=None: None)
+    monkeypatch.setattr("mini_reid.slack_lists.sync_user",
+                        lambda env, uid, name, path: 0)
+
+    out = members.refresh({}, "U1", profile)
+
+    assert [r["capture"] for r in out] == ["auto"]
+    assert [r["status"] for r in out] == ["open"]
+    assert load(profile["ledger"])[0]["status"] == "open"

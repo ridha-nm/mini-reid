@@ -201,7 +201,6 @@ def refresh(env: dict, user: str, profile: dict, days: int = 1) -> list[dict]:
                      me=profile.get("email") or profile.get("name"))
     fresh = polish_rows(env, items, fresh, now, clients)
     if fresh:
-        fresh = [dict(row, status="inbox") for row in fresh]
         save(ledger_path, apply_stalled(merge(existing, fresh), now))
         from .triage_ui import confirm_blocks
 
