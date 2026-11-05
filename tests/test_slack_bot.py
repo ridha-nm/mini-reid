@@ -1015,6 +1015,11 @@ def test_owner_reminders_use_slack_scheduling_now():
     assert should_schedule_reminder("remind", "URIDHA", "URIDHA", None)
 
 
+def test_plain_undo_is_a_command_not_a_note():
+    assert parse_command("undo") == ("undo", "")
+    assert parse_command("undo the last change") == ("undo", "")
+
+
 def test_not_rejects_a_question_instead_of_dropping_a_fuzzy_match(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")

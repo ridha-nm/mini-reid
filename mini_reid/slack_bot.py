@@ -996,7 +996,8 @@ POLITE_PREFIX = re.compile(
     r"(?:(?:please|pls|kindly|can you|could you|would you|will you|can u)\s+)*",
     re.I)
 NATURAL_VERBS = ("add", "note", "done", "drop", "remind", "due", "snooze",
-                 "waiting", "find", "status", "assign", "list", "help")
+                 "waiting", "find", "status", "assign", "list", "help",
+                 "undo")
 VERB_ALIASES = {
     "close": "done", "complete": "done", "completed": "done",
     "finish": "done", "finished": "done", "mark": "done",
@@ -1067,6 +1068,8 @@ def natural_command(body: str) -> tuple[str, str] | None:
         return "list", ""
     if verb == "help":
         return "help", ""
+    if verb == "undo":
+        return "undo", ""
     if verb == "assign":
         m = re.match(r"^(.+?)\s+to\s+(.+)$", rest, re.I)
         if m:

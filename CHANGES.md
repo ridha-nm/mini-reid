@@ -13,6 +13,8 @@ Append-only. Newest first.
   prompt.
 - `not: whats on my to-do` now refuses as a question instead of fuzzy-matching
   and dropping a real task. The wrongly dropped dashboard task was restored.
+- Plain `undo` is recognised as the undo command, not fuzzy-matched to a note.
+  The accidental note was removed.
 - Registered in the Slack app and manifest.
 - 344 tests passing.
 
