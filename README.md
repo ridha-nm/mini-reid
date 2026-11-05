@@ -36,6 +36,7 @@ Gmail, Jira and Google Calendar.
   line; the `[abc123]` ids in the paste pick the exact rows, and titles are
   matched as a fallback.
   `undo:` reverses the last change. Priority 1-5 sorts the digest and list.
+  `help` opens a topic picker grouped by intent, with My list and Triage buttons.
   Open rows untouched for a day get an evening DM (max 3 per row) with an inline
   status picker.
   Successful `add:` reacts ➕; `note:` / `tonote:` react 📝; `remind:` reacts ⏰.

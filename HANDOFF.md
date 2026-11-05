@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Knight Frank, Allianz, Setia and Eupe. 287 tests pass.
+overridden to Knight Frank, Allianz, Setia and Eupe. 291 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
@@ -139,7 +139,7 @@ ask: what did we agree with Eupe  answer from your own writing, with sources
 find: eupe                        search the ledger
 list                              grouped open items + Inbox + Notes, Triage button
 notes                             list notes; they also appear in the digest
-help                              the command list
+help                              topic picker: Capture / Update / Close / Find …
 ```
 
 Bot-addressed small talk ("hi", "you there?", "thanks") gets the default reply naming
@@ -191,6 +191,10 @@ scheduling duplicates.
 The daily overdue nudge (first watcher cycle after 09:00) uses the same row renderer as
 the digest, so it carries the same sender, time and link. Undated rows are not overdue;
 only a real past due date or a stalled status is.
+
+The 09:15 job writes `digest_delivered.json` only after Slack accepts the DM. If
+it fails (no DNS on 2, 3 and 5 Nov), the watcher regenerates and delivers after
+09:30, retrying every 10 minutes until the marker says today is done.
 
 A new item does not enter any digest bucket until it is confirmed. The capture DM
 shows each item with **Add to list** / **Not a task**; unanswered items stay in the
@@ -266,7 +270,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-287 tests passing as of 2026-11-05.
+291 tests passing as of 2026-11-05.
 
 ## Next, agreed
 

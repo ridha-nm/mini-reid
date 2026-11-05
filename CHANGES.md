@@ -2,6 +2,17 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (interactive help + morning digest catch-up)
+
+- `help` now opens a topic picker: Capture, Update, Close, Find, Inbox,
+  Reminders, Team, Fun, with **My list** and **Triage inbox** buttons and a
+  **Back to topics** button. Commands are grouped by what the person wants to do.
+- The 09:15 digest wrote `digest_delivered.json` only on a successful Slack DM.
+  If the Mac had no DNS at 09:15, the watcher now regenerates and delivers after
+  09:30, retrying every 10 minutes until it lands. That happened on 2, 3 and
+  5 Nov; those days had no digest.
+- 291 tests passing.
+
 ## 2026-11-05 (fuzzy "not" and bot self-messages)
 
 - `not the time` no longer fuzzy-matches `note` and becomes a note; plain

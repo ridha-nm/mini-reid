@@ -20,6 +20,7 @@ from .sources import (fetch_gmail, fetch_jira, fetch_slack, fetch_slack_dms,
 MYT = timezone(timedelta(hours=8))
 LEDGER = "ledger.json"
 DIGEST = "digest.md"
+DIGEST_DELIVERED = "digest_delivered.json"
 IGNORE_DOMAINS = {"pantas.com", "gmail.com", "google.com", "googlegroups.com",
                   "atlassian.net", "atlassian.com", "id.atlassian.com", "slack.com",
                   "github.com"}
@@ -168,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             send_dm(load_env(".env"), slack_out)
+            Path(DIGEST_DELIVERED).write_text(
+                json.dumps({"date": now.date().isoformat()}))
             print("delivered to Slack DM")
         except Exception as ex:  # noqa: BLE001 - delivery failure must be loud
             errors.append(f"Delivery: {ex}")
