@@ -72,6 +72,58 @@ def score(labels: list[dict], extracted: list[dict],
     }
 
 
+SELF_DM_BULLET = __import__("re").compile(
+    r"^\s*(?:[•*\-–☐☑]|\[[ xX]\]|\d+[.)])\s*")
+
+
+def labels_from_self_dm(messages: list[dict]) -> list[dict]:
+    from datetime import datetime, timedelta, timezone
+
+    myt = timezone(timedelta(hours=8))
+    labels: list[dict] = []
+    for message in messages:
+        try:
+            date = datetime.fromtimestamp(float(message.get("ts") or 0),
+                                          myt).date().isoformat()
+        except (TypeError, ValueError):
+            date = ""
+        for line in (message.get("text") or "").splitlines():
+            text = SELF_DM_BULLET.sub("", line).strip()
+            if len(text) < 3:
+                continue
+            labels.append({"date": date, "text": text, "is_task": True,
+                           "source": "self_dm", "id": ""})
+    return labels
+
+
+def _ledger_date(row: dict) -> str:
+    return (row.get("created_at") or "")[:10]
+
+
+def labels_from_ledger(rows: list[dict]) -> list[dict]:
+    out = []
+    for row in rows:
+        if (row.get("status") != "dropped"
+                or row.get("closed_how") != "not_commitment"
+                or row.get("kind") in {"note", "reminder"}):
+            continue
+        out.append({"id": row.get("id") or "", "date": _ledger_date(row),
+                    "text": row.get("what") or "", "is_task": False,
+                    "source": "dismissed"})
+    return out
+
+
+def extracted_from_ledger(rows: list[dict]) -> list[dict]:
+    out = []
+    for row in rows:
+        if row.get("kind") in {"note", "reminder"}:
+            continue
+        out.append({"id": row.get("id") or "", "date": _ledger_date(row),
+                    "text": row.get("action") or row.get("what") or "",
+                    "status": row.get("status") or "open"})
+    return out
+
+
 def load_labels(path: str) -> list[dict]:
     labels: list[dict] = []
     for line in Path(path).read_text().splitlines():

@@ -1,6 +1,8 @@
 import pytest
 
-from mini_reid.evaluation import load_labels, score, task_matches
+from mini_reid.evaluation import (extracted_from_ledger, labels_from_ledger,
+                                  labels_from_self_dm, load_labels, score,
+                                  task_matches)
 
 
 def test_task_matches_accepts_a_more_specific_extracted_title():
@@ -51,3 +53,28 @@ def test_score_handles_empty_labels():
     result = score([], [])
     assert result["recall"] is None
     assert result["meets_target"] is False
+
+
+def test_self_dm_lines_become_positive_labels():
+    messages = [{"ts": "1793866425.785539",
+                 "text": "• send the deck\n☐ review the dashboard\n"}]
+    labels = labels_from_self_dm(messages)
+    assert [l["text"] for l in labels] == ["send the deck", "review the dashboard"]
+    assert all(l["is_task"] is True for l in labels)
+    assert labels[0]["date"] == "2026-11-05"
+
+
+def test_ledger_dismissals_become_negative_labels_and_predictions():
+    rows = [
+        {"id": "a1", "what": "noise", "status": "dropped",
+         "closed_how": "not_commitment", "created_at": "2026-11-05T09:00:00+08:00"},
+        {"id": "a2", "what": "real task", "status": "open",
+         "created_at": "2026-11-05T10:00:00+08:00"},
+        {"id": "a3", "what": "a note", "kind": "note", "status": "open",
+         "created_at": "2026-11-05T11:00:00+08:00"},
+    ]
+    assert labels_from_ledger(rows) == [{
+        "id": "a1", "date": "2026-11-05", "text": "noise", "is_task": False,
+        "source": "dismissed"}]
+    extracted = extracted_from_ledger(rows)
+    assert [r["id"] for r in extracted] == ["a1", "a2"]
