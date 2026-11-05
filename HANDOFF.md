@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Knight Frank, Allianz, Setia and Eupe. 271 tests pass.
+overridden to Knight Frank, Allianz, Setia and Eupe. 274 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
@@ -74,6 +74,8 @@ their Gmail only after OAuth, and runs their reminders, meeting reminders, overd
 nudge and 09:15 digest. Their new items get the same model title cleanup, inbox
 confirmation DM, click acknowledgement/lock, grouped `list` with **Triage & update**,
 and 18:00 stale nudge; every button resolves the member's own ledger.
+Parity rule and checklist: `docs/MEMBER_PARITY.md` — no feature is done unless
+it works for every authorised member in the same change.
 
 Google setup uses the Cloud Run relay `mini-reid-setup` in project
 `rij-agent-march2026` (`cloud/relay.py`, source deploy, min/max instances 1). Link:
@@ -118,7 +120,9 @@ combine: #9 into #7               merge a duplicate into the task to keep
 uncombine: #7                     restore everything merged into #7
 undo:                             reverse the last ledger change (10 deep)
 185045 / id:185045                stable row reference, survives renumbering
-done: send the deck               close it; bulk refs work: done 7, 9 / #7 #9
+done: send the deck               close it; bulk refs: done 7, 9 / #7 #9
+done: <pasted list>               one bullet per line; closes every matched title
+not: <pasted list>                same, removes several at once
 status: deck in progress          open, in progress, blocked
 priority: deck 1                  P1 first; high/medium/low/none
 tonote: deck                      keep as a note (also convert:)
@@ -259,7 +263,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-271 tests passing as of 2026-11-05.
+274 tests passing as of 2026-11-05.
 
 ## Next, agreed
 

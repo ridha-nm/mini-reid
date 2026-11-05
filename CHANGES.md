@@ -2,6 +2,16 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (mass done from a pasted list)
+
+- `done:` and `not:` accept a pasted digest/list: one bullet per line, metadata
+  after an em dash ignored, ledger short ids stripped. Titles match on
+  normalised text, then unique prefix. All-or-nothing: one unknown or ambiguous
+  title changes nothing and names the offending line.
+- Works for the owner and every authorised member through the shared command path.
+- Member parity rule written down: `docs/MEMBER_PARITY.md`.
+- 274 tests passing.
+
 ## 2026-11-05 (authorised members get the same flow)
 
 - Members now get title cleanup from the local model, the `inbox` confirmation

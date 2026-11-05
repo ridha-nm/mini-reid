@@ -12,7 +12,7 @@ from pathlib import Path
 MYT = timezone(timedelta(hours=8))
 
 from .capture import parse_capture
-from .ledger import commitment_id, load, merge, save
+from .ledger import commitment_id, load, merge, normalize_what, save
 from .profiles import add_member, ledger_for, load as load_profiles
 
 # Slack sends mentions as <@U123> or <@U123|mini-reid>. Both must strip cleanly.
@@ -1121,6 +1121,66 @@ def _pick_many(rows: list[dict], target: str) -> tuple[list[dict] | None, str | 
     return unique, None
 
 
+_LIST_BULLET = re.compile(r"^\s*(?:[•*\-–]|\d+[.)])\s+")
+_LIST_META = re.compile(r"\s+[—–]\s+")
+
+
+def _list_titles(body: str) -> list[str] | None:
+    """Titles from a pasted digest/list: one bullet per line, metadata cut off."""
+    lines = [line.strip() for line in (body or "").splitlines() if line.strip()]
+    if len(lines) < 2:
+        return None
+    titles = []
+    for line in lines:
+        line = re.sub(r"^(?:done|not)\s*:\s*", "", line, flags=re.I)
+        line = _LIST_BULLET.sub("", line).strip()
+        line = _LIST_META.split(line, maxsplit=1)[0].strip()
+        line = re.sub(r"^\[[0-9a-f]{6}\]\s+", "", line)  # ledger short id
+        if line:
+            titles.append(line)
+    return titles or None
+
+
+def _pick_titles(rows: list[dict], body: str) -> tuple[list[dict] | None, str | None]:
+    """Bulk by pasted titles. None = not a list. All-or-nothing like refs."""
+    titles = _list_titles(body)
+    if not titles:
+        return None, None
+    items = _open_sorted(rows)
+    picked: list[dict] = []
+    errors: list[str] = []
+    for title in titles:
+        variants: list[str] = []
+        for text in (title, re.sub(r"^(?:\[[^\]]+\]\s*)+", "", title)):
+            want = normalize_what(text)
+            if want and want not in variants:
+                variants.append(want)
+        titles_of = [normalize_what(r.get("action") or r.get("what"))
+                     for r in items]
+        exact = [r for r, norm in zip(items, titles_of) if norm in variants]
+        if not exact:
+            exact = [r for r, norm in zip(items, titles_of)
+                     if any(len(want) >= 8
+                            and (norm.startswith(want) or want.startswith(norm))
+                            for want in variants)]
+        if len(exact) == 1:
+            picked.append(exact[0])
+        elif exact:
+            errors.append(f"“{title[:60]}” matches more than one item.")
+        else:
+            errors.append(f"No open item matches “{title[:60]}”.")
+    if errors:
+        return None, "\n".join(errors[:6])
+    seen: set[str] = set()
+    unique = []
+    for row in picked:
+        if row.get("id") in seen:
+            continue
+        seen.add(row.get("id"))
+        unique.append(row)
+    return unique, None
+
+
 def _shift(text: str, now):
     """Parse '3d', '2w', or a date phrase into an ISO date."""
     from .extract import parse_due
@@ -1440,6 +1500,10 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
         many, bulk_err = _pick_many(rows, body)
         if bulk_err:
             return bulk_err
+        if not many:
+            many, bulk_err = _pick_titles(rows, body)
+            if bulk_err:
+                return bulk_err
         if many:
             for row in many:
                 row["status"] = "done"
@@ -1488,6 +1552,10 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
         many, bulk_err = _pick_many(rows, body)
         if bulk_err:
             return bulk_err
+        if not many:
+            many, bulk_err = _pick_titles(rows, body)
+            if bulk_err:
+                return bulk_err
         if many:
             for row in many:
                 row["status"] = "dropped"

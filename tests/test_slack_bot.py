@@ -838,6 +838,46 @@ def test_done_accepts_a_bulk_list_of_ids(tmp_path):
     assert "Closed 2" in reply
 
 
+def test_done_accepts_a_pasted_digest_list(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Review Anasuria documents", NOW, clients, ledger)
+    apply_command("add", "Register for New User", NOW, clients, ledger)
+    apply_command("add", "Keep this open", NOW, clients, ledger)
+    body = ("• Review Anasuria documents — 1d overdue — from Ridha (Jira) — open\n"
+            "• Register for New User — 2d overdue — from NUR via BD (email) — open")
+    reply = apply_command("done", body, NOW, clients, ledger)
+    rows = {r["what"]: r["status"] for r in load(ledger)}
+    assert rows["Review Anasuria documents"] == "done"
+    assert rows["Register for New User"] == "done"
+    assert rows["Keep this open"] == "open"
+    assert "Closed 2" in reply
+
+
+def test_pasted_title_matches_without_its_jira_tag(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Review Anasuria documents", NOW, clients, ledger)
+    apply_command("add", "Keep this open", NOW, clients, ledger)
+    body = ("• [RJ] Review Anasuria documents — 1d overdue — from Ridha (Jira)"
+            " — open\n• Keep this open — open")
+    reply = apply_command("done", body, NOW, clients, ledger)
+    rows = {r["what"]: r["status"] for r in load(ledger)}
+    assert rows["Review Anasuria documents"] == "done"
+    assert rows["Keep this open"] == "done"
+    assert "Closed 2" in reply
+
+
+def test_pasted_list_with_one_unknown_title_changes_nothing(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Real task", NOW, clients, ledger)
+    body = "• Real task — open\n• Not in the ledger — open"
+    reply = apply_command("not", body, NOW, clients, ledger)
+    assert "No open item matches" in reply
+    assert [r["status"] for r in load(ledger)] == ["open"]
+
+
 def test_bulk_ref_with_one_bad_number_changes_nothing(tmp_path):
     ledger = str(tmp_path / "ledger.json")
     clients = load_clients("clients.json")
