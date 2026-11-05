@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from mini_reid.slack_bot import (add_slack_capture, capture_modal,
-                                 capture_reaction)
+                                 capture_reaction, file_reaction)
 
 MYT = timezone(timedelta(hours=8))
 NOW = datetime(2026, 11, 5, 19, 0, tzinfo=MYT)
@@ -31,6 +31,14 @@ def test_capture_modal_prefills_the_message_title():
     assert view["callback_id"] == "mini_reid_capture"
     assert view["blocks"][-1]["element"]["initial_value"] == "10 am interview"
     assert "https://slack/x" in str(view["blocks"])
+
+
+def test_file_reaction_uses_its_own_emoji():
+    event = {"type": "reaction_added", "reaction": "page_facing_up",
+             "user": "U2", "item": {"type": "message", "channel": "C1",
+                                    "ts": "1.2"}}
+    assert file_reaction(event, "page_facing_up") == ("C1", "1.2", "U2")
+    assert file_reaction(event, "pushpin") is None
 
 
 def test_capture_reaction_only_accepts_the_configured_emoji():

@@ -10,9 +10,12 @@ Append-only. Newest first.
   their XML. Unsupported types are skipped.
 - `ask:` checks ingested files before live Slack search and the local KB, with
   file name, snippet and Slack permalink.
-- Bot scope `files:read`; event `file_shared`. Live upload test ingested and
-  searched correctly, then cleaned up.
-- 356 tests passing.
+- Uploads and `FILE_REACTION` (default 📄) ingest files attached to a message.
+  The uploader/reactor gets a name-only ack; only Ridha gets the extractive
+  summary and the `ask:` prompt.
+- Bot scope `files:read`; event `file_shared`. Live upload, reaction and summary
+  tests passed, then cleaned up.
+- 360 tests passing.
 
 ## 2026-11-05 (Do Not Disturb quiet hours)
 

@@ -56,10 +56,63 @@ def extract_text(name: str, data: bytes) -> str:
     return ""
 
 
+def summarize(text: str, limit: int = 280) -> str:
+    """First whole sentences up to limit; a readable ack, not a model call."""
+    clean = " ".join((text or "").split())
+    if len(clean) <= limit:
+        return clean
+    out = ""
+    for sentence in re.split(r"(?<=[.!?])\s+", clean):
+        candidate = f"{out} {sentence}".strip()
+        if len(candidate) > limit:
+            break
+        out = candidate
+    return (out or clean[:limit]).strip()
+
+
 def _safe(name: str, file_id: str) -> str:
     base = Path(name or file_id).stem or file_id
     stem = re.sub(r"[^A-Za-z0-9._-]+", "_", base)[:80]
     return f"{file_id}_{stem}"
+
+
+def ack_messages(actor: str, owner: str,
+                 records: list[dict]) -> list[tuple[str, str]]:
+    """Actor gets names only; the owner gets names plus summaries."""
+    if not records:
+        return []
+    names = ", ".join(f"*{r['name']}*" for r in records)
+    out = []
+    if actor and actor != owner:
+        out.append((actor, f"Ingested: {names}"))
+    if owner:
+        detail = "\n".join(
+            f"*{r['name']}*\n_{r.get('summary') or ''}_" for r in records)
+        out.append((owner, f"Ingested:\n{detail}\n"
+                           "Ask me about them with `ask:`."))
+    return out
+
+
+def message_files(env: dict, channel: str, ts: str) -> list[dict]:
+    """Files attached to the Slack message behind a reaction."""
+    from .sources import _get_json
+
+    for key in ("SLACK_BOT_TOKEN", "SLACK_USER_TOKEN"):
+        token = env.get(key)
+        if not token:
+            continue
+        url = ("https://slack.com/api/conversations.history?"
+               + urllib.parse.urlencode({"channel": channel, "oldest": ts,
+                                         "latest": ts, "inclusive": "true",
+                                         "limit": 1}))
+        try:
+            data = _get_json(url, {"Authorization": f"Bearer {token}"})
+        except Exception:  # noqa: BLE001 - try the next token
+            continue
+        for message in data.get("messages") or []:
+            if message.get("ts") == ts:
+                return message.get("files") or []
+    return []
 
 
 def ingest(env: dict, file_id: str, root: str = FILES_DIR) -> dict | None:
@@ -88,6 +141,7 @@ def ingest(env: dict, file_id: str, root: str = FILES_DIR) -> dict | None:
     (folder / f"{stem}.txt").write_text(text)
     record = {"id": file_id, "name": name, "permalink": meta.get("permalink") or "",
               "path": str(folder / f"{stem}.txt"),
+              "summary": summarize(text),
               "created": meta.get("created") or 0}
     (folder / f"{file_id}.json").write_text(json.dumps(record))
     return record

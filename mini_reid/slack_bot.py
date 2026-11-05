@@ -879,6 +879,11 @@ def fetch_message_text(env: dict, channel: str, ts: str) -> str:
     return ""
 
 
+def file_reaction(event: dict, name: str) -> tuple[str, str, str] | None:
+    """(channel, message ts, reactor) for the file-ingest emoji."""
+    return capture_reaction(event, name)
+
+
 def capture_reaction(event: dict, name: str) -> tuple[str, str, str] | None:
     """(channel, message ts, reacting user) for the capture emoji only."""
     if event.get("type") != "reaction_added":
@@ -3265,6 +3270,12 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 record = ingest(env, event.get("file_id") or "")
                 if record:
                     print(f"  file ingested: {record['name']}", flush=True)
+                    from .files import ack_messages
+
+                    for uid, text in ack_messages(
+                            event.get("user_id") or "",
+                            env.get("SLACK_OWNER_ID", ""), [record]):
+                        send_dm_to(env, uid, text)
             except Exception as ex:  # noqa: BLE001 - file must not stop the bot
                 print(f"  file ingest failed: {type(ex).__name__}: {ex}",
                       flush=True)
@@ -3273,6 +3284,30 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             publish_home(event.get("user") or "")
             return
         if event.get("type") == "reaction_added":
+            file_parsed = file_reaction(
+                event, env.get("FILE_REACTION", "page_facing_up"))
+            if file_parsed:
+                from .files import ack_messages, ingest, message_files
+
+                channel, msg_ts, reactor = file_parsed
+                records = []
+                for attachment in message_files(env, channel, msg_ts):
+                    try:
+                        record = ingest(env, attachment.get("id") or "")
+                    except Exception as ex:  # noqa: BLE001 - keep other files
+                        print(f"  file react ingest failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
+                        record = None
+                    if record:
+                        records.append(record)
+                for uid, text in ack_messages(
+                        reactor, env.get("SLACK_OWNER_ID", ""), records):
+                    try:
+                        send_dm_to(env, uid, text)
+                    except Exception as ex:  # noqa: BLE001 - best effort
+                        print(f"  file ack failed: {type(ex).__name__}: {ex}",
+                              flush=True)
+                return
             parsed = capture_reaction(event,
                                       env.get("CAPTURE_REACTION", "pushpin"))
             if parsed:

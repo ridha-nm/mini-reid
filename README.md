@@ -80,7 +80,8 @@ Gmail, Jira and Google Calendar.
 - **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
   local documents. `ask:` answers pending/open/due questions from the ledger first,
   then ingested Slack files (PDF, DOCX, XLSX, text), then live Slack Real-time
-  Search, then the local passages.
+  Search, then the local passages. Shared files auto-ingest; react 📄 to ingest
+  a file on an older message. Summary goes to Ridha only.
 - **App Home**: per-person dashboard with a table of 10 task stats, today's
   meetings, top 3 focus items, Open Slack List, Triage Inbox and Refresh. Non-authorised users get a capabilities page with
   **Request access** (DMs you an **Authorise** button) and **Message Ridha**,

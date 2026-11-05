@@ -2,7 +2,30 @@ import json
 import zipfile
 from io import BytesIO
 
-from mini_reid.files import extract_text, search
+from mini_reid.files import ack_messages, extract_text, search, summarize
+
+
+def test_summary_goes_to_the_owner_only():
+    record = {"name": "deck.pdf", "summary": "The deck covers pricing."}
+    msgs = dict(ack_messages("U2", "U1", [record]))
+    assert "pricing" not in msgs["U2"]
+    assert "deck.pdf" in msgs["U2"]
+    assert "pricing" in msgs["U1"]
+    assert "ask:" in msgs["U1"]
+
+
+def test_owner_upload_gets_one_summary_message():
+    record = {"name": "deck.pdf", "summary": "The deck covers pricing."}
+    msgs = ack_messages("U1", "U1", [record])
+    assert len(msgs) == 1
+    assert "pricing" in msgs[0][1]
+
+
+def test_summary_keeps_whole_sentences_within_the_limit():
+    text = "First sentence. Second sentence with detail. " + "Filler " * 100
+    summary = summarize(text)
+    assert summary.startswith("First sentence. Second sentence")
+    assert len(summary) <= 280
 
 
 def test_extracts_plain_text_and_markdown():

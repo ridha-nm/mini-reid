@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 356 tests pass.
+overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 360 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
@@ -61,7 +61,9 @@ with count, due and links, filtered by client name; other questions use live
 Slack search then the KB.
 2026-11-05: `file_shared` files are downloaded, parsed (text, PDF via
 pdftotext, DOCX/XLSX XML) and saved under `data/slack_files/`. `ask:` searches
-them first, with name/snippet/permalink.
+them first. Reacting 📄 (`FILE_REACTION`) ingests files attached to a message.
+Uploader/reactor gets names only; Ridha gets the extractive summary plus the
+`ask:` prompt.
 2026-11-05: overdue nudges, stale nudges and local reminders can check Slack
 DND (`dnd:read`), but the gate is **off by default**; set `RESPECT_DND=1` to
 hold messages while the recipient is in Do Not Disturb.
@@ -319,7 +321,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-356 tests passing as of 2026-11-05.
+360 tests passing as of 2026-11-05.
 
 ## Next, agreed
 
