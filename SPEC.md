@@ -212,7 +212,8 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   roster) maps work email → clients; `allow:` fills the profile from it. Members can
   override it with `clients: Eupe, Gamuda` or inspect it with `clients`. Portfolios
   GHB/GVC/SAFE match their member-company domains; a child match also satisfies its
-  portfolio. Charanya is overridden to Knight Frank, Allianz, Setia and Eupe.
+  portfolio. Charanya is overridden to Eupe, Setia, Allianz, DNex, Edotco and
+  Knight Frank.
 - Setup page: `{RELAY_URL}/setup?state=<setup-token>` on Cloud Run. Google redirects to
   `{RELAY_URL}/callback`; the relay holds the code in memory and the bot polls
   `/take` with `RELAY_KEY`. Google consent is one-time and offline; the refresh token
