@@ -1877,9 +1877,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
 
     def post_reply(channel: str, text: str, notify: bool = True,
                    private: bool = False, dm_to: str | None = None,
-                   blocks: list[dict] | None = None) -> None:
+                   blocks: list[dict] | None = None,
+                   thread_ts: str | None = None) -> None:
         """Post in place; DM a copy when the command came from a channel.
-        `private` sends only to Ridha's DM; `dm_to` sends only to that user."""
+        `private` sends only to Ridha's DM; `dm_to` sends only to that user.
+        Channel replies stay in the triggering thread."""
         if dm_to and not channel.startswith("D"):
             try:
                 send_dm_to(env, dm_to, text, blocks=blocks)
@@ -1895,6 +1897,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         data = {"channel": channel, "text": text}
         if blocks:
             data["blocks"] = blocks
+        if thread_ts and not channel.startswith("D"):
+            data["thread_ts"] = thread_ts
         web.chat_postMessage(**data)
         if not notify or channel.startswith("D"):
             return
@@ -1926,9 +1930,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             except ValueError:
                 pass
 
-    def process(channel: str, user: str, text: str, ts: str, late: bool = False) -> None:
+    def process(channel: str, user: str, text: str, ts: str,
+                late: bool = False, thread_ts: str | None = None) -> None:
         if (channel, ts) in seen or channel in IGNORE_CHANNEL_IDS:
             return
+        thread_ts = (thread_ts or ts) if not channel.startswith("D") else None
         if not claim_message(STATE, channel, ts):
             return
         seen.add((channel, ts))
@@ -1957,11 +1963,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             """Reply to the command sender, privately for owner and members."""
             notify = (user == owner) if notify is None else notify
             if user == owner:
-                post_reply(channel, text, notify=notify, private=True, blocks=blocks)
+                post_reply(channel, text, notify=notify, private=True,
+                           blocks=blocks, thread_ts=thread_ts)
             elif member:
-                post_reply(channel, text, dm_to=user, blocks=blocks)
+                post_reply(channel, text, dm_to=user, blocks=blocks,
+                           thread_ts=thread_ts)
             else:
-                post_reply(channel, text, notify=notify, blocks=blocks)
+                post_reply(channel, text, notify=notify, blocks=blocks,
+                           thread_ts=thread_ts)
 
         key = f"{channel}:{user}"
         state_now = _state()
@@ -1985,7 +1994,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             control = banter_command(text, channel, users, datetime.now(MYT), env)
             if control:
                 _, reply = control
-                web.chat_postMessage(channel=channel, text=reply)
+                web.chat_postMessage(channel=channel, text=reply,
+                                     thread_ts=thread_ts)
                 _mark(ts)
                 return
 
@@ -1993,7 +2003,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         nice = nice_reply(text) if raw_action in {"unknown", "ack"} else None
         if nice:
             try:
-                web.chat_postMessage(channel=channel, text=nice)
+                web.chat_postMessage(channel=channel, text=nice,
+                                     thread_ts=thread_ts)
             except Exception as ex:  # noqa: BLE001 - best effort
                 print(f"  nice reply failed: {type(ex).__name__}", flush=True)
             _mark(ts)
@@ -2001,7 +2012,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         chatter = chatter_reply(text) if raw_action in {"unknown", "ack"} else None
         if chatter:
             try:
-                web.chat_postMessage(channel=channel, text=chatter)
+                web.chat_postMessage(channel=channel, text=chatter,
+                                     thread_ts=thread_ts)
             except Exception as ex:  # noqa: BLE001 - best effort
                 print(f"  default reply failed: {type(ex).__name__}", flush=True)
             _mark(ts)
@@ -2010,7 +2022,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if banter_active(channel, user) and is_mean(text):
             try:
                 web.chat_postMessage(channel=channel,
-                                     text=banter_line(channel, text))
+                                     text=banter_line(channel, text),
+                                     thread_ts=thread_ts)
             except Exception as ex:  # noqa: BLE001 - banter is best effort
                 print(f"  banter post failed: {type(ex).__name__}", flush=True)
             _mark(ts)
@@ -2019,7 +2032,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         guard = guardrail_reply(text)
         if guard:
             try:
-                web.chat_postMessage(channel=channel, text=guard)
+                web.chat_postMessage(channel=channel, text=guard,
+                                     thread_ts=thread_ts)
             except Exception as ex:  # noqa: BLE001 - guardrail is best effort
                 print(f"  guardrail post failed: {type(ex).__name__}", flush=True)
             _mark(ts)
@@ -2028,7 +2042,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         play = play_reply(text, users)
         if play:
             try:
-                web.chat_postMessage(channel=channel, text=play, thread_ts=ts)
+                web.chat_postMessage(channel=channel, text=play,
+                                     thread_ts=thread_ts)
             except Exception as ex:  # noqa: BLE001 - fun is best effort
                 print(f"  play post failed: {type(ex).__name__}", flush=True)
             _mark(ts)
@@ -2039,7 +2054,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
 
             if task_score(text) < 0.3:
                 try:
-                    web.chat_postMessage(channel=channel, text=DEFAULT_REPLY)
+                    web.chat_postMessage(channel=channel, text=DEFAULT_REPLY,
+                                         thread_ts=thread_ts)
                 except Exception as ex:  # noqa: BLE001 - best effort
                     print(f"  classifier reply failed: {type(ex).__name__}", flush=True)
                 _mark(ts)
@@ -2266,7 +2282,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     blocks = reminder_blocks(key, at, to_name)
                     try:
                         web.chat_postMessage(channel=channel, text=question,
-                                             blocks=blocks)
+                                             blocks=blocks, thread_ts=thread_ts)
                     except Exception as ex:  # noqa: BLE001 - text reply still works
                         print(f"  reminder buttons failed: {type(ex).__name__}",
                               flush=True)
@@ -2347,7 +2363,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 except Exception as ex:  # noqa: BLE001
                     print(f"  react failed: {type(ex).__name__}: {ex}", flush=True)
             if action == "help":
-                web.chat_postMessage(channel=channel, text=HELP)
+                web.chat_postMessage(channel=channel, text=HELP,
+                                     thread_ts=thread_ts)
                 _mark(ts)
                 return
             note = other_note(action, body, user)
@@ -2361,7 +2378,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     print(f"  note dm failed: {type(ex).__name__}", flush=True)
             elif action in {"unknown", "ack"}:
                 try:
-                    web.chat_postMessage(channel=channel, text=DEFAULT_REPLY)
+                    web.chat_postMessage(channel=channel, text=DEFAULT_REPLY,
+                                         thread_ts=thread_ts)
                 except Exception as ex:  # noqa: BLE001
                     print(f"  default reply failed: {type(ex).__name__}", flush=True)
             _mark(ts)
@@ -2644,7 +2662,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                                  "text": {"type": "mrkdwn", "text": reply}}])
                 except Exception:  # noqa: BLE001 - fall back to a fresh message
                     if channel:
-                        web.chat_postMessage(channel=channel, text=reply)
+                        web.chat_postMessage(channel=channel, text=reply,
+                                             thread_ts=msg_ts or None)
             return
         event = (req.payload or {}).get("event") or {}
         if event.get("bot_id"):
@@ -2675,7 +2694,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     Path(STATE).write_text(json.dumps(state))
                     release_message(STATE, ack[0], ack[1])
                     seen.discard((ack[0], ack[1]))
-                    process(ack[0], user, text, ack[1])
+                    process(ack[0], user, text, ack[1],
+                            thread_ts=msg.get("thread_ts") or ack[1])
             return
         text = event.get("text") or ""
         user = event.get("user") or ""
@@ -2692,7 +2712,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             control = banter_command(text, channel, users, datetime.now(MYT), env)
             if control:
                 _, reply = control
-                web.chat_postMessage(channel=channel, text=reply)
+                web.chat_postMessage(channel=channel, text=reply,
+                                     thread_ts=event.get("thread_ts") or ts)
                 return
         # message.channels/message.groups deliver every channel message. Only
         # act on ones that address the bot; DMs need no mention. Untagged
@@ -2702,7 +2723,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             waiting = (_state().get("pending_remind") or {}).get(f"{channel}:{user}")
             if not waiting:
                 return
-        process(channel, user, text, ts)
+        process(channel, user, text, ts,
+                thread_ts=event.get("thread_ts") or ts)
 
     def catch_up(me_id: str) -> None:
         """Replay commands missed while the Mac was asleep. Best effort, late."""
@@ -2756,7 +2778,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             text = m.get("text") or ""
             if (ch and user and user != me_id and not m.get("bot_id")
                     and not m.get("subtype")):
-                process(ch, user, text, m["ts"], late=True)
+                process(ch, user, text, m["ts"], late=True,
+                        thread_ts=m.get("thread_ts") or m["ts"])
                 late += 1
         # DMs carry no literal mention, so search never returns them. Read every
         # DM the bot is in, not only the owner's.

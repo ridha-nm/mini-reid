@@ -161,8 +161,9 @@ status questions go to the list.
 Ridha's command replies go to his DM, never to the channel, so a command does not ping
 everyone. Successful `add:` is acknowledged in the channel with ➕, `note:` / `tonote:`
 with 📝, and `remind:` with ⏰; failures go to his DM. Other people's explicit
-commands still answer in the channel; casual chatter ("drive the car") gets the
-default line and is never copied into Ridha's ledger as a note. Editing a message that still mentions the bot gets a ✅; when the text changed,
+commands still answer in the channel, always as a thread reply on their message —
+never in the main chat. Casual chatter ("drive the car") gets the default line in
+that thread and is never copied into Ridha's ledger as a note. Editing a message that still mentions the bot gets a ✅; when the text changed,
 the command is re-run once, except `remind` and `undo`. Repeated edits of the same text
 are ignored, so a command is not applied twice.
 
