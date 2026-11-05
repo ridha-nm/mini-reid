@@ -78,8 +78,8 @@ Gmail, Jira and Google Calendar.
   local documents. `ask:` answers pending/open/due questions from the ledger first,
   filtered by client; other questions use live Slack Real-time Search (channel,
   text, permalink), then fall back to the local passages.
-- **App Home**: per-person dashboard with counts, top 3 focus items, Open Slack List,
-  Triage Inbox and Refresh. Non-authorised users get a capabilities page with
+- **App Home**: per-person dashboard with 10 task stats, today's meetings, top 3
+  focus items, Open Slack List, Triage Inbox and Refresh. Non-authorised users get a capabilities page with
   **Request access** (DMs you an **Authorise** button) and **Message Ridha**,
   never another ledger.
 - **Slack List mirror**: each user's ledger is mirrored into a native Slack List with

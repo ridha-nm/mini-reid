@@ -3,28 +3,44 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from .ledger import _dt
+from .ledger import MYT, _dt
 from .listview import _title, ordered_rows
 
 
-def _counts(rows: list[dict], today: date) -> dict:
+def _counts(rows: list[dict], now: datetime) -> dict:
+    today = now.date()
     tasks = [r for r in rows
              if r.get("kind") not in {"note", "reminder"}
              and (r.get("status") or "open") not in {"done", "dropped", "inbox"}]
     inbox = [r for r in rows if (r.get("status") or "").lower() == "inbox"]
     notes = [r for r in rows if r.get("kind") == "note"
              and (r.get("status") or "open") not in {"done", "dropped"}]
-    overdue = today_count = 0
+    overdue = today_count = week = 0
     for row in tasks:
         due = _dt(row.get("due"))
         if not due:
             continue
+        days = (due.date() - today).days
         if due.date() < today:
             overdue += 1
         elif due.date() == today:
             today_count += 1
-    return {"open": len(tasks), "overdue": overdue,
-            "today": today_count, "inbox": len(inbox), "notes": len(notes)}
+        elif 1 <= days <= 7:
+            week += 1
+    done_week = len([r for r in rows
+                     if r.get("status") == "done"
+                     and _dt(r.get("closed_at"))
+                     and (now - _dt(r["closed_at"])).days <= 7])
+    return {
+        "open": len(tasks), "overdue": overdue, "today": today_count,
+        "week": week, "inbox": len(inbox), "notes": len(notes),
+        "in_progress": len([r for r in tasks
+                            if r.get("status") == "in progress"]),
+        "blocked": len([r for r in tasks if r.get("status") == "blocked"]),
+        "waiting": len([r for r in tasks
+                        if r.get("direction") == "owed_to_me"]),
+        "done_week": done_week,
+    }
 
 
 def _focus(rows: list[dict], now: datetime, limit: int = 3) -> list[dict]:
@@ -122,23 +138,42 @@ def public_home_blocks(owner: str = "", team: str = "gopantas") -> list[dict]:
 
 
 def home_blocks(rows: list[dict], now: datetime,
-                list_url: str | None = None) -> list[dict]:
-    counts = _counts(rows, now.date())
+                list_url: str | None = None,
+                meetings: list[dict] | None = None) -> list[dict]:
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=MYT)
+    counts = _counts(rows, now)
     focus = _focus(rows, now)
+    stats = [
+        ("Open", counts["open"]), ("Overdue", counts["overdue"]),
+        ("Due today", counts["today"]), ("This week", counts["week"]),
+        ("In progress", counts["in_progress"]), ("Blocked", counts["blocked"]),
+        ("Waiting on others", counts["waiting"]), ("Done 7d", counts["done_week"]),
+        ("Inbox", counts["inbox"]), ("Notes", counts["notes"]),
+    ]
     blocks: list[dict] = [
         {"type": "header",
          "text": {"type": "plain_text", "text": "Mini-Reid"}},
         {"type": "context",
          "elements": [{"type": "mrkdwn",
                        "text": f"{now:%a %d %b %Y} · your day at a glance"}]},
-        {"type": "section",
-         "text": {"type": "mrkdwn",
-                  "text": f"*{counts['open']} open* · "
-                          f"*{counts['overdue']} overdue* · "
-                          f"*{counts['today']} due today* · "
-                          f"*{counts['inbox']} in Inbox* · "
-                          f"*{counts['notes']} notes*"}},
+        {"type": "section", "fields": [
+            {"type": "mrkdwn", "text": f"*{label}*\n{value}"}
+            for label, value in stats
+        ]},
     ]
+    if meetings:
+        lines = []
+        for meeting in meetings[:3]:
+            start = (meeting.get("start") or "")[11:16]
+            title = (meeting.get("title") or "Meeting")[:80]
+            link = meeting.get("link")
+            tail = f" — <{link}|join>" if link else ""
+            lines.append(f"• {start} · {title}{tail}")
+        blocks.append({"type": "section",
+                       "text": {"type": "mrkdwn",
+                                "text": "*Today's meetings*\n"
+                                        + "\n".join(lines)}})
     if focus:
         blocks.append({"type": "section",
                        "text": {"type": "mrkdwn", "text": "*Focus*"}})

@@ -4,9 +4,10 @@ Append-only. Newest first.
 
 ## 2026-11-05 (App Home dashboard)
 
-- Mini-Reid's Home tab is a per-person dashboard: open/overdue/due-today/Inbox/
-  notes counts, the top 3 focus items, **Open Slack List**, **Triage Inbox**,
-  **Refresh** and quick commands. It no longer dumps the whole task list.
+- Mini-Reid's Home tab is a per-person dashboard: 10 stats (open, overdue, due
+  today, this week, in progress, blocked, waiting, done 7d, Inbox, notes),
+  today's meetings, top 3 focus items, **Open Slack List**, **Triage Inbox**,
+  **Refresh** and **What I can do**. It no longer dumps the whole task list.
   Members see their own ledger plus a **What I can do** block; anyone not
   authorised sees **What Mini-Reid can do**, what works now, what approval
   unlocks, **Request access** and **Message Ridha**. Request access DMs Ridha with

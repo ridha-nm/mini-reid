@@ -2698,8 +2698,28 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         from .slack_lists import list_url
 
         target = ledger_for_viewer(viewer)
+        meetings = []
+        if target:
+            try:
+                from .calendar import meetings_for_day
+                from .profiles import load as load_profiles
+
+                profile = load_profiles().get(viewer)
+                if profile:
+                    token = str(
+                        Path(profile["ledger"]).parent / "google_token.json")
+                    if Path(token).exists():
+                        meetings = meetings_for_day(
+                            env, datetime.now(MYT), token_path=token,
+                            owner_email=profile.get("email"),
+                            client_path=profile.get("google_client"))
+                else:
+                    meetings = meetings_for_day(env, datetime.now(MYT))
+            except Exception as ex:  # noqa: BLE001 - meetings stay optional
+                print(f"  home meetings failed: {type(ex).__name__}: {ex}",
+                      flush=True)
         blocks = (home_blocks(load(target), datetime.now(MYT),
-                              list_url(env, viewer))
+                              list_url(env, viewer), meetings)
                   if target else public_home_blocks(
                       env.get("SLACK_OWNER_ID", ""),
                       env.get("SLACK_TEAM", "gopantas")))

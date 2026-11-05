@@ -204,9 +204,8 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   The list's **Triage & update** modal can settle unanswered rows.
 - The owner mutates `ledger.json`; an allowlisted member mutates only their own
   `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
-- The App Home tab is a per-user dashboard: open/overdue/today/Inbox/notes
-  counts, top 3 focus items, Open Slack List, Triage Inbox, Refresh and quick
-  commands. A non-authorised viewer gets a capabilities page with **Request
+- The App Home tab is a per-user dashboard: 10 task stats, today's meetings,
+  top 3 focus items, Open Slack List, Triage Inbox, Refresh and What I can do. A non-authorised viewer gets a capabilities page with **Request
   access** (DMs Ridha an **Authorise** button that runs the normal `allow:`) and
   **Message Ridha**;
   no other ledger is exposed.
