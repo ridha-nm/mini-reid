@@ -49,7 +49,8 @@ Gmail, Jira and Google Calendar.
   logged locally and feed the task-vs-chatter classifier — no external training.
 - **Teammates**: Ridha runs `allow: @Charanya`. The bot creates an isolated profile,
   DMs a one-time setup link, and starts capture for that member. Their commands, ledger,
-  Slack mention alerts, reminders, meeting reminders and 09:15 digest stay private.
+  Slack mention alerts, reminders, meeting reminders and 09:15 digest stay private;
+  new items get the same confirmation buttons, grouped list/triage and stale nudges.
   Jira activates automatically from the shared workspace token, scoped to their Jira
   account. Gmail uses a hosted Google OAuth page: one click, consent, done. The Cloud
   Run relay holds the code for seconds and the Mac picks it up. A profile's `clients`

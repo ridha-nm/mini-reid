@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Knight Frank, Allianz, Setia and Eupe. 269 tests pass.
+overridden to Knight Frank, Allianz, Setia and Eupe. 271 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
@@ -71,7 +71,9 @@ Slack id → name, email and Jira account; rebuild with `python -m mini_reid.dir
 `allow:` reads it, so Jira works immediately from the shared workspace token scoped by
 account id. The watcher scans bot-visible channels for each member's mentions, uses
 their Gmail only after OAuth, and runs their reminders, meeting reminders, overdue
-nudge and 09:15 digest.
+nudge and 09:15 digest. Their new items get the same model title cleanup, inbox
+confirmation DM, click acknowledgement/lock, grouped `list` with **Triage & update**,
+and 18:00 stale nudge; every button resolves the member's own ledger.
 
 Google setup uses the Cloud Run relay `mini-reid-setup` in project
 `rij-agent-march2026` (`cloud/relay.py`, source deploy, min/max instances 1). Link:
@@ -257,7 +259,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-269 tests passing as of 2026-11-05.
+271 tests passing as of 2026-11-05.
 
 ## Next, agreed
 
