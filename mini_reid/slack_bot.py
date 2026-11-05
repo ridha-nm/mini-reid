@@ -54,6 +54,12 @@ ABUSE = re.compile(
     r"\b(?:molests?|rap(?:e|es|ed|ing|ist|ists)|grop(?:e|es|ed|ing))\b", re.I)
 ABUSE_DM = ("That message was abusive and it isn't okay here. "
             "I flagged it — please be better.")
+LINK_ONLY = re.compile(r"<?https?://[^|>\s]+(?:\|[^>]*)?>?", re.I)
+
+
+def is_link_only(text: str) -> bool:
+    """A bare pasted link is an unfurl, never a note."""
+    return bool(LINK_ONLY.fullmatch((text or "").strip()))
 INSULT = re.compile(
     r"\b(shut\s+up|stfu|fuck\w*|fking|fkin|fck|fk|idiot|stupid|dumb|moron|"
     r"asshole|bastard|bitch\w*|ass|arse|shit\w*|crap|damn|piss\s+off|"
@@ -2142,6 +2148,10 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         member = user != owner and user in profiles
         user_ledger = ledger_for(profiles, user, ledger_path) if member else ledger_path
 
+        if is_link_only(text):
+            _mark(ts)
+            return
+
         def say(text: str, notify: bool | None = None,
                 blocks: list[dict] | None = None):
             """Reply to the command sender, privately for owner and members."""
@@ -2945,6 +2955,24 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
+                if action_id == "unfurl_done":
+                    from .triage_ui import apply_triage
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    row_user, _, row_id = (action.get("value") or "").partition(":")
+                    target = ledger_for_viewer(clicker)
+                    if not target or not row_id or clicker != row_user:
+                        continue
+                    rows, count = apply_triage(
+                        load(target), [row_id], "done", datetime.now(MYT))
+                    save(target, rows)
+                    if count:
+                        try:
+                            send_dm_to(env, clicker,
+                                       "Marked done from unfurl.")
+                        except Exception:  # noqa: BLE001 - best effort
+                            pass
+                    continue
                 if action_id == "request_access":
                     from .home_ui import access_request_blocks
 
@@ -3263,6 +3291,40 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                                              thread_ts=msg_ts or None)
             return
         event = (req.payload or {}).get("event") or {}
+        if event.get("type") == "link_shared":
+            from .unfurl import find_task, task_blocks, unknown_blocks
+
+            people = load_profiles()
+            ledgers = [(owner, load(ledger_path))]
+            seen = {ledger_path}
+            for user in people:
+                path = ledger_for(people, user, ledger_path)
+                if path not in seen:
+                    seen.add(path)
+                    ledgers.append((user, load(path)))
+            unfurls = {}
+            for link in event.get("links") or []:
+                url = link.get("url") or ""
+                if not url:
+                    continue
+                hit = find_task(ledgers, url)
+                if hit:
+                    unfurls[url] = {"blocks": task_blocks(hit[1], user=hit[0])}
+                elif (event.get("channel") or "").startswith("D"):
+                    unfurls[url] = {"blocks": unknown_blocks()}
+            if unfurls:
+                if event.get("unfurl_id") and event.get("source"):
+                    kwargs = {"unfurl_id": event["unfurl_id"],
+                              "source": event["source"]}
+                else:
+                    kwargs = {"channel": event.get("channel") or "",
+                              "ts": event.get("message_ts") or ""}
+                try:
+                    web.chat_unfurl(unfurls=json.dumps(unfurls), **kwargs)
+                except Exception as ex:  # noqa: BLE001 - unfurl is best effort
+                    print(f"  unfurl failed: {type(ex).__name__}: {ex}",
+                          flush=True)
+            return
         if event.get("type") == "file_shared":
             from .files import ingest
 

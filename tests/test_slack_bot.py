@@ -2,10 +2,21 @@ from datetime import datetime, timedelta, timezone
 
 from mini_reid.clients import load_clients
 from mini_reid.ledger import load
-from mini_reid.slack_bot import apply_command, parse_command
+from mini_reid.slack_bot import apply_command, is_link_only, parse_command
 
 MYT = timezone(timedelta(hours=8))
 NOW = datetime(2026, 10, 30, 9, 0, tzinfo=MYT)
+
+
+def test_bare_link_is_not_a_note():
+    assert is_link_only(
+        "https://mail.google.com/mail/u/0/#label/IOI+Properties+Group/Qgrc1")
+    assert is_link_only("  <https://pantas.atlassian.net/browse/BO-1>  ")
+    assert is_link_only(
+        "<https://pantas.atlassian.net/browse/BO-8914|[RIJ] Audit activity data units>")
+    assert not is_link_only("check this link https://example.com")
+    assert not is_link_only("note: https://example.com")
+    assert not is_link_only("go to the doctor's office at 2pm")
 
 
 def test_parses_add_with_mention():

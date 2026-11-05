@@ -2,6 +2,21 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (link unfurls)
+
+- Gmail and Jira links shared in Slack unfurl into a Mini-Reid task card with
+  status, due date and a **Mark done** button when the link is already tracked.
+- Row lookup spans Ridha's ledger and every allowlisted member's ledger. The
+  button only closes the clicker's own task; someone else's task stays put.
+- Untracked links get no unfurl in channels; in a DM they show a small
+  "not on your list — add it with `add: …`" card, so the bot never goes silent.
+- A message that is only a link is no longer captured as a note; it is left
+  to the unfurl.
+- Bot scopes `links:read` and `links:write`; bot event `link_shared`; unfurl
+  domains `mail.google.com` and `pantas.atlassian.net`. App reinstalled and
+  live-tested in the bot DM; the test message was deleted after.
+- 367 tests passing.
+
 ## 2026-11-05 (Slack file ingestion)
 
 - `file_shared` events download the file, extract text and save it under
