@@ -12,8 +12,9 @@ the same change. A feature is not done because it works in Ridha's DM.
 
 - [ ] Command path: `_apply_command` runs against the sender's ledger, not the
       owner's. Members hit the same parser and the same bulk/text helpers.
-- [ ] Capture path: `members.refresh` gets the same extraction, model title
-      cleanup, `inbox` status and confirmation DM as `watcher.main`.
+- [ ] Capture path: `members.refresh` gets the same extraction, auto-capture
+      rules (matching rows open directly; uncertain rows get the model title
+      cleanup, `inbox` status and confirmation DM) as `watcher.main`.
 - [ ] Buttons and modals resolve the clicker through `ledger_for_viewer`, never
       hard-code `ledger_path`.
 - [ ] `list`, Inbox, Triage & update, stale pickers and the digest all read the
@@ -42,6 +43,8 @@ That is a permission boundary, not a parity gap.
 | Feature | Owner | Members |
 |---|---|---|
 | Capture + inbox confirmation | yes | yes |
+| Auto-capture rules (obvious rows open without a click) | yes | yes |
+| Gmail/Jira link unfurls with **Mark done** | yes | yes |
 | Add / Not a task buttons, click ack + lock | yes | yes |
 | Model title cleanup | yes | yes |
 | Grouped `list` + Inbox + Notes + Triage & update | yes | yes |

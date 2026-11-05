@@ -62,10 +62,14 @@ chmod 600 .env
    and to search missed mentions. Treat it as sensitive: it can read DMs.
 6. Your Slack member ID → `SLACK_OWNER_ID` (Profile → More → Copy member ID).
 7. Workspace subdomain → `SLACK_TEAM` (e.g. `gopantas`).
-8. The manifest also enables the **Add to Mini-Reid** message shortcut, the
-   `reaction_added` and `app_home_opened` events, and bot scopes
-   `reactions:read`, `lists:read` and `lists:write`. Reinstall the app whenever
-   scopes change; Slack shows a reinstall banner until you do.
+8. The manifest also enables the **Add to Mini-Reid** message shortcut; the
+   `reaction_added`, `app_home_opened`, `file_shared` and `link_shared`
+   events; bot scopes `reactions:read`, `lists:read`/`lists:write`,
+   `files:read`, `dnd:read`, `links:read`/`links:write`; and the unfurl
+   domains `mail.google.com` and `pantas.atlassian.net`. Reinstall the app
+   whenever scopes, events or unfurl domains change; Slack shows a reinstall
+   banner until you do. Gmail unfurls only match the exact link form stored on
+   a task (`#all/...`), not a browser-copied `#label/...` link.
 
 Invite `@mini-reid` to the channels you want it to watch. It cannot read
 channels it has not joined.

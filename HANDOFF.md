@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 361 tests pass.
+overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 361 tests passed at the time.
 
 2026-11-04: a candidate that matches no auto rule lands as `inbox` and waits for a
 click — the new-item DM has **Add to list** / **Not a task** per item (matched
@@ -100,6 +100,16 @@ kept in `capture_why`. Everything else stays `inbox` with **Add to list** /
 titles, existing rows are not migrated, and members run the same rules on their
 own ledger.
 
+2026-11-05 link unfurls: a tracked Gmail or Jira link posted in Slack shows a
+task card with status, due date and **Mark done**. Lookup spans every ledger;
+the button closes only the clicker's own task. Untracked Jira links show
+"not on your list" in DMs and nothing in channels. Gmail matches only the exact
+stored `#all/...` form; browser-copied `#label/.../Qgrc...` links cannot be
+matched because the Gmail API rejects that id form. Bare-link messages are never
+captured as notes. App has `links:read`/`links:write`, bot event `link_shared`
+and unfurl domains `mail.google.com` + `pantas.atlassian.net`; reinstall after
+changing them.
+
 ## Running now
 
 | Agent | Cadence | Log |
@@ -127,8 +137,9 @@ Slack id → name, email and Jira account; rebuild with `python -m mini_reid.dir
 `allow:` reads it, so Jira works immediately from the shared workspace token scoped by
 account id. The watcher scans bot-visible channels for each member's mentions, uses
 their Gmail only after OAuth, and runs their reminders, meeting reminders, overdue
-nudge and 09:15 digest. Their new items get the same model title cleanup, inbox
-confirmation DM, click acknowledgement/lock, grouped `list` with **Triage & update**,
+nudge and 09:15 digest. Their new items get the same auto rules (matching rows open
+directly; only uncertain ones get the model title cleanup and inbox confirmation DM),
+click acknowledgement/lock, grouped `list` with **Triage & update**,
 and 18:00 stale nudge; every button resolves the member's own ledger. A member's
 plain DM to the bot is added as a task, no `add:` prefix, so they can stop writing
 their own Slack list. The **Add to Mini-Reid** message shortcut and the 📌
@@ -313,8 +324,18 @@ kept or a real ask was missed.
 - Answers are extractive, not composed.
 - Untagged asks in channels and thread replies without a mention are not captured.
 - WhatsApp and calls are manual capture only.
-- macOS sleep pauses the socket; the catch-up sweep (every `CATCHUP_SECONDS`, default
-  300) replays commands and questions missed while asleep or disconnected.
+- Everything runs on this Mac and only while it is awake. Sleep pauses the socket,
+  watcher, digests and reminders; the catch-up sweep (every `CATCHUP_SECONDS`,
+  default 300) replays commands and questions missed while asleep or disconnected.
+  Vercel is not a fit: Socket Mode, local ledger files, the 2-minute watcher and
+  local Ollama need a daemon, and Hobby forbids commercial use.
+- Link unfurls match the exact stored source link. Gmail browser-copied
+  `#label/.../Qgrc...` links cannot map to the stored `#all/...` rows; the Gmail
+  API rejects that id form.
+- Auto-capture is deliberately narrow. Imperative-only channel mentions, undated
+  DMs without an explicit ask, and shared-alias mail without a direct To stay in
+  Inbox. A rare phrasing such as "please note the deck needs review" can still
+  auto-add because it contains a request word.
 - Watcher takes about 55 s per cycle after parallel source fetches (sources ~12 s;
   the member cycle and meeting scheduling make up the rest), inside the two-minute
   interval. Before the parallel fix a cycle ran 2+ minutes.

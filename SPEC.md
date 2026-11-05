@@ -239,8 +239,10 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   Jira. Jira uses the shared workspace token, queried by the member's Jira account id;
   Gmail uses the member's own OAuth token. Their reminders, meeting reminders, overdue
   nudge, 18:00 stale nudge and 09:15 digest go only to their DM. New items use the same
-  model title cleanup and inbox confirmation DM; `list`, its **Triage & update** modal
-  and stale pickers all resolve that member's ledger, never the owner's.
+  rules: rows matching an auto rule open directly, and only uncertain ones get the
+  model title cleanup plus the inbox confirmation DM; `list`, its
+  **Triage & update** modal and stale pickers all resolve that member's ledger,
+  never the owner's.
 - `directory.json` (gitignored, mode 600) maps Slack id → name, email and Jira account.
   Rebuild with `python -m mini_reid.directory`. `allow:` reads it first, so any Pantas
   member can be set up without typing their email or Jira id.
@@ -300,7 +302,10 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
 ### Slack app
 
 Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
-`message.groups`. Every Slack message id is claimed once in `bot_state.json` before a
+`message.groups`, `reaction_added`, `app_home_opened`, `file_shared`,
+`link_shared`. Bot scopes include `files:read`, `dnd:read`,
+`lists:read`/`lists:write` and `links:read`/`links:write`; unfurl domains are
+`mail.google.com` and `pantas.atlassian.net`. Every Slack message id is claimed once in `bot_state.json` before a
 reply, so Slack delivering both `app_mention` and `message.channels` (or a restart
 replaying an event) cannot produce a second response. An edit releases the claim once so
 the corrected text can run. Channel messages that do not mention the bot are ignored. An edit that
@@ -309,6 +314,13 @@ still mentions the bot gets a ✅; if Ridha changed the text, the command is re-
 replayed. Replies to Ridha's own commands go to his DM, never to the channel, so a
 command does not ping everyone. The channel only gets the ➕ / 📝 / ⏰ reaction where
 applicable.
+
+A tracked Gmail or Jira link posted in Slack unfurls into a task card with
+status, due date and **Mark done**. Lookup spans the owner's and every member's
+ledger; the button only closes the clicker's own task. A Jira link not on any
+list gets a "not on your list" card in DMs and no card in channels. Gmail
+matches only the exact stored form (`#all/...`); a browser-copied
+`#label/...` link cannot be matched.
 
 Slack sends no events from a DM the bot is not in, so the watcher polls Ridha's recently
 active DMs with the user token every two minutes. Only owner-authored messages that
@@ -336,6 +348,9 @@ Rebuild nightly at 02:00, incremental.
 | P5 grounded Q&A | done, extractive |
 | P6 learning from corrections | done: `not:` feeds the local classifier |
 | P7 stock-take hub | not started |
+| Flying-car S1 eval harness | done |
+| Flying-car S2 auto-capture (rules-only) | done |
+| Flying-car S3-S6 cloud runtime, actions, planner, pilot | not started |
 
 ## Acceptance criteria
 

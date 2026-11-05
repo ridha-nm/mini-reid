@@ -1,7 +1,8 @@
 # Flying-car Mini-Reid: design
 
 Date: 2026-11-05
-Status: design approved in conversation; first subsystem planned.
+Status: design approved. Subsystems 1 (eval harness) and 2 (auto-capture,
+rules-only) shipped on 2026-11-05. Subsystems 3-6 remain.
 
 ## Outcome
 
