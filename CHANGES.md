@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (source link on every confirmation DM)
+
+- Each **Add to list / Not a task** item now shows `<source|open source>`
+  (Gmail, Jira or Slack) plus sender and via, so the title can be checked before
+  deciding. Shared `confirm_blocks`, so owner and every authorised member get it.
+- 295 tests passing.
+
 ## 2026-11-05 (channel replies stay in the thread)
 
 - Every channel reply now posts on the triggering message's `thread_ts`: default

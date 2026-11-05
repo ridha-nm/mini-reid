@@ -82,9 +82,14 @@ def confirm_blocks(rows: list[dict],
         meta = []
         if row.get("asker"):
             meta.append(f"from {row['asker']}")
+        if row.get("via"):
+            meta.append(row["via"])
         if row.get("due"):
             meta.append(f"due {row['due']}")
         tail = f"\n_{' · '.join(meta)}_" if meta else ""
+        link = row.get("source_link")
+        if link:
+            tail += f"\n<{link}|open source>"
         blocks.append({
             "type": "section",
             "text": {"type": "mrkdwn",

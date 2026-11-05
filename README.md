@@ -15,9 +15,9 @@ Gmail, Jira and Google Calendar.
   retrying every 10 minutes until Slack accepts it.
 - **Watcher** (every 2 min): new Slack mentions, DMs to you, inbox mail including
   already-read mail, and Jira issues assigned to you. Every new item waits as Inbox and
-  gets a DM with **Add to list** / **Not a task**; the click updates that DM with the
-  outcome and removes its buttons, Add opens it on the list and ✅s the source message.
-  Nothing reaches the digest until confirmed. The first cycle after 09:00 also
+  gets a DM with the sender, an **open source** link and **Add to list** / **Not a
+  task**; the click updates that DM with the outcome and removes its buttons, Add
+  opens it on the list and ✅s the source. Nothing reaches the digest until confirmed. The first cycle after 09:00 also
   DMs any overdue rows once a day. Each meeting gets a DM 10 minutes before it starts,
   with the join link and "Are you attending?". Answer `yes`, `no <reason>`, or
   `moved` / `rescheduled` / `postponed` in the DM.
