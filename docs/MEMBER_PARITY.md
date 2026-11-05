@@ -51,6 +51,7 @@ That is a permission boundary, not a parity gap.
 | Digest delivery retry after 09:30 | yes | yes |
 | Reminder added to the recipient's list | yes | yes |
 | Plain DM becomes a task (no prefix) | n/a | yes |
+| App Home dashboard + meetings + Slack List link | yes | yes |
 | Message shortcut / 📌 capture into own ledger | yes | yes |
 | Native Slack List mirror | yes | yes |
 | Live Slack search in `ask:` | yes | no (owner user token only) |

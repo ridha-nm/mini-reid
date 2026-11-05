@@ -59,11 +59,12 @@ recorded in `docs/MEMBER_PARITY.md`.
 2026-11-05: `ask:` routes pending/open/due/task questions to the ledger first,
 with count, due and links, filtered by client name; other questions use live
 Slack search then the KB.
-2026-11-05: App Home is a per-person dashboard: 10 stats, today's meetings,
-top 3 focus, Open Slack List, Triage Inbox, Refresh, What I can do. Not the full
-task list. Unknown
-viewers get a capabilities page with Request access (DMs Ridha with the exact
-`allow:` line) and Message Ridha; no cross-ledger exposure.
+2026-11-05: App Home is a per-person dashboard: a Block Kit table with 10 stats,
+today's meetings, top 3 focus, Open Slack List, Triage Inbox, Refresh, What I
+can do. Not the full task list. Unknown viewers get a capabilities page with
+**Request access** (DMs Ridha captured name/email/Jira plus an Authorise button)
+and **Message Ridha**; no cross-ledger exposure. Full setup completion DMs both
+Ridha and the member.
 2026-11-05: `ask:` tries live Slack Real-time Search first for Ridha, with
 channel/text/permalink, then falls back to the local KB. Each user's ledger is
 mirrored into a native Slack List (“Mini-Reid — Name”) with title, status, due
