@@ -232,3 +232,29 @@ def test_email_asker_keeps_the_full_address():
             "ts": "2026-10-30T08:00:00+08:00"}
     row = extract(item, None, NOW)[0]
     assert row["asker"] == "Quekjoelyn (bd@pantas.com)"
+
+
+def test_auto_capture_matrix():
+    from mini_reid.extract import auto_reason
+    slack = {"source": "slack", "kind": "mention"}
+    dm = {"source": "slack", "kind": "dm"}
+    mail = {"source": "gmail", "kind": "inbox",
+            "to": "Ridha <ridha@pantas.com>"}
+    jira = {"source": "jira", "kind": "issue"}
+    assert auto_reason(jira, "Audit data units", None, None) == "jira-assigned"
+    assert auto_reason(slack, "can you review the deck", None, None) == "slack-direct-ask"
+    assert auto_reason(slack, "the office is closed tomorrow", None, None) is None
+    assert auto_reason(dm, "send the deck", None, None) is None
+    assert auto_reason(dm, "send the deck by Friday", "2026-11-06", None) == "slack-dm-ask"
+    assert auto_reason(mail, "please confirm the mapping", None, "Ridha") == "email-direct-ask"
+    alias = dict(mail, to="BD <bd@pantas.com>")
+    assert auto_reason(alias, "please confirm the mapping", None, "Ridha") is None
+
+
+def test_extract_stamps_capture_mode():
+    item = {"source": "slack", "native_id": "s1", "kind": "mention",
+            "author": "kasib", "text": "can you review the deck", "link": "l",
+            "ts": "2026-10-30T08:00:00+08:00"}
+    row = extract(item, None, NOW)[0]
+    assert row["capture"] == "auto"
+    assert row["capture_why"] == "slack-direct-ask"

@@ -17,6 +17,9 @@ REQUEST_POLITE = re.compile(
     r"\b(?:please|pls|plz|kindly|action required)\b", re.I)
 REQUEST_NEED = re.compile(
     r"\b(?:we\s+need|need\s+(?:you|your|the|a|an|it|this|that|by))\b", re.I)
+EXPLICIT_ASK = re.compile(
+    REQUEST_MODAL.pattern + "|" + REQUEST_POLITE.pattern + "|" + REQUEST_NEED.pattern,
+    re.I)
 IMPERATIVE = re.compile(
     r"^(?:please\s+)?(?:send|share|provide|confirm|review|approve|update|check|"
     r"prepare|draft|book|schedule|fix|add|remove|create|complete|finish|submit|"
@@ -147,6 +150,26 @@ def looks_actionable(text: str, item: dict) -> bool:
     return asked
 
 
+def auto_reason(item: dict, text: str, due: str | None,
+                me: str | None) -> str | None:
+    """Why this row can skip the click, or None to keep it in Inbox."""
+    source = item.get("source") or ""
+    kind = item.get("kind") or ""
+    if source == "jira":
+        return "jira-assigned"
+    ask = bool(EXPLICIT_ASK.search(text or ""))
+    if source == "slack" and kind == "mention" and ask:
+        return "slack-direct-ask"
+    if source == "slack" and kind == "dm" and (ask or due):
+        return "slack-dm-ask"
+    if source == "gmail" and kind == "inbox":
+        needle = (me or "Ridha").split("@")[0].lower()
+        direct = needle in (item.get("to") or "").lower() or needle in (text or "").lower()
+        if direct and (ask or due):
+            return "email-direct-ask"
+    return None
+
+
 def _clean(text: str) -> str:
     import html
 
@@ -215,6 +238,7 @@ def extract(item: dict, client: dict | None, now: datetime,
     # A subject line is a task name. The body opens with "Hi X, thanks for..."
     subject = re.sub(r"^\s*((re|fw|fwd)\s*:\s*)+", "", item.get("subject") or "", flags=re.I)
     what_text = subject.strip() if (item.get("source") == "gmail" and subject.strip()) else text
+    reason = auto_reason(item, gate_text, due, me)
 
     return [{
         "id": commitment_id(item.get("source", ""), item.get("native_id", ""), what_text),
@@ -231,6 +255,8 @@ def extract(item: dict, client: dict | None, now: datetime,
         "due": due,
         "due_confidence": conf,
         "cycle": (client or {}).get("cycle"),
+        "capture": "auto" if reason else "inbox",
+        "capture_why": reason or "",
         "status": "open",
         "stalled_since": None,
         "ack_policy": "bot_may_ack",
