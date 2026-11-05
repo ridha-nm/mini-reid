@@ -49,8 +49,9 @@ def test_access_request_carries_details_and_authorise_button():
 
 def test_public_home_explains_setup_and_offers_access():
     text = str(public_home_blocks("U1", "gopantas"))
-    assert "Available now" in text
-    assert "Once Ridha allows you" in text
+    assert "What Mini-Reid can do" in text
+    assert "Available to you now" in text
+    assert "Unlocked when Ridha allows you" in text
     assert "request_access" in text
     assert "https://gopantas.slack.com/team/U1" in text
     assert "Send the deck" not in text

@@ -49,6 +49,14 @@ def _focus_line(row: dict, now: datetime) -> str:
     return f"• *{title}*" + (f" — {when}" if when else "") + tail
 
 
+CAPABILITIES = [
+    "Capture tasks from Slack, Gmail and Jira, then confirm with buttons",
+    "Add by DM, message shortcut or 📌 reaction",
+    "Grouped `list`, Inbox triage, and a native Slack List mirror",
+    "`ask` questions, `remind` anyone, `meet` with free/busy and a Meet invite",
+]
+
+
 def access_request_blocks(user: str, details: dict | None = None) -> list[dict]:
     details = details or {}
     fields = [
@@ -84,16 +92,20 @@ def public_home_blocks(owner: str = "", team: str = "gopantas") -> list[dict]:
                        "text": "A personal commitment assistant for Pantas."}]},
         {"type": "section",
          "text": {"type": "mrkdwn",
-                  "text": "*Available now*\n"
+                  "text": "*What Mini-Reid can do*\n"
+                          + "\n".join(f"• {item}" for item in CAPABILITIES)}},
+        {"type": "section",
+         "text": {"type": "mrkdwn",
+                  "text": "*Available to you now*\n"
                           "• `remind me to send the deck at 2pm`\n"
                           "• `remind @Teammate to … at 2pm`\n"
                           "• `help` for the command list"}},
         {"type": "section",
          "text": {"type": "mrkdwn",
-                  "text": "*Once Ridha allows you*\n"
+                  "text": "*Unlocked when Ridha allows you*\n"
                           "• Your own task list and daily digest\n"
-                          "• A native Slack List mirror with status/date/source\n"
-                          "• Meeting scheduling with free/busy across calendars\n"
+                          "• The native Slack List mirror\n"
+                          "• Meeting scheduling across calendars\n"
                           "• Inbox triage and confirmation buttons"}},
     ]
     elements = [{"type": "button", "action_id": "request_access",
@@ -150,7 +162,7 @@ def home_blocks(rows: list[dict], now: datetime,
     blocks.append({"type": "actions", "elements": elements})
     blocks.append({"type": "section",
                    "text": {"type": "mrkdwn",
-                            "text": "*Quick commands*\n"
-                                    "`add: …` · `done: …` · `remind … at 2pm` · "
-                                    "`meet: @Name about …`"}})
+                            "text": "*What I can do*\n"
+                                    + "\n".join(f"• {item}"
+                                                for item in CAPABILITIES)}})
     return blocks

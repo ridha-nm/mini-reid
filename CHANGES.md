@@ -7,8 +7,9 @@ Append-only. Newest first.
 - Mini-Reid's Home tab is a per-person dashboard: open/overdue/due-today/Inbox/
   notes counts, the top 3 focus items, **Open Slack List**, **Triage Inbox**,
   **Refresh** and quick commands. It no longer dumps the whole task list.
-  Members see their own ledger; anyone not authorised sees a capabilities page
-  with **Request access** and **Message Ridha**. Request access DMs Ridha with
+  Members see their own ledger plus a **What I can do** block; anyone not
+  authorised sees **What Mini-Reid can do**, what works now, what approval
+  unlocks, **Request access** and **Message Ridha**. Request access DMs Ridha with
   the captured Slack/name/email/Jira details and an **Authorise and send setup**
   button; one click runs the normal `allow:` setup and sends the requester their
   link. The requester gets a confirmation, and Ridha gets a second DM when
