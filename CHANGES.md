@@ -2,6 +2,13 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (list links no longer cut off)
+
+- The list was placed in one Slack section capped at 3000 chars, which cut row
+  18's URL mid-link. It now splits across multiple section blocks on line
+  boundaries. Real ledger: 4353 chars → 2 sections, 23 links intact.
+- 286 tests passing.
+
 ## 2026-11-05 (assign by row id no longer creates id-titled tasks)
 
 - `assign: @Person eb8263` (or `#7`, `id:abc1`) now reassigns the matching

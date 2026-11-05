@@ -17,6 +17,20 @@ def _option_values(block):
         else [o["value"] for o in block["element"]["options"]]
 
 
+def test_long_list_splits_without_cutting_links():
+    from mini_reid.triage_ui import SECTION_LIMIT
+
+    rows = [_row(f"id{i:02d}", "A very long task title " * 5,
+                 source_link=f"https://example.com/{i}/a-long-enough-link")
+            for i in range(25)]
+    blocks = list_blocks(rows, NOW)
+    sections = [b for b in blocks if b.get("type") == "section"]
+    assert len(sections) > 1
+    assert all(len(b["text"]["text"]) <= SECTION_LIMIT for b in sections)
+    joined = "\n".join(b["text"]["text"] for b in sections)
+    assert "https://example.com/24/a-long-enough-link" in joined
+
+
 def test_list_blocks_offer_a_triage_button():
     blocks = list_blocks([_row("a1", "Real task"),
                           _row("b2", "Maybe", status="inbox")], NOW)

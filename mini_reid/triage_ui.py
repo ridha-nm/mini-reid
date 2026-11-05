@@ -22,10 +22,34 @@ def _selectable(rows: list[dict], now: datetime) -> list[dict]:
     return (inbox + [r for r in open_rows if r not in inbox])[:MAX_SELECTABLE]
 
 
+SECTION_LIMIT = 2900
+
+
+def _sections(text: str, limit: int = SECTION_LIMIT) -> list[dict]:
+    """Split on line boundaries; Slack rejects a section text over 3000 chars."""
+    chunks: list[str] = []
+    buf: list[str] = []
+    for line in (text or "").splitlines():
+        while len(line) > limit:
+            if buf:
+                chunks.append("\n".join(buf))
+                buf = []
+            chunks.append(line[:limit])
+            line = line[limit:]
+        candidate = "\n".join(buf + [line])
+        if buf and len(candidate) > limit:
+            chunks.append("\n".join(buf))
+            buf = [line]
+        else:
+            buf.append(line)
+    if buf:
+        chunks.append("\n".join(buf))
+    return [{"type": "section", "text": {"type": "mrkdwn", "text": chunk}}
+            for chunk in chunks or [text or ""]]
+
+
 def list_blocks(rows: list[dict], now: datetime) -> list[dict]:
-    text = format_list(rows, now)
-    blocks = [{"type": "section",
-               "text": {"type": "mrkdwn", "text": text[:2950]}}]
+    blocks = _sections(format_list(rows, now))
     selectable = _selectable(rows, now)
     if selectable:
         blocks.append({
