@@ -2,6 +2,15 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (fuzzy "not" and bot self-messages)
+
+- `not the time` no longer fuzzy-matches `note` and becomes a note; plain
+  `not …` is unrecognised text unless it uses `not:`.
+- The bot ignores its own posted messages (some arrive without `bot_id`),
+  so a play reply cannot be processed as a new request.
+- Removed the stray "the time" note.
+- 287 tests passing.
+
 ## 2026-11-05 (notes in `list`; play requests never captured)
 
 - `list` now ends with a **Notes (N)** section, same short ids as the `notes`

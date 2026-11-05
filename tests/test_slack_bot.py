@@ -1189,6 +1189,7 @@ def test_play_reply_hugs_and_high_fives():
         "🙌 *<@U9>* — up high.")
     assert play_reply("<@UBOT> pls give ridha a hug", {"ridha": "U1"}) == (
         "🤗 *<@U1>* gets a hug.")
+    assert parse_command("not the time")[0] == "unknown"
     assert play_reply("give the deck a hug", {}) is None
 
 
