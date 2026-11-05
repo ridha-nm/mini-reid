@@ -2373,7 +2373,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 say("You are not on the list for that. Ask Ridha to add you.")
                 return
             reply = ""
-            if user == owner:
+            try:
+                from .ask_ledger import answer_ledger
+
+                reply = answer_ledger(body, load(user_ledger), clients) or ""
+            except Exception as ex:  # noqa: BLE001 - fall through to search/KB
+                print(f"  ledger ask failed: {type(ex).__name__}: {ex}",
+                      flush=True)
+            if not reply and user == owner:
                 try:
                     from .slack_search import format_hits, search as slack_search
 

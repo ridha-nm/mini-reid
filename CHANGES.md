@@ -13,6 +13,9 @@ Append-only. Newest first.
 
 ## 2026-11-05 (live Slack search + native Slack List)
 
+- `ask:` with pending / open / due / task wording now answers from the ledger
+  first, filtered by any named client, with count, due dates and source links.
+  Other questions use live Slack search.
 - `ask:` for the owner now searches Slack first with the Real-time Search API
   (`assistant.search.context`), returns channel, text and permalink, and falls
   back to the local knowledge base when there are no hits or an error.
