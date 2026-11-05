@@ -53,7 +53,9 @@ def test_member_refresh_keeps_the_auto_capture_decision(tmp_path, monkeypatch):
     profile = {"name": "Charanya", "ledger": str(tmp_path / "ledger.json")}
     item = {"source": "jira", "native_id": "j1", "kind": "issue",
             "author": "Bo", "text": "Audit data units", "link": "https://x/j1",
-            "ts": "2026-11-03T09:00:00+00:00"}
+            # Current time: refresh uses the real clock and apply_stalled would
+            # otherwise stall the row once the hardcoded date ages out.
+            "ts": datetime.now(timezone.utc).isoformat()}
     monkeypatch.setattr(members, "collect", lambda *a, **k: ([item], []))
     monkeypatch.setattr("mini_reid.providers.extract_batch_safe",
                         lambda items, provider, now, clients: ([], []))
