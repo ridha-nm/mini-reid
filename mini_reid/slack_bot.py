@@ -123,7 +123,8 @@ PLAY_LINES = {
     "fist bump": "👊 *{who}* — bump.",
     "pat on the back": "👏 *{who}* — well deserved.",
 }
-_PLAY_WHO = r"(?P<who><@[A-Z0-9]+(?:\|[^>]*)?>|@[A-Za-z0-9._'-]+)"
+_PLAY_WHO = (r"(?P<who><@[A-Z0-9]+(?:\|[^>]*)?>"
+             r"|@?[A-Za-z0-9._'-]+)")
 _PLAY_WHAT = r"(?P<what>hug|high[ -]?five|fist[ -]?bump|pat on the back)"
 PLAY_GIVE = re.compile(
     r"\b(?:give|send)\s+" + _PLAY_WHO + r"\s+(?:a\s+)?" + _PLAY_WHAT, re.I)
@@ -136,7 +137,7 @@ def _play_uid(who: str, users: dict[str, str]) -> str | None:
     m = re.match(r"<@([A-Z0-9]+)", who or "")
     if m:
         return m.group(1)
-    return users.get((who or "").lstrip("@").lower())
+    return users.get((who or "").lstrip("@").rstrip(".!").lower())
 
 
 def play_reply(text: str, users: dict[str, str]) -> str | None:
@@ -150,7 +151,7 @@ def play_reply(text: str, users: dict[str, str]) -> str | None:
             continue
         uid = _play_uid(m.group("who"), users)
         if not uid:
-            return None
+            continue
         what = re.sub(r"[-\s]+", " ", m.group("what").lower())
         line = PLAY_LINES.get(what)
         if line:
@@ -609,7 +610,9 @@ def other_note(action: str, body: str, user: str) -> str | None:
     text = (body or "").strip()
     if not text:
         return None
-    if action in MUTATING or action == "unknown":
+    # Only an explicit command from someone else is worth relaying. Casual
+    # bot-addressed chatter ("drive the car") is answered, never noted.
+    if action in MUTATING:
         return f"from <@{user}>: {text}"
     return None
 
@@ -2284,6 +2287,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     send_dm(env, f"*Note from <@{user}>*\n{(body or '').strip()[:500]}")
                 except Exception as ex:  # noqa: BLE001
                     print(f"  note dm failed: {type(ex).__name__}", flush=True)
+            elif action in {"unknown", "ack"}:
+                try:
+                    web.chat_postMessage(channel=channel, text=DEFAULT_REPLY)
+                except Exception as ex:  # noqa: BLE001
+                    print(f"  default reply failed: {type(ex).__name__}", flush=True)
             _mark(ts)
             return
 
