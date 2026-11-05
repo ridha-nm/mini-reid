@@ -34,6 +34,16 @@ def test_member_gmail_is_scoped_to_their_own_address():
     assert extract(item, None, NOW, me="Charanya") == []
 
 
+def test_play_requests_are_not_commitments():
+    for text in ("<@UBOT> pls give ridha a hug",
+                 "high five Julian",
+                 "give <@U1> a fist bump"):
+        item = {"source": "slack", "native_id": text, "kind": "mention",
+                "author": "kasib", "text": text, "link": "l",
+                "ts": "2026-10-30T08:00:00+08:00"}
+        assert extract(item, None, NOW) == []
+
+
 def test_undated_ask_still_becomes_a_commitment():
     item = {"source": "slack", "native_id": "1", "kind": "mention", "author": "kasib",
             "text": "can you look at the dashboard", "link": "l",

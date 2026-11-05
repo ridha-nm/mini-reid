@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (notes in `list`; play requests never captured)
+
+- `list` now ends with a **Notes (N)** section, same short ids as the `notes`
+  command. Previously notes were only visible via `notes`.
+- Extraction ignores hug / high-five / fist-bump / pat requests, so a playful
+  message no longer lands in the inbox asking "is this a task?".
+- 287 tests passing.
+
 ## 2026-11-05 (bare-name play, and chatter is not noted)
 
 - `give ridha a hug` now works without an `@` or a Slack mention; the play

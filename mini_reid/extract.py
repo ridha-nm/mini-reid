@@ -27,6 +27,13 @@ MENTION = re.compile(r"<@[A-Z0-9]+>")
 CHATTER = re.compile(
     r"\b(lol|haha+|bahaha+|im tired|i'?m tired|no worries|working on it|"
     r"noted|got it|sure|yep|yeah|okay|ok|thanks|thank you|see you|hmm)\b", re.I)
+# Playful requests to the bot are never commitments, tagged or not.
+PLAY_REQUEST = re.compile(
+    r"(?:\b(?:give|send)\s+"
+    r"(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@?[\w.'-]+)\s+(?:a\s+)?"
+    r"(?:hug|high[ -]?five|fist[ -]?bump|pat on the back)\b"
+    r"|\b(?:hug|high[ -]?five|fist[ -]?bump|pat on the back)\s+(?:to\s+)?"
+    r"(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@?[\w.'-]+))", re.I)
 BOILERPLATE_TEXT = re.compile(
     r"accounts\.google\.com|gmail is email that|unsubscribe", re.I)
 SIGNATURE = re.compile(
@@ -176,6 +183,8 @@ def extract(item: dict, client: dict | None, now: datetime,
         return []
     text = _clean(item.get("text") or "")
     if len(text) < 8:
+        return []
+    if PLAY_REQUEST.search(text):
         return []
     # Never ingest our own digest or alerts.
     if text.startswith("Mini-Reid —") or "open commitments. Nothing sent." in text:

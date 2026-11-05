@@ -30,8 +30,8 @@ Gmail, Jira and Google Calendar.
   and `#probies`.
   `list` prints a stable short id per row, grouped by status and due date with
   relative due labels (`3d overdue`, `today`, `in 2d`), plus an Inbox section for
-  items awaiting confirmation; its **Triage & update** button lets you set a status
-  on several rows at once, with **Select all** / **Clear** for bulk picking. `185045` or `id:185045` works in every command;
+  items awaiting confirmation, then Notes; its **Triage & update** button lets you
+  set a status on several rows at once, with **Select all** / **Clear**. `185045` or `id:185045` works in every command;
   `done`/`not` also take bulk refs (`done 7, 9`) or a pasted list, one bullet per
   line; the `[abc123]` ids in the paste pick the exact rows, and titles are
   matched as a fallback.

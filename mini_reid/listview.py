@@ -94,7 +94,9 @@ def format_list(rows: list[dict], now: datetime, limit: int = 25) -> str:
     """Numbered, grouped text version. Same numbering as `ordered_rows`."""
     ordered = ordered_rows(rows, now)
     inbox = [r for r in rows if (r.get("status") or "").lower() == "inbox"]
-    if not ordered and not inbox:
+    notes = [r for r in rows if r.get("kind") == "note"
+             and (r.get("status") or "open") not in {"done", "dropped"}]
+    if not ordered and not inbox and not notes:
         return "Nothing open."
 
     shown = ordered[:limit]
@@ -115,5 +117,12 @@ def format_list(rows: list[dict], now: datetime, limit: int = 25) -> str:
         sections.append(f"*Inbox — needs decision ({len(inbox)})*")
         for row in inbox[:20]:
             sections.append(f"• [{row.get('id', '')[:6]}] {_title(row)[:100]}")
+
+    if notes:
+        sections.append(f"*Notes ({len(notes)})*")
+        for row in notes[:20]:
+            sections.append(f"• [{row.get('id', '')[:6]}] {_title(row)[:100]}")
+        if len(notes) > 20:
+            sections.append(f"… and {len(notes) - 20} more notes")
 
     return "\n".join(sections)
