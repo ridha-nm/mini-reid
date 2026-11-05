@@ -25,6 +25,53 @@ def task_matches(label: str, extracted: str, threshold: float = 0.8) -> bool:
     return len(smaller) >= 3 and smaller <= larger
 
 
+def score(labels: list[dict], extracted: list[dict],
+          threshold: float = 0.8) -> dict:
+    """Recall against positive labels; false tasks against reviewed dismissals."""
+    by_id: dict[str, dict] = {}
+    for row in extracted:
+        by_id.setdefault(row.get("id") or "", row)
+    predicted = [r for r in by_id.values()
+                 if r.get("status") not in {"done", "dropped"}]
+
+    positives = [l for l in labels if l.get("is_task")]
+    misses: list[str] = []
+    covered = 0
+    for label in positives:
+        hit = any(
+            (not label.get("date") or not row.get("date")
+             or label.get("date") == row.get("date"))
+            and task_matches(label.get("text") or "", row.get("text") or "",
+                             threshold)
+            for row in predicted
+        )
+        if hit:
+            covered += 1
+        elif len(misses) < 20:
+            misses.append(label.get("text") or "")
+
+    negatives = [l for l in labels
+                 if not l.get("is_task") and l.get("id")]
+    reviewed = [l for l in negatives if (l.get("id") or "") in by_id]
+    false_rows = [l for l in reviewed
+                  if by_id[l["id"]].get("status") not in {"done", "dropped"}]
+    days = {l.get("date") for l in negatives if l.get("date")}
+    recall = (covered / len(positives)) if positives else None
+    false_per_day = (len(false_rows) / len(days)) if days else 0.0
+    return {
+        "positives": len(positives),
+        "covered": covered,
+        "recall": recall,
+        "false_tasks": len(false_rows),
+        "reviewed": len(reviewed),
+        "false_per_day": false_per_day,
+        "misses": misses,
+        "false_examples": [l.get("text") or "" for l in false_rows[:20]],
+        "meets_target": (recall is not None and recall >= 0.95
+                         and false_per_day < 1.0),
+    }
+
+
 def load_labels(path: str) -> list[dict]:
     labels: list[dict] = []
     for line in Path(path).read_text().splitlines():

@@ -1,6 +1,6 @@
 import pytest
 
-from mini_reid.evaluation import load_labels, task_matches
+from mini_reid.evaluation import load_labels, score, task_matches
 
 
 def test_task_matches_accepts_a_more_specific_extracted_title():
@@ -20,3 +20,34 @@ def test_load_labels_rejects_a_row_without_is_task(tmp_path):
     path.write_text('{"date": "2026-11-05", "text": "send the deck"}\n')
     with pytest.raises(ValueError):
         load_labels(str(path))
+
+
+def test_score_finds_a_covered_positive_and_a_false_task():
+    labels = [
+        {"date": "2026-11-05", "text": "send the deck", "is_task": True, "id": ""},
+        {"date": "2026-11-05", "text": "review the dashboard", "is_task": True, "id": ""},
+        {"date": "2026-11-05", "text": "random chatter", "is_task": False, "id": "x1"},
+    ]
+    extracted = [
+        {"date": "2026-11-05", "text": "send the deck to Eupe", "status": "open", "id": "e1"},
+        {"date": "2026-11-05", "text": "random chatter", "status": "open", "id": "x1"},
+    ]
+    result = score(labels, extracted)
+    assert result["recall"] == 0.5
+    assert result["false_tasks"] == 1
+    assert result["false_per_day"] == 1.0
+    assert result["meets_target"] is False
+
+
+def test_score_does_not_count_a_dropped_extracted_row_as_a_task():
+    labels = [{"date": "2026-11-05", "text": "noise", "is_task": False, "id": "x1"}]
+    extracted = [{"date": "2026-11-05", "text": "noise", "status": "dropped", "id": "x1"}]
+    result = score(labels, extracted)
+    assert result["false_tasks"] == 0
+    assert result["meets_target"] is False
+
+
+def test_score_handles_empty_labels():
+    result = score([], [])
+    assert result["recall"] is None
+    assert result["meets_target"] is False
