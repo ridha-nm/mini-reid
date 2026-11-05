@@ -56,7 +56,8 @@ def _overlaps(start: datetime, end: datetime, busy: list[tuple]) -> bool:
 def propose_slots(env: dict, emails: list[str], now: datetime | None = None,
                   duration: int = SLOT_MINUTES, days: int = PROPOSE_DAYS,
                   token_path: str | None = None,
-                  client_path: str | None = None) -> list[dict]:
+                  client_path: str | None = None,
+                  busy_out: dict | None = None) -> list[dict]:
     now = now or datetime.now(MYT)
     earliest = now.replace(second=0, microsecond=0) + timedelta(minutes=30)
     end = (now + timedelta(days=days)).replace(hour=WORK_END, minute=0,
@@ -64,6 +65,8 @@ def propose_slots(env: dict, emails: list[str], now: datetime | None = None,
     everyone = [OWNER_EMAIL] + [e for e in emails if e != OWNER_EMAIL]
     busy = busy_by_email(env, everyone, earliest, end,
                          token_path=token_path, client_path=client_path)
+    if busy_out is not None:
+        busy_out.update(busy)
     slots: list[dict] = []
     day = earliest.date()
     while day <= end.date() and len(slots) < PROPOSE_COUNT:

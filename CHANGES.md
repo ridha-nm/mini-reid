@@ -8,6 +8,9 @@ Append-only. Newest first.
   discuss BD Command Centre`, reads both calendars and offers five 30-minute
   slots in the next five working days, 09:00–18:00 MYT, as Pick buttons in the
   DM ("both free" per slot).
+- The DM is a formal proposal: Title, With (name + email), Duration, time zone,
+  an availability snapshot of both calendars' busy blocks, then Pick buttons.
+  **Refresh availability** recomputes; **Cancel** drops the proposal.
 - Picking a slot creates the Google Calendar event, adds a Meet link and invites
   the attendee (`sendUpdates=all`).
 - `calendar.events` added to owner consent and the member relay.
