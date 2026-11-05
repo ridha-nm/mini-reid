@@ -821,6 +821,8 @@ def _fuzzy_verb(word: str) -> str | None:
     from difflib import get_close_matches
 
     w = (word or "").lower().strip(".,!?:")
+    if w == "not":
+        return None  # no colon: plain text, never fuzzy-match to "note"
     if w in NATURAL_VERBS:
         return w
     if w in VERB_ALIASES:
@@ -2561,6 +2563,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         ts = event.get("ts") or ""
         if not channel or not user:
             return
+        if user == bot_user_id:
+            return  # never process the bot's own replies
         if user == env.get("SLACK_OWNER_ID") and re.match(
                 r"^banter\b", text.strip(), re.I):
             if not claim_message(STATE, channel, ts):
