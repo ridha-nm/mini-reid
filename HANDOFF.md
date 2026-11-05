@@ -1,7 +1,7 @@
 # Handoff
 
 Current state of Mini-Reid. Update after every material change. Last updated
-2026-11-04; next session can start here.
+2026-11-05; next session can start here.
 
 ## What it is
 
@@ -43,6 +43,15 @@ picker, at most three times. `done`/`not` accept bulk refs (`7, 9`, `#7 #9`,
 `catch_up_ts` watermark, so messages missed while the Mac slept or the socket dropped
 are replayed; live messages still advance `last_ts`. Remaining build phases are in
 `SPEC.md`: P2 cycles, P4 closure confirmation, P7 stock-take hub.
+
+2026-11-05: `help` is a topic picker with My list / Triage buttons; every channel
+reply stays in the triggering thread; pasted `done:`/`not:` lists match tasks and
+notes (including notes that start with `9. [abc123]`); a reminder adds an open
+reminder row to the recipient's list; `list` shows 40 rows, undated newest first;
+a missed 09:15 digest is rebuilt and delivered after 09:30 until Slack accepts it;
+`assign:` by row id reassigns and mirrors the title; Triage has Select all / Clear;
+a meeting reply can be `moved` / `rescheduled` / `postponed`. Member parity is
+recorded in `docs/MEMBER_PARITY.md`.
 
 ## Running now
 

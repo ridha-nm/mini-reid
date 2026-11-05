@@ -59,4 +59,4 @@ good enough to be trusted with the decision.
 ## Tests
 
 `tests/test_watcher.py`, `test_providers.py`, `test_triage_ui.py`,
-`test_listview.py`, `test_render.py`. Suite: 262 passing.
+`test_listview.py`, `test_render.py`. Suite: 295 passing as of 2026-11-05.

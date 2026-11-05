@@ -44,10 +44,14 @@ That is a permission boundary, not a parity gap.
 | Capture + inbox confirmation | yes | yes |
 | Add / Not a task buttons, click ack + lock | yes | yes |
 | Model title cleanup | yes | yes |
-| Grouped `list` + Triage & update | yes | yes |
+| Grouped `list` + Inbox + Notes + Triage & update | yes | yes |
+| Interactive `help` topic picker | yes | yes |
 | Stale 18:00 nudge | yes | yes |
 | Overdue nudge, reminders, meetings, digest | yes | yes |
-| Bulk `done:` / `not:` by refs and pasted list | yes | yes |
+| Digest delivery retry after 09:30 | yes | yes |
+| Reminder added to the recipient's list | yes | yes |
+| Meeting replies: yes / no / moved | yes | yes |
+| Bulk `done:` / `not:` by refs, pasted tasks and notes | yes | yes |
 
 ## How this gets enforced
 
