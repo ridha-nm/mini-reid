@@ -25,23 +25,26 @@ def _busy_on(intervals: list[tuple], day) -> str:
     return ", ".join(parts) or "free"
 
 
-def _snapshot(busy: dict, attendee: str, attendee_email: str,
-              slots: list[dict]) -> str:
+def _snapshot(busy: dict, attendees: list[dict], slots: list[dict]) -> str:
     days = sorted({datetime.fromisoformat(s["start"]).astimezone(MYT).date()
                    for s in slots})
     lines = []
     for day in days[:5]:
         lines.append(f"{day:%a %d %b}")
         lines.append(f"  You:      {_busy_on(busy.get(OWNER_EMAIL, []), day)}")
-        lines.append(f"  {attendee[:10]:9} {_busy_on(busy.get(attendee_email, []), day)}")
+        for person in attendees:
+            label = person["name"][:10]
+            lines.append(f"  {label:9} {_busy_on(busy.get(person['email'], []), day)}")
     return "\n".join(lines)
 
 
-def slot_blocks(token: str, topic: str, attendee: str,
-                slots: list[dict], attendee_email: str = "",
-                busy: dict | None = None) -> list[dict]:
-    with_email = (f"{attendee} ({attendee_email})" if attendee_email
-                  else attendee)
+def slot_blocks(token: str, topic: str, attendees: list[dict],
+                slots: list[dict], busy: dict | None = None) -> list[dict]:
+    if isinstance(attendees, str):
+        attendees = [{"name": attendees, "email": ""}]
+    with_email = "\n".join(
+        f"{a['name']}" + (f" ({a['email']})" if a.get("email") else "")
+        for a in attendees)
     blocks: list[dict] = [
         {"type": "section",
          "text": {"type": "mrkdwn", "text": "*Meeting proposal*"}},
@@ -57,7 +60,7 @@ def slot_blocks(token: str, topic: str, attendee: str,
             "type": "section",
             "text": {"type": "mrkdwn",
                      "text": "*Availability snapshot — busy blocks*\n```"
-                             + _snapshot(busy, attendee, attendee_email, slots)
+                             + _snapshot(busy, attendees, slots)
                              + "```"},
         })
     blocks.append({

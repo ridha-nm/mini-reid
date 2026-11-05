@@ -8,6 +8,9 @@ Append-only. Newest first.
   discuss BD Command Centre`, reads both calendars and offers five 30-minute
   slots in the next five working days, 09:00–18:00 MYT, as Pick buttons in the
   DM ("both free" per slot).
+- Multiple attendees work: `meet: @Kasib and @Charanya about BD Command Centre`,
+  `Kasib, Charanya and Arman Rahman about …`; freeBusy covers everyone and all
+  are invited.
 - The DM is a formal proposal: Title, With (name + email), Duration, time zone,
   an availability snapshot of both calendars' busy blocks, then Pick buttons.
   **Refresh availability** recomputes; **Cancel** drops the proposal.

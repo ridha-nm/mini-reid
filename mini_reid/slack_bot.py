@@ -705,18 +705,57 @@ def split_target(body: str, users: dict[str, str], sender: str,
     return None, text
 
 
+def _meeting_people(text: str, users: dict[str, str]) -> list[str]:
+    """Slack ids from '@Kasib and @Charanya', mentions, or full names."""
+    found: list[str] = []
+    for uid in re.findall(r"<@([A-Z0-9]+)(?:\|[^>]*)?>", text):
+        if uid not in found:
+            found.append(uid)
+    left = re.sub(r"<@[A-Z0-9]+(?:\|[^>]*)?>", " ", text)
+    left = re.sub(r"@([A-Za-z0-9._'-]+)",
+                  lambda m: f" {m.group(1)} ", left)
+    chunks = [c.strip(" ,.") for c in re.split(r"\s*(?:,|&|\band\b)\s*",
+                                               left, flags=re.I) if c.strip(" ,.")]
+    for chunk in chunks:
+        low = chunk.lower()
+        if low in users:
+            if users[low] not in found:
+                found.append(users[low])
+            continue
+        # Full names with spaces: consume the longest known prefix.
+        rest = low
+        matched = False
+        while rest:
+            name = next((n for n in sorted(users, key=len, reverse=True)
+                         if rest.startswith(n)), None)
+            if not name:
+                break
+            if users[name] not in found:
+                found.append(users[name])
+            rest = rest[len(name):].strip()
+            matched = True
+        if not matched:
+            return []
+    return found
+
+
 def parse_meeting(body: str, users: dict[str, str],
-                  sender: str) -> tuple[str | None, str]:
-    """'Kasib to discuss BD' -> (slack id, 'BD')."""
+                  sender: str) -> tuple[list[str] | None, str]:
+    """'Kasib and Charanya to discuss BD' -> ([U1, U2], 'BD')."""
     text = re.sub(r"^with\s+", "", (body or "").strip(), flags=re.I)
-    target, rest = split_target(text, users, sender, bare_name=True)
-    if not target:
+    topic = ""
+    m = re.search(
+        r"\s+(?:to\s+)?(?:discuss|talk\s+about|review|about|re)\s*:?\s+(.+)$",
+        text, re.I)
+    if m:
+        people_text, topic = text[:m.start()].strip(), m.group(1).strip()
+    else:
+        people_text = text
+    targets = _meeting_people(people_text, users)
+    if not targets:
         return None, ""
-    topic = re.sub(r"^(?:to\s+)?(?:discuss|talk\s+about|review|about|re)\s*:?\s*",
-                   "", rest or "", flags=re.I).strip()
-    if not topic:
-        topic = f"Meeting with {_person_name(target, users)}"
-    return target, topic[:200]
+    names = ", ".join(_person_name(t, users) for t in targets)
+    return targets, (topic or f"Meeting with {names}")[:200]
 
 
 def unresolved_recipient(body: str, users: dict[str, str]) -> str | None:
@@ -2096,30 +2135,39 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 say("Only Ridha can schedule meetings.")
                 _mark(ts)
                 return
-            target, topic = parse_meeting(body, users, user)
-            if not target:
-                say("Use: meet: @Kasib about BD Command Centre")
+            targets, topic = parse_meeting(body, users, user)
+            if not targets:
+                say("Use: meet: @Kasib and @Charanya about BD Command Centre")
                 _mark(ts)
                 return
             from .directory import lookup as directory_lookup
             from .meeting_ui import slot_blocks
             from .meetings import propose_slots
 
-            attendee = _person_name(target, users)
-            email = (directory_lookup(target).get("email") or "").lower()
-            if not email:
-                say(f"I don't have a work email for {attendee}.")
+            attendees: list[dict] = []
+            missing: list[str] = []
+            for target in targets:
+                name = _person_name(target, users)
+                email = (directory_lookup(target).get("email") or "").lower()
+                if email:
+                    attendees.append({"name": name, "email": email})
+                else:
+                    missing.append(name)
+            if missing:
+                say("I don't have a work email for " + ", ".join(missing) + ".")
                 _mark(ts)
                 return
+            emails = [a["email"] for a in attendees]
+            names = ", ".join(a["name"] for a in attendees)
             busy: dict = {}
             try:
-                slots = propose_slots(env, [email], busy_out=busy)
+                slots = propose_slots(env, emails, busy_out=busy)
             except Exception as ex:  # noqa: BLE001 - tell the owner why
                 say(f"Could not read calendars: {type(ex).__name__}: {ex}")
                 _mark(ts)
                 return
             if not slots:
-                say(f"No common free slot with {attendee} in the next 5 working days.")
+                say(f"No common free slot with {names} in the next 5 working days.")
                 _mark(ts)
                 return
             from secrets import token_hex
@@ -2127,14 +2175,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             token = token_hex(6)
             state_now = _state()
             pending = state_now.setdefault("pending_meet", {})
-            pending[token] = {"topic": topic, "emails": [email],
-                              "attendee": attendee, "slots": slots,
-                              "user": user, "channel": channel}
+            pending[token] = {"topic": topic, "emails": emails,
+                              "attendees": attendees, "attendee": names,
+                              "slots": slots, "user": user, "channel": channel}
             if len(pending) > 50:
                 state_now["pending_meet"] = dict(list(pending.items())[-50:])
             Path(STATE).write_text(json.dumps(state_now))
-            say(f"Free slots with {attendee}:",
-                blocks=slot_blocks(token, topic, attendee, slots, email, busy))
+            say(f"Free slots with {names}:",
+                blocks=slot_blocks(token, topic, attendees, slots, busy))
             _mark(ts)
             return
 
@@ -2584,9 +2632,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     pending["slots"] = slots
                     Path(STATE).write_text(json.dumps(state_now))
                     if channel and msg_ts:
+                        people = pending.get("attendees") or [{
+                            "name": pending.get("attendee", "Attendee"),
+                            "email": (pending.get("emails") or [""])[0]}]
                         blocks = slot_blocks(
-                            token, pending["topic"], pending["attendee"],
-                            slots, pending["emails"][0], busy)
+                            token, pending["topic"], people, slots, busy)
                         web.chat_update(channel=channel, ts=msg_ts,
                                         text=f"Free slots with {pending['attendee']}",
                                         blocks=blocks)
