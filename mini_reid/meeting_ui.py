@@ -18,8 +18,9 @@ def slot_blocks(token: str, topic: str, attendee: str,
     blocks = [{
         "type": "section",
         "text": {"type": "mrkdwn",
-                 "text": f"*Meeting with {attendee}*\n{topic}\n"
-                         "Pick a free slot. I will create the event and invite them."},
+                 "text": f"*Meeting with {attendee} — both free*\n{topic}\n"
+                         "These slots are free on both calendars. Pick one and I "
+                         "create the event and invite them."},
     }]
     for slot in slots:
         blocks.append({
