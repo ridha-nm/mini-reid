@@ -2,6 +2,16 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (authorised members get the same flow)
+
+- Members now get title cleanup from the local model, the `inbox` confirmation
+  DM with **Add to list** / **Not a task**, and the click/edit/lock behaviour.
+- `list` sends the **Triage & update** button to members, and its modal,
+  submission and stale pickers resolve the clicker's own ledger instead of the
+  owner's.
+- Members get the 18:00 stale nudge with inline status pickers.
+- 271 tests passing.
+
 ## 2026-11-05 (confirm clicks acknowledge and lock)
 
 - Clicking **Add to list** / **Not a task** now edits the DM itself: shows

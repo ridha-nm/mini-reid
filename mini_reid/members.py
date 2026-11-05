@@ -18,7 +18,8 @@ from .profiles import load as load_profiles
 from .render import render
 from .sources import _get_json, fetch_gmail, fetch_jira, slack_user_name
 from .watcher import (_stamp_confirmation, fire_reminders, format_alert,
-                      new_rows, nudge_overdue, remind_meetings)
+                      new_rows, nudge_overdue, nudge_stale, polish_rows,
+                      remind_meetings)
 
 MYT = timezone(timedelta(hours=8))
 IGNORE_CHANNELS = {"bd-triager-agent", "C0B59LA0X5M"}
@@ -198,6 +199,7 @@ def refresh(env: dict, user: str, profile: dict, days: int = 1) -> list[dict]:
     clients = load_clients("clients.json")
     fresh = new_rows(items, existing, clients, now,
                      me=profile.get("email") or profile.get("name"))
+    fresh = polish_rows(env, items, fresh, now, clients)
     if fresh:
         fresh = [dict(row, status="inbox") for row in fresh]
         save(ledger_path, apply_stalled(merge(existing, fresh), now))
@@ -259,9 +261,10 @@ def cycle(env: dict, now: datetime) -> int:
                     owner_email=profile.get("email"),
                     ignores_path=str(d / "calendar_ignores.json"),
                     client_path=_google_client(env, profile))
-            nudge_overdue(env, profile.get("ledger") or
-                          f"data/{user}/ledger.json", now, user,
-                          str(d / "watcher_state.json"))
+            ledger = profile.get("ledger") or f"data/{user}/ledger.json"
+            state = str(d / "watcher_state.json")
+            nudge_overdue(env, ledger, now, user, state)
+            nudge_stale(env, ledger, now, state, user)
             refresh(env, user, profile)
             handled += 1
         except Exception as ex:  # noqa: BLE001 - one member must not stop the rest

@@ -2185,7 +2185,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if late:
             reply = "_(answered late, I was offline)_\n" + reply
         blocks = None
-        if action == "list" and user == owner:
+        if action == "list" and (user == owner or member):
             try:
                 from .triage_ui import list_blocks
 
@@ -2195,6 +2195,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         say(reply, blocks=blocks)
         _mark(ts)
 
+    def ledger_for_viewer(user_id: str) -> str | None:
+        """The ledger behind a button click: owner or an allowlisted member."""
+        if not user_id:
+            return None
+        if user_id == owner:
+            return ledger_path
+        people = load_profiles()
+        return ledger_for(people, user_id, ledger_path) if user_id in people else None
+
     def handle(_socket_client, req):
         client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
         payload = req.payload or {}
@@ -2203,6 +2212,10 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             if view.get("callback_id") == "triage_apply":
                 from .triage_ui import apply_triage
 
+                clicker = (payload.get("user") or {}).get("id") or ""
+                target = ledger_for_viewer(clicker)
+                if not target:
+                    return
                 values = (view.get("state") or {}).get("values") or {}
                 ids: list[str] = []
                 for block_id, elements in values.items():
@@ -2213,9 +2226,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 choice = ((values.get("verdict") or {}).get("value") or {}) \
                     .get("selected_option") or {}
                 verdict = choice.get("value") or "open"
-                rows, count = apply_triage(load(ledger_path), ids,
+                rows, count = apply_triage(load(target), ids,
                                            verdict, datetime.now(MYT))
-                save(ledger_path, rows)
+                save(target, rows)
                 clicker = (payload.get("user") or {}).get("id") or owner
                 try:
                     send_dm_to(env, clicker,
@@ -2228,11 +2241,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 action_id = action.get("action_id") or ""
                 if action_id == "triage_open":
                     trigger = payload.get("trigger_id") or ""
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target = ledger_for_viewer(clicker)
+                    if not target:
+                        continue
                     try:
                         from .triage_ui import triage_modal
 
                         web.views_open(trigger_id=trigger,
-                                       view=triage_modal(load(ledger_path),
+                                       view=triage_modal(load(target),
                                                          datetime.now(MYT)))
                     except Exception as ex:  # noqa: BLE001 - user can retry
                         print(f"  triage modal failed: {type(ex).__name__}: {ex}",
@@ -2246,10 +2263,13 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     if not parsed:
                         continue
                     row_id, verdict = parsed
-                    rows, count = apply_triage(load(ledger_path), [row_id],
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target = ledger_for_viewer(clicker)
+                    if not target:
+                        continue
+                    rows, count = apply_triage(load(target), [row_id],
                                                verdict, datetime.now(MYT))
-                    save(ledger_path, rows)
-                    clicker = (payload.get("user") or {}).get("id") or owner
+                    save(target, rows)
                     if count:
                         try:
                             send_dm_to(env, clicker,

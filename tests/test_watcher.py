@@ -92,6 +92,35 @@ def test_stale_rows_wait_for_a_day_without_activity():
     assert [r["id"] for r in stale_rows(rows, NOW)] == ["old"]
 
 
+def test_polish_rows_rewrites_titles_and_still_waits(monkeypatch):
+    from mini_reid import watcher as w
+
+    monkeypatch.setattr(
+        "mini_reid.providers.extract_batch_safe",
+        lambda items, provider, now, clients: (
+            [dict(_rule("m1"), what="Review the deck")], []))
+    out = w.polish_rows({}, [{"native_id": "m1"}], [_rule("m1")], NOW, [])
+    assert [r["what"] for r in out] == ["Review the deck"]
+    assert out[0]["status"] == "inbox"
+
+
+def test_stale_nudge_can_go_to_a_member(tmp_path, monkeypatch):
+    from mini_reid import watcher as w
+    from mini_reid.ledger import save
+
+    monkeypatch.chdir(tmp_path)
+    sent = []
+    monkeypatch.setattr(w, "send_dm_to",
+                        lambda env, uid, text, blocks=None:
+                        sent.append((uid, text, blocks)))
+    save("ledger.json", [{"id": "a", "what": "Old thing", "status": "open",
+                          "last_activity": "2026-10-28T09:00:00+08:00"}])
+    assert w.nudge_stale({}, "ledger.json", NOW.replace(hour=19),
+                         "state.json", "U2") == 1
+    assert sent and sent[0][0] == "U2"
+    assert sent[0][2]
+
+
 def test_stale_nudge_asks_once_a_day_and_counts_up(tmp_path, monkeypatch):
     from mini_reid import watcher as w
     from mini_reid.ledger import load, save

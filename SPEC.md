@@ -185,7 +185,9 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 - The member watcher reads mentions in channels the bot is in, plus their own Gmail and
   Jira. Jira uses the shared workspace token, queried by the member's Jira account id;
   Gmail uses the member's own OAuth token. Their reminders, meeting reminders, overdue
-  nudge and 09:15 digest go only to their DM.
+  nudge, 18:00 stale nudge and 09:15 digest go only to their DM. New items use the same
+  model title cleanup and inbox confirmation DM; `list`, its **Triage & update** modal
+  and stale pickers all resolve that member's ledger, never the owner's.
 - `directory.json` (gitignored, mode 600) maps Slack id → name, email and Jira account.
   Rebuild with `python -m mini_reid.directory`. `allow:` reads it first, so any Pantas
   member can be set up without typing their email or Jira id.

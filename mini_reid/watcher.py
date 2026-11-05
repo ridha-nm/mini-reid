@@ -41,6 +41,25 @@ def new_rows(items: list[dict], existing: list[dict], clients: dict, now: dateti
     return out
 
 
+def polish_rows(env: dict, items: list[dict], fresh: list[dict],
+                now: datetime, clients) -> list[dict]:
+    """Clean titles with the local model; every row still waits in the inbox."""
+    if not fresh:
+        return fresh
+    from .providers import OllamaProvider, extract_batch_safe
+
+    by_nid = {i.get("native_id"): i for i in items}
+    candidates = [by_nid[r["native_id"]] for r in fresh
+                  if r.get("native_id") in by_nid]
+    rewritten: list[dict] = []
+    provider = OllamaProvider(model=env.get("OLLAMA_MODEL", "llama3.2:3b"))
+    for start in range(0, len(candidates), 5):
+        rows, _bad = extract_batch_safe(
+            candidates[start:start + 5], provider, now, list(clients))
+        rewritten.extend(rows)
+    return triage_rows(fresh, rewritten)
+
+
 def triage_rows(fresh: list[dict], rewritten: list[dict]) -> list[dict]:
     """Every rule-captured row waits for a person; the model only cleans the title.
 
@@ -388,7 +407,8 @@ def stale_rows(rows: list[dict], now: datetime) -> list[dict]:
 
 
 def nudge_stale(env: dict, ledger_path: str, now: datetime,
-                state_path: str = "watcher_state.json") -> int:
+                state_path: str = "watcher_state.json",
+                user_id: str | None = None) -> int:
     """Evening DM: ask what happened to tasks that saw no update today."""
     from .ledger import save
     from .triage_ui import stale_blocks
@@ -404,7 +424,10 @@ def nudge_stale(env: dict, ledger_path: str, now: datetime,
         return 0
     shown = rows[:5]
     text = f"*No update today ({len(rows)})*\nStill open — what happened?"
-    send_dm(env, text, blocks=stale_blocks(shown))
+    if user_id:
+        send_dm_to(env, user_id, text, blocks=stale_blocks(shown))
+    else:
+        send_dm(env, text, blocks=stale_blocks(shown))
     for row in shown:
         row["nudges"] = int(row.get("nudges") or 0) + 1
         row["last_nudged"] = today
@@ -518,20 +541,8 @@ def main() -> int:
     existing = load(ledger_path)
     fresh = new_rows(items, existing, clients, now)
 
-    # Rewrite and filter through the local model before alerting. Rules alone
-    # copy email openers and keep thread chatter that is not a commitment.
-    if fresh:
-        from .providers import OllamaProvider, extract_batch_safe
-
-        by_nid = {i.get("native_id"): i for i in items}
-        candidates = [by_nid[r["native_id"]] for r in fresh if r.get("native_id") in by_nid]
-        rewritten: list[dict] = []
-        provider = OllamaProvider(model=env.get("OLLAMA_MODEL", "llama3.2:3b"))
-        for start in range(0, len(candidates), 5):
-            rows, _bad = extract_batch_safe(
-                candidates[start:start + 5], provider, now, list(clients))
-            rewritten.extend(rows)
-        fresh = triage_rows(fresh, rewritten)
+    # Rules capture; the model only cleans titles. Every row waits for a click.
+    fresh = polish_rows(env, items, fresh, now, clients)
 
     if fresh:
         ledger = apply_stalled(merge(existing, fresh), now)
