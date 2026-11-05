@@ -1943,28 +1943,29 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         Channel replies stay in the triggering thread."""
         if dm_to and not channel.startswith("D"):
             try:
-                send_dm_to(env, dm_to, text, blocks=blocks)
+                return send_dm_to(env, dm_to, text, blocks=blocks)
             except Exception as ex:  # noqa: BLE001
                 print(f"  dm reply failed: {type(ex).__name__}", flush=True)
-            return
+            return None
         if private and not channel.startswith("D"):
             try:
-                send_dm(env, text, blocks=blocks)
+                return send_dm(env, text, blocks=blocks)
             except Exception as ex:  # noqa: BLE001
                 print(f"  dm reply failed: {type(ex).__name__}", flush=True)
-            return
+            return None
         data = {"channel": channel, "text": text}
         if blocks:
             data["blocks"] = blocks
         if thread_ts and not channel.startswith("D"):
             data["thread_ts"] = thread_ts
-        web.chat_postMessage(**data)
+        sent = web.chat_postMessage(**data)
         if not notify or channel.startswith("D"):
-            return
+            return sent
         try:
             send_dm(env, text)
         except Exception as ex:  # noqa: BLE001 - the channel reply already went out
             print(f"  dm mirror failed: {type(ex).__name__}", flush=True)
+        return sent
 
     seen: set[tuple[str, str]] = set()
     STATE = "bot_state.json"
@@ -2018,18 +2019,17 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         user_ledger = ledger_for(profiles, user, ledger_path) if member else ledger_path
 
         def say(text: str, notify: bool | None = None,
-                blocks: list[dict] | None = None) -> None:
+                blocks: list[dict] | None = None):
             """Reply to the command sender, privately for owner and members."""
             notify = (user == owner) if notify is None else notify
             if user == owner:
-                post_reply(channel, text, notify=notify, private=True,
-                           blocks=blocks, thread_ts=thread_ts)
-            elif member:
-                post_reply(channel, text, dm_to=user, blocks=blocks,
-                           thread_ts=thread_ts)
-            else:
-                post_reply(channel, text, notify=notify, blocks=blocks,
-                           thread_ts=thread_ts)
+                return post_reply(channel, text, notify=notify, private=True,
+                                  blocks=blocks, thread_ts=thread_ts)
+            if member:
+                return post_reply(channel, text, dm_to=user, blocks=blocks,
+                                  thread_ts=thread_ts)
+            return post_reply(channel, text, notify=notify, blocks=blocks,
+                              thread_ts=thread_ts)
 
         key = f"{channel}:{user}"
         state_now = _state()
@@ -2181,8 +2181,12 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             if len(pending) > 50:
                 state_now["pending_meet"] = dict(list(pending.items())[-50:])
             Path(STATE).write_text(json.dumps(state_now))
-            say(f"Free slots with {names}:",
-                blocks=slot_blocks(token, topic, attendees, slots, busy))
+            sent = say(f"Free slots with {names}:",
+                       blocks=slot_blocks(token, topic, attendees, slots, busy))
+            if sent:
+                pending[token]["channel"] = sent.get("channel") or channel
+                pending[token]["message_ts"] = sent.get("ts") or ""
+                Path(STATE).write_text(json.dumps(state_now))
             _mark(ts)
             return
 
@@ -2570,6 +2574,42 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         payload = req.payload or {}
         if payload.get("type") == "view_submission":
             view = payload.get("view") or {}
+            if view.get("callback_id") == "meet_edit":
+                from .meeting_ui import slot_blocks
+                from .meetings import propose_slots
+
+                token = view.get("private_metadata") or ""
+                values = (view.get("state") or {}).get("values") or {}
+                title = ((values.get("title") or {}).get("value") or {}) \
+                    .get("value") or ""
+                notes = ((values.get("notes") or {}).get("value") or {}) \
+                    .get("value") or ""
+                state_now = _state()
+                pending = (state_now.get("pending_meet") or {}).get(token)
+                if not pending:
+                    return
+                pending["notes"] = notes[:8000]
+                if title.strip():
+                    pending["topic"] = title.strip()[:200]
+                busy: dict = {}
+                try:
+                    slots = propose_slots(env, pending["emails"], busy_out=busy)
+                    pending["slots"] = slots
+                except Exception:  # noqa: BLE001 - keep the previous slots
+                    slots = pending.get("slots") or []
+                Path(STATE).write_text(json.dumps(state_now))
+                channel = pending.get("channel") or ""
+                msg_ts = pending.get("message_ts") or ""
+                people = pending.get("attendees") or [{
+                    "name": pending.get("attendee", "Attendee"),
+                    "email": (pending.get("emails") or [""])[0]}]
+                if channel and msg_ts and slots:
+                    web.chat_update(
+                        channel=channel, ts=msg_ts,
+                        text=f"Meeting proposal: {pending['topic']}",
+                        blocks=slot_blocks(token, pending["topic"], people,
+                                           slots, busy))
+                return
             if view.get("callback_id") == "triage_apply":
                 from .triage_ui import apply_triage
 
@@ -2600,6 +2640,22 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
+                if action_id == "meet_edit":
+                    from .meeting_ui import edit_modal
+
+                    token = action.get("value") or ""
+                    pending = (_state().get("pending_meet") or {}).get(token)
+                    if not pending:
+                        continue
+                    try:
+                        web.views_open(
+                            trigger_id=payload.get("trigger_id") or "",
+                            view=edit_modal(token, pending["topic"],
+                                            pending.get("notes", "")))
+                    except Exception as ex:  # noqa: BLE001 - user can retry
+                        print(f"  meet edit modal failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
                 if action_id in {"meet_refresh", "meet_cancel"}:
                     from .meeting_ui import slot_blocks
                     from .meetings import propose_slots
@@ -2662,7 +2718,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     try:
                         event = create_event(env, pending["topic"],
                                              slot["start"], slot["end"],
-                                             pending["emails"])
+                                             pending["emails"],
+                                             pending.get("notes", ""))
                     except Exception as ex:  # noqa: BLE001 - report, do not crash
                         message = (f"Could not create the meeting: "
                                    f"{type(ex).__name__}: {ex}\n"

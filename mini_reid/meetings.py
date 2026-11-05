@@ -88,12 +88,14 @@ def propose_slots(env: dict, emails: list[str], now: datetime | None = None,
 
 
 def create_event(env: dict, topic: str, start: str, end: str,
-                 emails: list[str], token_path: str | None = None,
+                 emails: list[str], notes: str = "",
+                 token_path: str | None = None,
                  client_path: str | None = None) -> dict:
     """Create a Google Calendar event with a Meet link and invite attendees."""
     access = gmail_access(env, token_path, client_path)
     body = {
         "summary": topic[:200],
+        "description": (notes or f"Meeting notes: {topic}")[:8000],
         "start": {"dateTime": start, "timeZone": "Asia/Kuala_Lumpur"},
         "end": {"dateTime": end, "timeZone": "Asia/Kuala_Lumpur"},
         "attendees": [{"email": e} for e in emails],

@@ -59,10 +59,21 @@ def test_slot_and_confirmation_blocks():
     assert "BD Command Centre" in str(blocks[1])
     controls = next(b for b in blocks if b.get("type") == "actions")
     assert [e["action_id"] for e in controls["elements"]] == [
-        "meet_refresh", "meet_cancel"]
+        "meet_edit", "meet_refresh", "meet_cancel"]
     done = confirmation_blocks("BD Command Centre", slots[0]["start"],
                                slots[0]["end"], "https://meet.google.com/x")
     assert "<https://meet.google.com/x|join>" in done[0]["text"]["text"]
+
+
+def test_edit_modal_prefills_title_and_notes():
+    from mini_reid.meeting_ui import edit_modal
+
+    modal = edit_modal("tok", "BD Command Centre", "Bring the numbers")
+    assert modal["callback_id"] == "meet_edit"
+    assert modal["private_metadata"] == "tok"
+    blocks = {b["block_id"]: b for b in modal["blocks"]}
+    assert blocks["title"]["element"]["initial_value"] == "BD Command Centre"
+    assert blocks["notes"]["element"]["initial_value"] == "Bring the numbers"
 
 
 def test_slot_blocks_show_both_calendars_busy():
