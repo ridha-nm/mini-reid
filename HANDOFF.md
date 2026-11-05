@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Knight Frank, Allianz, Setia and Eupe. 286 tests pass.
+overridden to Knight Frank, Allianz, Setia and Eupe. 287 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
@@ -137,7 +137,7 @@ not: anything not part c          wrong item; also takes bulk refs; meeting titl
 remind me to send the deck in 2 minutes
 ask: what did we agree with Eupe  answer from your own writing, with sources
 find: eupe                        search the ledger
-list                              grouped open items + Inbox, with a Triage button
+list                              grouped open items + Inbox + Notes, Triage button
 notes                             list notes; they also appear in the digest
 help                              the command list
 ```
@@ -266,7 +266,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-286 tests passing as of 2026-11-05.
+287 tests passing as of 2026-11-05.
 
 ## Next, agreed
 

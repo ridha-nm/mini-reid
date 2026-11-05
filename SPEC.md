@@ -104,7 +104,7 @@ a channel mention. Channel mentions are always kept unless they are pure chatter
 - Kept: requests, first-person commitments, Gmail with a direct address or a dated
   request, Jira assignments.
 - Rejected: bots, `bd-triager-agent` tags, calendar responses, Jira notification mail,
-  sent mail, chatter,
+  sent mail, chatter, playful requests (`give … a hug`, `high five …`),
   questions with no ask ("do you have access?"), status updates ("Update: …"), other
   people's own plans ("I try to get … today"), Google boilerplate, URLs, newsletters.
 
@@ -154,7 +154,7 @@ is nudged at most three times; a status change through triage or the picker rese
 count. Inbox rows are never nudged as stale or overdue.
 
 `list` is grouped as In progress / Blocked / Overdue / Due today / This week / Later /
-No date, followed by Inbox. The reply carries a **Triage & update** button that opens a
+No date, followed by Inbox and Notes. The reply carries a **Triage & update** button that opens a
 modal: select rows (checkboxes chunked ten per Slack block, at most forty selectable),
 choose one status, apply once. **Select all** / **Clear** rebuild the modal with every
 row ticked or none; Slack has no shift-select. Long lists split across section

@@ -54,13 +54,17 @@ def test_inbox_items_are_separated_and_not_numbered():
     assert "2. [maybe1]" not in text
 
 
-def test_list_hides_notes_done_and_dropped():
+def test_list_shows_notes_in_their_own_section():
     rows = [
         _row("n1", "a note", kind="note"),
         _row("d1", "done task", status="done"),
         _row("x1", "dropped task", status="dropped"),
     ]
-    assert format_list(rows, NOW) == "Nothing open."
+    text = format_list(rows, NOW)
+    assert "Notes (1)" in text
+    assert "[n1] a note" in text
+    assert "done task" not in text
+    assert "dropped task" not in text
 
 
 def test_due_dates_read_relative():
