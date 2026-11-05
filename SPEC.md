@@ -180,7 +180,9 @@ ignores that title), `remind` (absolute or `in 2 minutes`),
 (`@Kasib and @Charanya`, comma/and-separated names), reads everyone's freeBusy, proposes five
 30-minute slots over five working days with a formal Title/With/Duration block and a
 busy snapshot of both calendars, then creates the Google event with a Meet link and
-invites the attendee. Refresh and Cancel buttons; requires `calendar.events` consent.
+invites the attendee. Edit title/notes, Refresh and Cancel buttons; notes become the
+event description, Meet is always created. Requires `calendar.events` consent.
+Google does not expose the Gemini meeting-notes toggle through Calendar API.
 `help` is a topic picker (Capture, Update, Close, Find, Inbox, Reminders, Team,
 Fun) with **My list** and **Triage inbox** buttons, not a command dump.
 

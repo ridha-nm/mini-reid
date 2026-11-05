@@ -83,12 +83,36 @@ def slot_blocks(token: str, topic: str, attendees: list[dict],
             },
         })
     blocks.append({"type": "actions", "elements": [
+        {"type": "button", "action_id": "meet_edit", "value": token,
+         "text": {"type": "plain_text", "text": "Edit title / notes"}},
         {"type": "button", "action_id": "meet_refresh", "value": token,
          "text": {"type": "plain_text", "text": "Refresh availability"}},
         {"type": "button", "action_id": "meet_cancel", "value": token,
          "text": {"type": "plain_text", "text": "Cancel"}, "style": "danger"},
     ]})
     return blocks
+
+
+def edit_modal(token: str, topic: str, notes: str = "") -> dict:
+    return {
+        "type": "modal",
+        "callback_id": "meet_edit",
+        "private_metadata": token,
+        "title": {"type": "plain_text", "text": "Edit meeting"},
+        "submit": {"type": "plain_text", "text": "Save"},
+        "close": {"type": "plain_text", "text": "Cancel"},
+        "blocks": [
+            {"type": "input", "block_id": "title",
+             "label": {"type": "plain_text", "text": "Meeting title"},
+             "element": {"type": "plain_text_input", "action_id": "value",
+                         "initial_value": topic[:200],
+                         "max_length": 200}},
+            {"type": "input", "block_id": "notes", "optional": True,
+             "label": {"type": "plain_text", "text": "Notes (event description)"},
+             "element": {"type": "plain_text_input", "action_id": "value",
+                         "multiline": True, "initial_value": (notes or "")[:2000]}},
+        ],
+    }
 
 
 def confirmation_blocks(topic: str, start: str, end: str,

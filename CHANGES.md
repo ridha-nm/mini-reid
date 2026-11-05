@@ -11,6 +11,10 @@ Append-only. Newest first.
 - Multiple attendees work: `meet: @Kasib and @Charanya about BD Command Centre`,
   `Kasib, Charanya and Arman Rahman about …`; freeBusy covers everyone and all
   are invited.
+- **Edit title / notes** opens a modal before the invite. The title and event
+  description are saved to the pending proposal. Google Meet is always created;
+  notes go on the event description (Google exposes no API for the Gemini
+  "take notes" toggle).
 - The DM is a formal proposal: Title, With (name + email), Duration, time zone,
   an availability snapshot of both calendars' busy blocks, then Pick buttons.
   **Refresh availability** recomputes; **Cancel** drops the proposal.
