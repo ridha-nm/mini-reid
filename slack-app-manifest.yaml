@@ -60,6 +60,8 @@ oauth_config:
       - im:history
       - im:read
       - im:write
+      - lists:read
+      - lists:write
       - reactions:write
       - users:read
     user_optional:

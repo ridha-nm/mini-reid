@@ -75,7 +75,10 @@ Gmail, Jira and Google Calendar.
   `python -m mini_reid.accounts` rebuilds email → client accounts from the
   stocktake-hub config.
 - **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
-  local documents. `ask:` returns passages from your own writing, with sources.
+  local documents. `ask:` tries live Slack Real-time Search first (channel, text,
+  permalink), then falls back to the local passages.
+- **Slack List mirror**: each user's ledger is mirrored into a native Slack List with
+  title, status, due and source; created once and updated every watcher cycle.
 
 ## Run
 

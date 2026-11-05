@@ -175,7 +175,8 @@ ledger), `reassign: <item> to <person>`,
 `edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
 ignores that title), `remind` (absolute or `in 2 minutes`),
-`ask:`, `find:`, `list`, `notes`, `meet: @Name about <topic>`, `allow: @Name`,
+`ask:` (owner tries live Slack Real-time Search first, then the local KB),
+`find:`, `list`, `notes`, `meet: @Name about <topic>`, `allow: @Name`,
 `banter on|off|status`, `help`. `meet:` accepts one or more attendees
 (`@Kasib and @Charanya`, comma/and-separated names), reads everyone's freeBusy, proposes five
 30-minute slots over five working days with a formal Title/With/Duration block and a
@@ -202,6 +203,9 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   The list's **Triage & update** modal can settle unanswered rows.
 - The owner mutates `ledger.json`; an allowlisted member mutates only their own
   `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
+- Each user's ledger is mirrored into a native Slack List (“Mini-Reid — Name”)
+  with title, status, due and source link. The list is created once and shared
+  write with that user; the watcher creates/updates the latest 50 rows.
 - A member's plain DM to the bot becomes a task without an `add:` prefix;
   questions and channel messages keep their existing behaviour.
 - The **Add to Mini-Reid** message shortcut captures any message after a prefilled

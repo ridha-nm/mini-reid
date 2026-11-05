@@ -2,6 +2,18 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (live Slack search + native Slack List)
+
+- `ask:` for the owner now searches Slack first with the Real-time Search API
+  (`assistant.search.context`), returns channel, text and permalink, and falls
+  back to the local knowledge base when there are no hits or an error.
+- The watcher mirrors each user's ledger into a native Slack List
+  (“Mini-Reid — Name”): title, status, due and source link. The list is created
+  once, shared with the user, and rows are created or updated incrementally
+  (last 50).
+- Bot scopes `lists:read` / `lists:write`; live list created for Ridha.
+- 329 tests passing.
+
 ## 2026-11-05 (message shortcut and reaction capture)
 
 - **Add to Mini-Reid** message shortcut: right-click any message, edit the

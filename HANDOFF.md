@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 324 tests pass.
+overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 329 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
@@ -55,6 +55,12 @@ a missed 09:15 digest is rebuilt and delivered after 09:30 until Slack accepts i
 `assign:` by row id reassigns and mirrors the title; Triage has Select all / Clear;
 a meeting reply can be `moved` / `rescheduled` / `postponed`. Member parity is
 recorded in `docs/MEMBER_PARITY.md`.
+
+2026-11-05: `ask:` tries live Slack Real-time Search first for Ridha, with
+channel/text/permalink, then falls back to the local KB. Each user's ledger is
+mirrored into a native Slack List (“Mini-Reid — Name”) with title, status, due
+and source; created once, shared write, incremental last 50. Bot scopes
+`lists:read`/`lists:write`.
 
 2026-11-05 flying-car baseline: `mini_reid.evaluation` scores capture against
 Charanya's self-written list, with `benchmark: false` for tasks that have no
@@ -293,7 +299,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-324 tests passing as of 2026-11-05.
+329 tests passing as of 2026-11-05.
 
 ## Next, agreed
 

@@ -2372,21 +2372,33 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             if user != owner and user not in allow:
                 say("You are not on the list for that. Ask Ridha to add you.")
                 return
-            try:
-                from .kb import answer as kb_answer
-                from .kb import load as kb_load
+            reply = ""
+            if user == owner:
+                try:
+                    from .slack_search import format_hits, search as slack_search
 
-                index = kb_load()
-                if not index:
-                    reply = "Knowledge base is empty. Ridha needs to run the index build."
-                else:
-                    body_text, hits = kb_answer(body, index)
-                    sources = "\n".join(
-                        f"[{i}] {h['source']} · {h['link']}"
-                        for i, h in enumerate(hits, 1) if h.get("link"))
-                    reply = f"{body_text}\n\n{sources}"
-            except Exception as ex:  # noqa: BLE001
-                reply = f"Could not answer: {type(ex).__name__}"
+                    hits = slack_search(env, body)
+                    if hits:
+                        reply = "*From Slack*\n" + format_hits(hits)
+                except Exception as ex:  # noqa: BLE001 - fall back to the KB
+                    print(f"  live slack search failed: "
+                          f"{type(ex).__name__}: {ex}", flush=True)
+            if not reply:
+                try:
+                    from .kb import answer as kb_answer
+                    from .kb import load as kb_load
+
+                    index = kb_load()
+                    if not index:
+                        reply = "Knowledge base is empty. Ridha needs to run the index build."
+                    else:
+                        body_text, hits = kb_answer(body, index)
+                        sources = "\n".join(
+                            f"[{i}] {h['source']} · {h['link']}"
+                            for i, h in enumerate(hits, 1) if h.get("link"))
+                        reply = f"{body_text}\n\n{sources}"
+                except Exception as ex:  # noqa: BLE001
+                    reply = f"Could not answer: {type(ex).__name__}"
             if late:
                 reply = "_(answered late, I was offline)_\n" + reply
             say(reply[:3900])

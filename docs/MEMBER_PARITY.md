@@ -52,6 +52,8 @@ That is a permission boundary, not a parity gap.
 | Reminder added to the recipient's list | yes | yes |
 | Plain DM becomes a task (no prefix) | n/a | yes |
 | Message shortcut / 📌 capture into own ledger | yes | yes |
+| Native Slack List mirror | yes | yes |
+| Live Slack search in `ask:` | yes | no (owner user token only) |
 | Meeting replies: yes / no / moved | yes | yes |
 | Bulk `done:` / `not:` by refs, pasted tasks and notes | yes | yes |
 

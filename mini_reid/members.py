@@ -207,6 +207,12 @@ def refresh(env: dict, user: str, profile: dict, days: int = 1) -> list[dict]:
 
         sent = send_dm_to(env, user, format_alert(fresh), blocks=confirm_blocks(fresh))
         _stamp_confirmation(ledger_path, {r["id"] for r in fresh}, sent)
+    try:
+        from .slack_lists import sync_user as sync_slack_list
+
+        sync_slack_list(env, user, profile.get("name") or user, ledger_path)
+    except Exception as ex:  # noqa: BLE001 - list sync must not stop capture
+        print(f"  member slack list: {type(ex).__name__}: {ex}", flush=True)
     if errors:
         print(f"  member source errors: {errors}", flush=True)
     return fresh

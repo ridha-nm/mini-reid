@@ -628,6 +628,16 @@ def main() -> int:
         _stamp_confirmation(ledger_path, {r["id"] for r in fresh}, sent)
         print(f"[{now:%H:%M:%S}] asked to confirm {len(fresh)} new", flush=True)
     try:
+        from .slack_lists import sync_user as sync_slack_list
+
+        synced = sync_slack_list(env, env.get("SLACK_OWNER_ID", ""), "Ridha",
+                                 ledger_path)
+        if synced:
+            print(f"[{now:%H:%M:%S}] slack list synced: {synced}", flush=True)
+    except Exception as ex:  # noqa: BLE001 - list sync must not stop capture
+        print(f"[{now:%H:%M:%S}] slack list: {type(ex).__name__}: {ex}",
+              flush=True)
+    try:
         from .members import cycle as member_cycle
 
         handled = member_cycle(env, now)
