@@ -62,6 +62,7 @@ Gmail, Jira and Google Calendar.
   DMs a one-time setup link, and starts capture for that member. Their commands, ledger,
   Slack mention alerts, reminders, meeting reminders and 09:15 digest stay private;
   new items get the same confirmation buttons, grouped list/triage and stale nudges.
+  A member can DM the bot plain text and it becomes a task; no prefix needed.
   Jira activates automatically from the shared workspace token, scoped to their Jira
   account. Gmail uses a hosted Google OAuth page: one click, consent, done. The Cloud
   Run relay holds the code for seconds and the Mac picks it up. A profile's `clients`

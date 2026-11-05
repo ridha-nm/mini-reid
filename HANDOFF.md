@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 295 tests pass.
+overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 320 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
@@ -55,6 +55,11 @@ a missed 09:15 digest is rebuilt and delivered after 09:30 until Slack accepts i
 `assign:` by row id reassigns and mirrors the title; Triage has Select all / Clear;
 a meeting reply can be `moved` / `rescheduled` / `postponed`. Member parity is
 recorded in `docs/MEMBER_PARITY.md`.
+
+2026-11-05 flying-car baseline: `mini_reid.evaluation` scores capture against
+Charanya's self-written list, with `benchmark: false` for tasks that have no
+Slack/Gmail/Jira signal. Her 7-task snapshot: 3 benchmarked, strict recall 0/3.
+Runbook in `docs/EVAL.md`. That zero is the reason for the auto-capture plan.
 
 ## Running now
 
@@ -85,7 +90,9 @@ account id. The watcher scans bot-visible channels for each member's mentions, u
 their Gmail only after OAuth, and runs their reminders, meeting reminders, overdue
 nudge and 09:15 digest. Their new items get the same model title cleanup, inbox
 confirmation DM, click acknowledgement/lock, grouped `list` with **Triage & update**,
-and 18:00 stale nudge; every button resolves the member's own ledger.
+and 18:00 stale nudge; every button resolves the member's own ledger. A member's
+plain DM to the bot is added as a task, no `add:` prefix, so they can stop writing
+their own Slack list.
 Parity rule and checklist: `docs/MEMBER_PARITY.md` — no feature is done unless
 it works for every authorised member in the same change.
 
@@ -285,7 +292,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-295 tests passing as of 2026-11-05.
+320 tests passing as of 2026-11-05.
 
 ## Next, agreed
 

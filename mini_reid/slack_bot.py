@@ -806,6 +806,14 @@ def add_reminder_row(ledger_path: str, what: str, fields: dict,
     return row
 
 
+def member_quick_add(channel: str, action: str, member: bool,
+                     text: str) -> bool:
+    """A member's plain DM becomes a task; no `add:` prefix needed."""
+    return bool(member and channel.startswith("D") and action == "unknown"
+                and (text or "").strip()
+                and not (text or "").rstrip().endswith("?"))
+
+
 def should_schedule_reminder(action: str, requester: str, owner: str,
                              target: str | None, member: bool = False) -> bool:
     """All reminders are Slack-scheduled. `add:` only leaves the caller's ledger
@@ -2129,6 +2137,13 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
 
         # Catch-up replays missed commands too, not only questions. Each
         # message is claimed once in bot_state.json, so a replay cannot repeat.
+
+        if member_quick_add(channel, action, member, text):
+            reply = _apply_command("add", text.strip(), datetime.now(MYT),
+                                   clients, user_ledger, users)
+            say(reply)
+            _mark(ts)
+            return
 
         if action == "meet":
             if user != owner:

@@ -202,6 +202,8 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   The list's **Triage & update** modal can settle unanswered rows.
 - The owner mutates `ledger.json`; an allowlisted member mutates only their own
   `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
+- A member's plain DM to the bot becomes a task without an `add:` prefix;
+  questions and channel messages keep their existing behaviour.
 - Bot-addressed chatter from a non-owner is answered with the default line in the
   triggering thread and never stored as a note. Only an explicit command from someone
   else is relayed to Ridha. Every channel reply uses the triggering `thread_ts`.

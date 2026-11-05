@@ -20,6 +20,18 @@ each shaped `{"messages": [...]}`. Merge the self-DM message lists into one
    false tasks. Every other non-note/non-reminder row counts as a captured
    prediction.
 
+## Benchmark labels
+
+A task with no Slack, Gmail or Jira evidence cannot be captured and must not
+count against recall. Set `"benchmark": false` on that label:
+
+```json
+{"date": "", "text": "10 am interview", "is_task": true, "benchmark": false}
+```
+
+The report shows `Manual-only labels excluded` and scores recall only on
+benchmark labels.
+
 Both stay on this Mac. `data/eval/` is gitignored.
 
 ## Run

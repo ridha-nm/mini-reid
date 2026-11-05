@@ -1015,6 +1015,16 @@ def test_owner_reminders_use_slack_scheduling_now():
     assert should_schedule_reminder("remind", "URIDHA", "URIDHA", None)
 
 
+def test_member_plain_dm_is_quick_added_but_questions_are_not():
+    from mini_reid.slack_bot import member_quick_add
+
+    assert member_quick_add("D1", "unknown", True, "10 am interview")
+    assert not member_quick_add("D1", "unknown", True, "what is this?")
+    assert not member_quick_add("C1", "unknown", True, "10 am interview")
+    assert not member_quick_add("D1", "unknown", False, "10 am interview")
+    assert not member_quick_add("D1", "add", True, "10 am interview")
+
+
 def test_reminder_is_added_to_the_receivers_list(tmp_path):
     from mini_reid.slack_bot import add_reminder_row
 

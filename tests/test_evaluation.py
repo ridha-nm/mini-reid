@@ -144,6 +144,18 @@ def test_idless_extracted_rows_are_kept_distinct():
     assert result["recall"] == 1.0
 
 
+def test_manual_only_labels_are_excluded_from_recall():
+    labels = [
+        {"date": "2026-11-05", "text": "call my mother", "is_task": True,
+         "benchmark": False, "id": ""},
+        {"date": "2026-11-05", "text": "send the deck", "is_task": True, "id": ""},
+    ]
+    result = score(labels, [])
+    assert result["positives"] == 1
+    assert result["manual_only"] == 1
+    assert result["recall"] == 0.0
+
+
 def test_negative_label_without_an_id_is_not_a_false_task():
     labels = [{"date": "2026-11-05", "text": "noise", "is_task": False}]
     extracted = [{"date": "2026-11-05", "text": "noise", "status": "open", "id": "x1"}]

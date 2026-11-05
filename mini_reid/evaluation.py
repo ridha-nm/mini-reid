@@ -50,10 +50,12 @@ def score(labels: list[dict], extracted: list[dict],
     predicted = [r for r in rows if r.get("status") not in TERMINAL]
 
     positives = [l for l in labels if l.get("is_task")]
+    benchmark = [l for l in positives if l.get("benchmark", True)]
+    manual_only = len(positives) - len(benchmark)
     misses: list[str] = []
     covered = 0
     used: set[int] = set()
-    for label in positives:
+    for label in benchmark:
         hit = None
         for i, row in enumerate(predicted):
             if i in used:
@@ -78,10 +80,11 @@ def score(labels: list[dict], extracted: list[dict],
                   if by_id[l["id"]].get("status") not in TERMINAL]
     days = {l.get("date") for l in labels if l.get("date")}
     days |= {r.get("date") for r in rows if r.get("date")}
-    recall = (covered / len(positives)) if positives else None
+    recall = (covered / len(benchmark)) if benchmark else None
     false_per_day = (len(false_rows) / len(days)) if days else 0.0
     return {
-        "positives": len(positives),
+        "positives": len(benchmark),
+        "manual_only": manual_only,
         "covered": covered,
         "recall": recall,
         "false_tasks": len(false_rows),
@@ -179,6 +182,7 @@ def format_report(result: dict) -> str:
         "# Capture evaluation",
         "",
         f"Positives: {result['positives']}",
+        f"Manual-only labels excluded: {result.get('manual_only', 0)}",
         f"Covered: {result['covered']}",
         f"Recall: {recall_text}",
         f"False tasks: {result['false_tasks']}",

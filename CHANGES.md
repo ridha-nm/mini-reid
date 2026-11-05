@@ -2,6 +2,16 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (seamless member capture + benchmark flags)
+
+- A member's plain DM to the bot is now added as a task, no `add:` prefix.
+  Questions and channel messages are unchanged. Charanya can stop writing to
+  herself and write to Mini-Reid instead.
+- Eval labels accept `benchmark: false` for tasks with no Slack, Gmail or Jira
+  signal; they are reported as manual-only and excluded from recall.
+- Charanya snapshot: 7 tasks, 4 manual-only, 3 benchmarked, strict recall 0/3.
+- 320 tests passing.
+
 ## 2026-11-05 (schedule meetings from free/busy)
 
 - `meet: @Kasib about BD Command Centre`, or plain `set meeting with Kasib to
