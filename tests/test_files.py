@@ -59,3 +59,17 @@ def test_search_finds_a_saved_file_and_snippet(tmp_path):
 def test_search_needs_two_words(tmp_path):
     (tmp_path / "a.txt").write_text("deck review")
     assert search("deck", str(tmp_path)) == []
+
+
+def test_generic_file_question_returns_the_latest_ingest(tmp_path):
+    (tmp_path / "old.json").write_text(json.dumps(
+        {"name": "old.pdf", "summary": "Old summary.", "permalink": "x"}))
+    (tmp_path / "new.json").write_text(json.dumps(
+        {"name": "new.xlsx", "summary": "Entity structure update.",
+         "permalink": "y"}))
+    import os
+    os.utime(tmp_path / "old.json", (1, 1))
+    os.utime(tmp_path / "new.json", (2, 2))
+    hits = search("waht is this file about", str(tmp_path))
+    assert hits and hits[0]["name"] == "new.xlsx"
+    assert "Entity structure" in hits[0]["text"]

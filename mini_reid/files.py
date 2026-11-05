@@ -178,4 +178,20 @@ def search(question: str, root: str = FILES_DIR, limit: int = 3) -> list[dict]:
                      "permalink": record.get("permalink") or "",
                      "text": snippet, "score": score})
     hits.sort(key=lambda h: h["score"], reverse=True)
-    return hits[:limit]
+    if hits:
+        return hits[:limit]
+    if not re.search(r"\bfiles?\b", question or "", re.I):
+        return []
+    # "what is this file about?" refers to the most recent ingest.
+    metas = sorted(folder.glob("*.json"),
+                   key=lambda p: p.stat().st_mtime, reverse=True)
+    for meta_path in metas:
+        try:
+            record = json.loads(meta_path.read_text())
+        except (OSError, ValueError):
+            continue
+        if record.get("summary"):
+            return [{"name": record.get("name") or meta_path.stem,
+                     "permalink": record.get("permalink") or "",
+                     "text": record["summary"], "score": 1}]
+    return []

@@ -13,6 +13,8 @@ Append-only. Newest first.
 - Uploads and `FILE_REACTION` (default 📄) ingest files attached to a message.
   The uploader/reactor gets a name-only ack; only Ridha gets the extractive
   summary and the `ask:` prompt.
+- A generic question such as `ask: what is this file about` falls back to the
+  most recently ingested file's summary instead of live Slack.
 - Bot scope `files:read`; event `file_shared`. Live upload, reaction and summary
   tests passed, then cleaned up.
 - 360 tests passing.
