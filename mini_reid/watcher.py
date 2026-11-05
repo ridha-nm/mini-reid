@@ -303,7 +303,8 @@ def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE,
             continue
         text = (f"*Meeting in 10 minutes*\n{span(meeting)} · {meeting['title']}"
                 + (f"\n<{meeting['link']}|join>" if meeting.get("link") else "")
-                + "\n\nAre you attending? Reply `yes` or `no <reason>`.")
+                + "\n\nAre you attending? Reply `yes`, `no <reason>`, "
+                  "or `moved` if the time changed.")
         remind_at = start - timedelta(minutes=10)
         if remind_at <= now:
             if user_id:
@@ -339,13 +340,20 @@ def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE,
 
 def record_meeting_reply(text: str, now: datetime,
                          state_path: str = MEETINGS_STATE) -> str | None:
-    """`yes` or `no <reason>` in a DM answers the nearest meeting reminder."""
+    """`yes`, `no <reason>` or `moved` in a DM answers the nearest reminder.
+
+    `moved` covers "it might have moved", "rescheduled", "postponed" and
+    "time changed". It records the note without guessing the new time.
+    """
     today = now.date().isoformat()
     state = _load_meetings(state_path, today)
     raw = (text or "").strip()
     yes = re.match(r"^(yes|y|attending|will attend)\b", raw, re.I)
     no = re.match(r"^(no|n|not attending|can't|cannot|skip|decline)\b(.*)$", raw, re.I)
-    if not (yes or no):
+    moved = re.search(
+        r"\b(?:moved|rescheduled|postponed|time (?:has |might have )?changed)\b(.*)$",
+        raw, re.I)
+    if not (yes or no or moved):
         return None
     candidates = []
     for mid, rec in state["meetings"].items():
@@ -357,7 +365,15 @@ def record_meeting_reply(text: str, now: datetime,
     if not candidates:
         return None
     _, mid, rec = min(candidates, key=lambda c: abs(c[0] - now))
-    reason = (no.group(2) if no else "").strip(" ,:-")
+    note = ((no.group(2) if no else moved.group(1) if moved else "")
+            .strip(" ,:-"))
+    if moved and not no:
+        rec["status"] = "moved"
+        if note:
+            rec["note"] = note[:200]
+        Path(state_path).write_text(json.dumps(state))
+        return f"Marked as moved: {rec['title']}" + (f" — {note}" if note else "")
+    reason = note
     rec["status"] = "attending" if yes else "declined"
     if reason:
         rec["reason"] = reason[:200]

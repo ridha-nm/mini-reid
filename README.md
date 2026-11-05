@@ -17,7 +17,8 @@ Gmail, Jira and Google Calendar.
   outcome and removes its buttons, Add opens it on the list and ✅s the source message.
   Nothing reaches the digest until confirmed. The first cycle after 09:00 also
   DMs any overdue rows once a day. Each meeting gets a DM 10 minutes before it starts,
-  with the join link and "Are you attending?". Answer `yes` or `no <reason>` in the DM.
+  with the join link and "Are you attending?". Answer `yes`, `no <reason>`, or
+  `moved` / `rescheduled` / `postponed` in the DM.
   The watcher also polls Ridha's DMs for `remind` commands in conversations the bot is
   not part of.
 - **Bot** (`@minireid`): add, assign, reassign, note, tonote/convert, status, priority,

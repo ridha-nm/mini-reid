@@ -135,7 +135,8 @@ order. Email senders keep their full address. A Slack row quotes the original me
 when the task title was rewritten.
 
 The watcher schedules a Slack DM 10 minutes before each meeting starts: time, title,
-join link, and "Are you attending?". Reply `yes` or `no <reason>`; the answer is
+join link, and "Are you attending?". Reply `yes`, `no <reason>`, or `moved` /
+`rescheduled` / `postponed`; a note after the word is kept. The answer is
 recorded in `meeting_reminders.json` and confirmed in the DM. Slack keeps the schedule,
 so a sleeping Mac does not lose it. Each meeting is reminded once.
 
