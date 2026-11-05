@@ -1137,38 +1137,77 @@ _LIST_META = re.compile(r"\s+[—–]\s+")
 _LIST_ID = re.compile(r"^\[([0-9a-f]{6})\]\s+", re.I)
 
 
-def _list_entries(body: str) -> list[tuple[str, str]] | None:
-    """(title, ledger short id) from a pasted digest/list, metadata cut off."""
+def _list_entries(body: str) -> list[tuple[str, str, str]] | None:
+    """(raw line, title, ledger short id) from a pasted list.
+
+    `raw` keeps the pasted numbering so note text that itself starts with
+    "9. [abc123]" can still match the note; `title` has the numbering and a
+    ledger short id stripped for task matching.
+    """
     lines = [line.strip() for line in (body or "").splitlines() if line.strip()]
     if len(lines) < 2:
         return None
-    entries: list[tuple[str, str]] = []
+    entries: list[tuple[str, str, str]] = []
     for line in lines:
         line = html.unescape(line)
         line = re.sub(r"^(?:done|not)\s*:\s*", "", line, flags=re.I)
-        line = _LIST_BULLET.sub("", line).strip()
-        line = _LIST_META.split(line, maxsplit=1)[0].strip()
+        raw = re.sub(r"^\s*[•*\-–]\s+", "", line).strip()
+        raw = _LIST_META.split(raw, maxsplit=1)[0].strip()
+        title = _LIST_BULLET.sub("", raw).strip()
         short = ""
-        m = _LIST_ID.match(line)
+        m = _LIST_ID.match(title)
         if m:
             short = m.group(1).lower()
-            line = _LIST_ID.sub("", line).strip()
-        if line:
-            entries.append((line, short))
+            title = _LIST_ID.sub("", title).strip()
+        if raw:
+            entries.append((raw, title, short))
     return entries or None
 
 
-def _pick_titles(rows: list[dict], body: str) -> tuple[list[dict] | None, str | None]:
+def _pick_titles(rows: list[dict], body: str,
+                 include_notes: bool = False) -> tuple[list[dict] | None, str | None]:
     """Bulk by pasted titles. None = not a list. All-or-nothing like refs."""
     entries = _list_entries(body)
     if not entries:
         return None, None
     open_items = _open_sorted(rows)
-    all_items = [r for r in rows if r.get("kind") != "note"]
+    all_items = [r for r in rows if include_notes or r.get("kind") != "note"]
+    notes = [r for r in rows if r.get("kind") == "note"
+             and (r.get("status") or "open") not in {"done", "dropped"}]
     picked: list[dict] = []
     skipped: list[dict] = []
     errors: list[str] = []
-    for title, short in entries:
+    for raw, title, short in entries:
+        if include_notes and notes:
+            note_variants: list[str] = []
+            for text in (raw, title, re.sub(r"^(?:\[[^\]]+\]\s*)+", "", title)):
+                want = normalize_what(text)
+                if want and want not in note_variants:
+                    note_variants.append(want)
+            def tokens(text: str) -> set[str]:
+                return {t for t in text.split()
+                        if not re.fullmatch(r"u[0-9a-z]{6,}", t)}
+
+            want_tokens = tokens(note_variants[0]) if note_variants else set()
+            note_norms = [normalize_what(r.get("what")) for r in notes]
+            hits = [r for r, norm in zip(notes, note_norms)
+                    if norm in note_variants]
+            if not hits:
+                hits = [r for r, norm in zip(notes, note_norms)
+                        if any(len(w) >= 8 and (norm.startswith(w) or w.startswith(norm))
+                               for w in note_variants)]
+            if not hits and len(want_tokens) >= 3:
+                hits = [r for r, norm in zip(notes, note_norms)
+                        if (tokens(norm) and len(tokens(norm)) >= 3
+                            and tokens(norm) <= want_tokens)
+                        or (len(want_tokens) >= 3
+                            and want_tokens <= tokens(norm))]
+            if len(hits) == 1:
+                picked.append(hits[0])
+                continue
+            if hits:
+                errors.append(f"“{raw[:60]}” matches more than one note.")
+                continue
         if short:
             id_hits = [r for r in all_items
                        if (r.get("id") or "").lower().startswith(short)]
@@ -1628,7 +1667,7 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
         if bulk_err:
             return bulk_err
         if not many:
-            many, bulk_err = _pick_titles(rows, body)
+            many, bulk_err = _pick_titles(rows, body, include_notes=True)
             if bulk_err:
                 return bulk_err
         if many:

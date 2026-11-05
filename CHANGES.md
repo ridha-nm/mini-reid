@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-05 (`not:` works on notes)
+
+- A pasted list after `not:` now matches open **notes** as well as tasks. It
+  handles note text that starts with list numbering (`9. [abc123]`), Slack
+  `&amp;`, `<@U…>` ids vs typed names, and lines truncated by the list renderer.
+- The reported five-note list was removed.
+- 292 tests passing.
+
 ## 2026-11-05 (interactive help + morning digest catch-up)
 
 - `help` now opens a topic picker: Capture, Update, Close, Find, Inbox,
