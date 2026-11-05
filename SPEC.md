@@ -218,6 +218,9 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   `/take` with `RELAY_KEY`. Google consent is one-time and offline; the refresh token
   lives in the member's data directory. Jira is automatic and the form is only a
   fallback.
+- A reminder is also written to the recipient's ledger (`kind: reminder`, `status:
+  open`, `reminded: True`) so it shows in `list` and the digest without the watcher
+  sending it a second time.
 - Anyone who tags or DMs the bot can set a reminder for themselves or any teammate in
   the Pantas workspace: `remind me …`, `remind @Arman …`, `remind Arman Rahman …`,
   `add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed

@@ -28,7 +28,7 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Knight Frank, Allianz, Setia and Eupe. 292 tests pass.
+overridden to Knight Frank, Allianz, Setia and Eupe. 293 tests pass.
 
 2026-11-04: every new candidate lands as `inbox` and waits for a click — the
 new-item DM has **Add to list** / **Not a task** per item. The model never decides;
@@ -170,7 +170,9 @@ Anyone who tags or DMs the bot can set a reminder for themselves or any teammate
 Pantas workspace: `remind me to … at 2pm`, `remind @Arman to … at 2pm`,
 `remind Arman Rahman to …`, `add: … at 2pm`. The time is optional; without one the DM is
 sent immediately. Timed reminders, including Ridha's own, are scheduled server-side with
-Slack, so they fire on time even when the Mac sleeps. An unknown name gets a reply, not a
+Slack, so they fire on time even when the Mac sleeps. Every reminder is also added to
+the recipient's list as `kind: reminder`, open, with `reminded: True` so the watcher
+does not send it twice. An unknown name gets a reply, not a
 silent reminder to the sender. Other people's reminders never touch Ridha's ledger or
 digest. Slack keeps the queue; there is no local copy yet, so there is no cancel or list.
 
@@ -270,7 +272,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-292 tests passing as of 2026-11-05.
+293 tests passing as of 2026-11-05.
 
 ## Next, agreed
 

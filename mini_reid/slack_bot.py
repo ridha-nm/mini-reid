@@ -727,6 +727,31 @@ def unresolved_recipient(body: str, users: dict[str, str]) -> str | None:
     return None
 
 
+def add_reminder_row(ledger_path: str, what: str, fields: dict,
+                     now: datetime) -> dict:
+    """Put a Slack-scheduled reminder on the recipient's list.
+
+    `reminded` is True because Slack owns delivery; the watcher must not send
+    the same reminder again.
+    """
+    clean = (what or "").strip()
+    row = {
+        "id": commitment_id("reminder", clean.lower(), clean),
+        "direction": "owed_by_me", "what": clean[:200], "source": "manual",
+        "native_id": clean.lower(), "kind": "reminder", "source_link": "",
+        "evidence": clean[:200], "due": fields.get("due"),
+        "due_confidence": 0.9 if fields.get("due") else 0.0,
+        "cycle": None, "status": "open", "stalled_since": None,
+        "ack_policy": "bot_may_ack", "closure": "open", "client": None,
+        "created_at": now.isoformat(), "last_activity": now.isoformat(),
+        "remind_at": fields.get("remind_at"), "reminded": True,
+        "closed_at": None, "closed_how": None,
+    }
+    Path(ledger_path).parent.mkdir(parents=True, exist_ok=True)
+    save(ledger_path, merge(load(ledger_path), [row]))
+    return row
+
+
 def should_schedule_reminder(action: str, requester: str, owner: str,
                              target: str | None, member: bool = False) -> bool:
     """All reminders are Slack-scheduled. `add:` only leaves the caller's ledger
@@ -2198,6 +2223,12 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 return
             recipient = target or user
             who = "you" if recipient == user else f"<@{recipient}>"
+            # The reminder belongs on the receiver's list, not only in Slack.
+            recipient_ledger = (ledger_path if recipient == owner
+                                else (profiles.get(recipient) or {}).get("ledger"))
+            if recipient_ledger:
+                add_reminder_row(recipient_ledger, fields["what"], fields,
+                                 datetime.now(MYT))
             explicit_both = (not fields.get("immediate")
                              and asks_now_and_again(rest))
             if explicit_both:
