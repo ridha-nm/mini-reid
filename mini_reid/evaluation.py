@@ -134,3 +134,64 @@ def load_labels(path: str) -> list[dict]:
             raise ValueError("label needs date, text and is_task")
         labels.append(row)
     return labels
+
+
+def _load_jsonl(path: str) -> list[dict]:
+    return [json.loads(line) for line in Path(path).read_text().splitlines()
+            if line.strip()]
+
+
+def format_report(result: dict) -> str:
+    recall = result.get("recall")
+    recall_text = "n/a" if recall is None else f"{recall * 100:.1f}%"
+    lines = [
+        "# Capture evaluation",
+        "",
+        f"Positives: {result['positives']}",
+        f"Covered: {result['covered']}",
+        f"Recall: {recall_text}",
+        f"False tasks: {result['false_tasks']}",
+        f"Reviewed dismissals: {result['reviewed']}",
+        f"False tasks per day: {result['false_per_day']:.2f}",
+        f"Verdict: {'PASS' if result['meets_target'] else 'FAIL'}",
+    ]
+    if result.get("misses"):
+        lines += ["", "## Missed tasks", ""]
+        lines += [f"- {text}" for text in result["misses"]]
+    if result.get("false_examples"):
+        lines += ["", "## False tasks", ""]
+        lines += [f"- {text}" for text in result["false_examples"]]
+    return "\n".join(lines) + "\n"
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--self-dm")
+    parser.add_argument("--ledger")
+    parser.add_argument("--labels")
+    parser.add_argument("--extracted")
+    parser.add_argument("--out", default="eval_report.md")
+    args = parser.parse_args(argv)
+
+    if args.labels and args.extracted:
+        labels = load_labels(args.labels)
+        extracted = _load_jsonl(args.extracted)
+    elif args.self_dm and args.ledger:
+        messages = json.loads(Path(args.self_dm).read_text()).get("messages") or []
+        rows = json.loads(Path(args.ledger).read_text())
+        labels = labels_from_self_dm(messages) + labels_from_ledger(rows)
+        extracted = extracted_from_ledger(rows)
+    else:
+        parser.error("use --labels and --extracted, or --self-dm and --ledger")
+
+    result = score(labels, extracted)
+    report = format_report(result)
+    Path(args.out).write_text(report)
+    print(report)
+    return 0 if result["meets_target"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

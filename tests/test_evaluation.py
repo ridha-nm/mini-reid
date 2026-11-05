@@ -1,8 +1,8 @@
 import pytest
 
 from mini_reid.evaluation import (extracted_from_ledger, labels_from_ledger,
-                                  labels_from_self_dm, load_labels, score,
-                                  task_matches)
+                                  labels_from_self_dm, load_labels, main,
+                                  score, task_matches)
 
 
 def test_task_matches_accepts_a_more_specific_extracted_title():
@@ -78,3 +78,17 @@ def test_ledger_dismissals_become_negative_labels_and_predictions():
         "source": "dismissed"}]
     extracted = extracted_from_ledger(rows)
     assert [r["id"] for r in extracted] == ["a1", "a2"]
+
+
+def test_cli_writes_a_report_and_fails_below_target(tmp_path):
+    self_dm = tmp_path / "self_dm.json"
+    self_dm.write_text('{"messages": [{"ts": "1793866425.785539", '
+                       '"text": "send the deck"}]}')
+    ledger = tmp_path / "ledger.json"
+    ledger.write_text("[]")
+    out = tmp_path / "report.md"
+    code = main(["--self-dm", str(self_dm), "--ledger", str(ledger),
+                 "--out", str(out)])
+    assert code == 1
+    text = out.read_text()
+    assert "Recall" in text and "0.0%" in text

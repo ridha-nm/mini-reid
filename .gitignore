@@ -36,3 +36,6 @@ auth.log
 
 # digest delivery marker
 digest_delivered.json
+
+# evaluation datasets and reports
+data/eval/
