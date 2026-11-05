@@ -1220,6 +1220,20 @@ def _pick_titles(rows: list[dict], body: str) -> tuple[list[dict] | None, str | 
     return unique, None
 
 
+_REF_ONLY = re.compile(r"^(?:#\d+|(?:id:)?[0-9a-f]{4,40})$", re.I)
+
+
+def assign_title(ledger_path: str, what: str) -> str:
+    """When assigning by row id, mirror the task title, never the id."""
+    text = (what or "").strip()
+    if not _REF_ONLY.fullmatch(text):
+        return text
+    row, _err = _pick(load(ledger_path), text)
+    if not row:
+        return text
+    return row.get("action") or row.get("what") or text
+
+
 def _shift(text: str, now):
     """Parse '3d', '2w', or a date phrase into an ISO date."""
     from .extract import parse_due
@@ -1402,7 +1416,7 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
             row["via"] = "reassigned"
             row["last_activity"] = now.isoformat()
             save(ledger_path, rows)
-            return f"Reassigned to {person}: {row['what'][:80]}"
+            return f"Assigned to {person}: {row['what'][:80]}"
         due, confidence = parse_due(what, now)
         row = {
             "id": commitment_id("manual", f"assign:{body}".lower(), what),
@@ -2291,8 +2305,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 sender_name = ((profiles.get(user) or {}).get("name")
                                or ("Ridha" if user == owner
                                    else slack_user_name(env["SLACK_BOT_TOKEN"], user)))
+                # Assigning by row id must copy the task title, never the id.
+                what = assign_title(ledger_path,
+                                    assign_what or body)
                 cross_assign(env, profiles, user, sender_name, assign_to,
-                             assign_what or body, ledger_path)
+                             what, ledger_path)
         print(f"  reply: {reply[:120]!r}", flush=True)
         if action in EMOJI_ACKS and reply.startswith(
                 ("Added.", "Noted.", "Converted to note:")):

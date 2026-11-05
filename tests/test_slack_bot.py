@@ -152,7 +152,18 @@ def test_assign_with_a_row_id_reassigns_instead_of_creating_a_task(tmp_path):
     assert len(rows) == 1
     assert rows[0]["what"] == "Update Reviewer Role for Admins"
     assert rows[0]["assigned_to"] == "Charanya"
-    assert reply.startswith("Reassigned to Charanya:")
+    assert reply.startswith("Assigned to Charanya:")
+
+
+def test_assign_title_resolves_an_id_to_the_task_text(tmp_path):
+    from mini_reid.ledger import save
+    from mini_reid.slack_bot import assign_title
+
+    ledger = str(tmp_path / "ledger.json")
+    save(ledger, [{"id": "eb8263abc123", "what": "Update Reviewer Role",
+                   "status": "open", "kind": "manual"}])
+    assert assign_title(ledger, "eb8263") == "Update Reviewer Role"
+    assert assign_title(ledger, "brand new task") == "brand new task"
 
 
 def test_assign_with_an_unknown_id_creates_nothing(tmp_path):

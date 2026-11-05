@@ -9,7 +9,10 @@ Append-only. Newest first.
   id gets an error and creates nothing.
 - Removed the four junk rows this produced in the owner and Charanya ledgers;
   the two intended rows (`eb8263`, `1290b3`) are now assigned to Charanya.
-- 284 tests passing.
+- Assigning by id also mirrors the **task title** into the assignee's ledger
+  (never the id), and DMs them the real task. Charanya's ledger now carries
+  both tasks.
+- 285 tests passing.
 
 ## 2026-11-05 (select all in the triage modal)
 
