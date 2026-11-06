@@ -1,7 +1,7 @@
 """Slack UI for a meeting proposal and its free slots."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from .meetings import OWNER_EMAIL, SLOT_MINUTES
@@ -16,12 +16,18 @@ def _label(start: str, end: str) -> str:
 
 
 def _busy_on(intervals: list[tuple], day) -> str:
+    day_start = datetime.combine(day, time.min, tzinfo=MYT)
+    day_end = day_start + timedelta(days=1)
     parts = []
     for start, end in intervals:
         s, e = start.astimezone(MYT), end.astimezone(MYT)
-        if s.date() != day and e.date() != day:
+        if e <= day_start or s >= day_end:
             continue
-        parts.append(f"{s:%H:%M}–{e:%H:%M}")
+        if s <= day_start and e >= day_end:
+            parts.append("all day")
+        else:
+            parts.append(f"{max(s, day_start):%H:%M}–"
+                         f"{min(e, day_end):%H:%M}")
     return ", ".join(parts) or "free"
 
 
@@ -66,7 +72,7 @@ def slot_blocks(token: str, topic: str, attendees: list[dict],
     blocks.append({
         "type": "section",
         "text": {"type": "mrkdwn",
-                 "text": "These slots are free on both calendars. Pick one and I "
+                 "text": "These slots are free on every calendar. Pick one and I "
                          "create the event and invite them."},
     })
     for slot in slots:

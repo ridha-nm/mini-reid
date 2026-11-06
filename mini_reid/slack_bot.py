@@ -752,7 +752,7 @@ def parse_meeting(body: str, users: dict[str, str],
     text = re.sub(r"^with\s+", "", (body or "").strip(), flags=re.I)
     topic = ""
     m = re.search(
-        r"\s+(?:to\s+)?(?:discuss|talk\s+about|review|about|re)\s*:?\s+(.+)$",
+        r"\s+(?:to\s+)?(?:discuss|talk\s+about|review|about|on|re)\s*:?\s+(.+)$",
         text, re.I)
     if m:
         people_text, topic = text[:m.start()].strip(), m.group(1).strip()

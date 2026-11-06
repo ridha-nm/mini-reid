@@ -50,7 +50,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     ),
     "meet": (
         "Schedule a meeting",
-        "I read both calendars and offer free slots, then create the event and invite.",
+        "I read everyone's calendars and offer free slots, then create the event and invite.",
         ["`meet: @Kasib about BD Command Centre`",
          "`meet: @Kasib and @Charanya about the deck` — multiple people",
          "or just `set meeting with Kasib to discuss BD Command Centre`",

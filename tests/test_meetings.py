@@ -23,6 +23,9 @@ def test_meeting_phrase_parses_to_meet():
     assert parse_meeting("Kasib, Charanya and Arman Rahman about the deck",
                          people, "U0") == (
         ["U1", "U2", "U3"], "the deck")
+    assert parse_meeting("Nish and Eden on the Change Request Workflow",
+                         {"nish": "U4", "eden": "U5"}, "U0") == (
+        ["U4", "U5"], "the Change Request Workflow")
 
 
 def test_propose_slots_skips_busy_and_weekend(monkeypatch):
@@ -92,3 +95,17 @@ def test_slot_blocks_show_both_calendars_busy():
                            slots, busy))
     assert "Availability snapshot" in text
     assert "09:00–10:00" in text and "10:00–11:00" in text
+
+
+def test_busy_snapshot_skips_midnight_boundary_and_labels_all_day():
+    from datetime import date
+
+    from mini_reid.meeting_ui import _busy_on
+
+    day = date(2026, 11, 11)
+    boundary = (datetime(2026, 11, 10, 23, 0, tzinfo=MYT),
+                datetime(2026, 11, 11, 0, 0, tzinfo=MYT))
+    all_day = (datetime(2026, 11, 11, 0, 0, tzinfo=MYT),
+               datetime(2026, 11, 12, 0, 0, tzinfo=MYT))
+    assert _busy_on([boundary], day) == "free"
+    assert _busy_on([all_day], day) == "all day"
