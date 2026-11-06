@@ -46,13 +46,8 @@ def _save_state(path: str, state: dict) -> None:
 _TEAM_ID = ""
 
 
-def list_url(env: dict, user: str, state_path: str = STATE) -> str | None:
-    """Deep link to the user's Slack List."""
+def _team_id(env: dict) -> str:
     global _TEAM_ID
-    cfg = _state(state_path).get(user) or {}
-    list_id = cfg.get("list_id")
-    if not list_id:
-        return None
     if not _TEAM_ID:
         try:
             token = env["SLACK_BOT_TOKEN"]
@@ -61,10 +56,34 @@ def list_url(env: dict, user: str, state_path: str = STATE) -> str | None:
                 headers={"Authorization": f"Bearer {token}"})
             with urllib.request.urlopen(req, timeout=15) as response:
                 _TEAM_ID = json.load(response).get("team_id") or ""
-        except Exception:  # noqa: BLE001 - link is optional
-            return None
+        except Exception:  # noqa: BLE001 - links degrade to https
+            return ""
+    return _TEAM_ID
+
+
+def _source_link(env: dict, row: dict) -> str:
+    """A Slack message opens in the app; mail and Jira stay web links."""
+    link = row.get("source_link") or ""
+    if row.get("source") == "slack":
+        channel, _, ts = (row.get("native_id") or "").partition(":")
+        team = _team_id(env)
+        if channel and ts and team:
+            return (f"slack://channel?team={team}&id={channel}"
+                    f"&message={ts}")
+    return link
+
+
+def list_url(env: dict, user: str, state_path: str = STATE) -> str | None:
+    """Deep link to the user's Slack List."""
+    cfg = _state(state_path).get(user) or {}
+    list_id = cfg.get("list_id")
+    if not list_id:
+        return None
+    team = _team_id(env)
+    if not team:
+        return None
     # slack:// hands off to the desktop app; the https link opens a browser.
-    return f"slack://list?team={_TEAM_ID}&id={list_id}"
+    return f"slack://list?team={team}&id={list_id}"
 
 
 def ensure_list(env: dict, user: str, name: str,
@@ -202,7 +221,7 @@ def _fields(env: dict, cfg: dict, row: dict) -> list[dict]:
         out.append({"column_id": cols["due"], "date": [row["due"]]})
     if cols.get("source") and row.get("source_link"):
         out.append({"column_id": cols["source"], "link": [{
-            "original_url": row["source_link"], "display_as_url": False,
+            "original_url": _source_link(env, row), "display_as_url": False,
             "display_name": "open source"}]})
     return out
 

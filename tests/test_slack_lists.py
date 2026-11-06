@@ -122,3 +122,18 @@ def test_list_url_uses_the_app_deep_link(tmp_path, monkeypatch):
     monkeypatch.setattr(slack_lists, "_TEAM_ID", "T1")
     assert slack_lists.list_url({"SLACK_BOT_TOKEN": "x"}, "U1",
                                 str(state)) == "slack://list?team=T1&id=F1"
+
+
+def test_slack_rows_link_to_the_message_in_the_app(monkeypatch):
+    monkeypatch.setattr(slack_lists, "_TEAM_ID", "T1")
+    row = {"source": "slack", "native_id": "C1:1793.42",
+           "source_link": "https://t.slack.com/archives/C1/p179342"}
+    assert slack_lists._source_link({}, row) == (
+        "slack://channel?team=T1&id=C1&message=1793.42")
+
+
+def test_mail_rows_keep_the_web_link(monkeypatch):
+    monkeypatch.setattr(slack_lists, "_TEAM_ID", "T1")
+    row = {"source": "gmail", "native_id": "m1",
+           "source_link": "https://mail.google.com/mail/u/0/#all/abc"}
+    assert slack_lists._source_link({}, row) == row["source_link"]
