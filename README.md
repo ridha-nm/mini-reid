@@ -20,8 +20,10 @@ Gmail, Jira and Google Calendar.
   **Not a task**; the click updates that DM with the outcome and removes its
   buttons, Add opens it on the list and ✅s the source. The first cycle after 09:00 also
   DMs any overdue rows once a day. Each meeting gets a DM 10 minutes before it starts,
-  with the join link and "Are you attending?". Answer `yes`, `no <reason>`, or
-  `moved` / `rescheduled` / `postponed` in the DM.
+  with the join link and "Are you attending?". Attendees of meetings created through
+  Mini-Reid get the same DM with **Attending** / **Can't attend** buttons, if they map
+  to a Slack user. Answer `yes`, `no <reason>`, or `moved <note>`; the organiser can
+  reply `reschedule to <time> <note>` to move the event and notify attendees.
   The watcher also polls Ridha's DMs for `remind` commands in conversations the bot is
   not part of.
 - **Bot** (`@minireid`): add, assign, reassign, note, tonote/convert, status, priority,

@@ -317,7 +317,7 @@ def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE,
         text = (f"*Meeting in 10 minutes*\n{span(meeting)} · {meeting['title']}"
                 + (f"\n<{meeting['link']}|join>" if meeting.get("link") else "")
                 + "\n\nAre you attending? Reply `yes`, `no <reason>`, "
-                  "or `moved` if the time changed.")
+                  "`moved <note>`, or `reschedule to <time> <note>`.")
         remind_at = start - timedelta(minutes=10)
         if remind_at <= now:
             if user_id:
@@ -603,6 +603,10 @@ def main() -> int:
         print(f"[{now:%H:%M:%S}] fired {fired} reminder(s)", flush=True)
     try:
         reminded = remind_meetings(env, now)
+        from .profiles import load as load_profiles
+
+        attendees = remind_attendees(env, now, profiles=load_profiles())
+        reminded += attendees
         if reminded:
             print(f"[{now:%H:%M:%S}] scheduled {reminded} meeting reminder(s)", flush=True)
     except Exception as ex:  # noqa: BLE001 - calendar must not stop the watcher
@@ -686,3 +690,66 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def remind_attendees(env: dict, now: datetime,
+                     created_path: str = "created_meetings.json",
+                     profiles: dict | None = None) -> int:
+    """DM every Slack attendee of a bot-created meeting 10 minutes before."""
+    from .meetings import email_to_slack, load_created
+    from .notify import schedule_dm
+
+    data = load_created(created_path)
+    by_email = email_to_slack()
+    for uid, profile in (profiles or {}).items():
+        email = (profile.get("email") or "").lower()
+        if email:
+            by_email[email] = uid
+    sent = 0
+    changed = False
+    for eid, rec in data.items():
+        if rec.get("attendee_reminded"):
+            continue
+        try:
+            start = datetime.fromisoformat(rec.get("start") or "")
+        except ValueError:
+            continue
+        rec["attendee_reminded"] = now.isoformat()
+        changed = True
+        if start <= now:
+            continue
+        end = datetime.fromisoformat(rec.get("end") or rec.get("start") or "")
+        when = start - timedelta(minutes=10)
+        if when <= now:
+            when = now + timedelta(seconds=30)
+        text = (f"*Meeting in 10 minutes*\n{start:%H:%M}–{end:%H:%M} · "
+                f"{rec.get('title', '')}"
+                + (f"\n<{rec['link']}|join>" if rec.get("link") else "")
+                + "\n\nAre you attending?")
+        blocks = [
+            {"type": "section", "text": {"type": "mrkdwn", "text": text}},
+            {"type": "actions", "elements": [
+                {"type": "button", "action_id": "meet_rsvp_yes",
+                 "value": eid,
+                 "text": {"type": "plain_text", "text": "Attending"},
+                 "style": "primary"},
+                {"type": "button", "action_id": "meet_rsvp_no",
+                 "value": eid,
+                 "text": {"type": "plain_text", "text": "Can't attend"},
+                 "style": "danger"},
+            ]},
+        ]
+        for person in rec.get("attendees") or []:
+            uid = by_email.get((person.get("email") or "").lower())
+            if not uid or uid == rec.get("creator"):
+                continue
+            try:
+                schedule_dm(env, uid, text, int(when.timestamp()), blocks=blocks)
+                sent += 1
+            except Exception as ex:  # noqa: BLE001 - one DM must not stop others
+                print(f"  attendee reminder failed: "
+                      f"{type(ex).__name__}: {ex}", flush=True)
+    if changed:
+        Path(created_path).write_text(json.dumps(data, indent=1,
+                                                 ensure_ascii=False))
+    return sent

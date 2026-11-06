@@ -57,12 +57,15 @@ def send_dm(env: dict, text: str, blocks: list[dict] | None = None) -> dict:
     return send_dm_to(env, env["SLACK_OWNER_ID"], text, blocks=blocks)
 
 
-def schedule_dm(env: dict, user_id: str, text: str, post_at: int) -> str:
+def schedule_dm(env: dict, user_id: str, text: str, post_at: int,
+                blocks: list[dict] | None = None) -> str:
     """Slack-side scheduled DM. Survives this Mac sleeping."""
     token = env["SLACK_BOT_TOKEN"]
     ch = dm_channel(token, user_id)
-    d = _post("chat.scheduleMessage", token, channel=ch, text=text[:39000],
-              post_at=post_at)
+    data = {"channel": ch, "text": text[:39000], "post_at": post_at}
+    if blocks:
+        data["blocks"] = json.dumps(blocks)
+    d = _post("chat.scheduleMessage", token, **data)
     if not d.get("ok"):
         raise RuntimeError(f"chat.scheduleMessage: {d.get('error')}")
     return d.get("scheduled_message_id") or ""

@@ -2,6 +2,19 @@
 
 Append-only. Newest first.
 
+## 2026-11-06 (attendee reminders, reschedule with note)
+
+- Meetings created through Mini-Reid are remembered with their event id,
+  attendees and organiser. Ten minutes before, every attendee who maps to a
+  Slack user gets a DM with **Attending** / **Can't attend** buttons; the click
+  is recorded and confirmed. External attendees are skipped (calendar invite
+  still covers them).
+- The organiser reminder now accepts `reschedule to <time> <note>`. It moves the
+  Google event, keeps the original duration, appends the note to the
+  description, updates the stored time, and DMs attendees. `moved <note>` still
+  only records a note without changing the calendar.
+- 390 tests passing.
+
 ## 2026-11-06 (Jira approval, note prompt)
 
 - Jira issues no longer auto-open. `jira-assigned` is removed from the auto

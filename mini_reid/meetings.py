@@ -111,3 +111,134 @@ def create_event(env: dict, topic: str, start: str, end: str,
     except urllib.error.HTTPError as ex:
         detail = ex.read().decode()[:300]
         raise RuntimeError(f"calendar create failed ({ex.code}): {detail}") from ex
+
+
+CREATED = "created_meetings.json"
+
+
+def load_created(path: str = CREATED) -> dict:
+    from pathlib import Path
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def remember_meeting(event: dict, topic: str, start: str, end: str,
+                     attendees: list[dict], creator: str, notes: str = "",
+                     path: str = CREATED) -> None:
+    """Keep what the reminder and reschedule flows need after creation."""
+    eid = event.get("id") or ""
+    if not eid:
+        return
+    from pathlib import Path
+
+    data = load_created(path)
+    data[eid] = {
+        "title": topic[:200], "start": start, "end": end,
+        "link": event.get("hangoutLink") or event.get("htmlLink") or "",
+        "notes": notes[:8000], "attendees": attendees, "creator": creator,
+        "rsvps": data.get(eid, {}).get("rsvps") or {},
+        "attendee_reminded": False,
+    }
+    Path(path).write_text(json.dumps(data, indent=1, ensure_ascii=False))
+
+
+def update_event(env: dict, event_id: str, start: str, end: str,
+                 notes: str | None = None, token_path: str | None = None,
+                 client_path: str | None = None) -> dict:
+    """Move an existing event and tell every attendee."""
+    access = gmail_access(env, token_path, client_path)
+    body: dict = {
+        "start": {"dateTime": start, "timeZone": "Asia/Kuala_Lumpur"},
+        "end": {"dateTime": end, "timeZone": "Asia/Kuala_Lumpur"},
+    }
+    if notes is not None:
+        body["description"] = notes[:8000]
+    url = ("https://www.googleapis.com/calendar/v3/calendars/primary/events/"
+           + urllib.parse.quote(event_id, safe="") + "?"
+           + urllib.parse.urlencode({"sendUpdates": "all"}))
+    req = urllib.request.Request(
+        url, data=json.dumps(body).encode(), method="PATCH",
+        headers={"Authorization": f"Bearer {access}",
+                 "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+
+
+def email_to_slack(path: str = "directory.json") -> dict[str, str]:
+    """Work email → Slack user id, for attendee reminders."""
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for uid, rec in (data or {}).items():
+        email = ((rec or {}).get("email") or "").lower()
+        if email:
+            out[email] = uid
+    return out
+
+
+def reschedule_nearest(env: dict, new_start: datetime, note: str,
+                       now: datetime, created_path: str = CREATED,
+                       state_path: str = "meeting_reminders.json"
+                       ) -> str | None:
+    """Move the meeting whose start is closest to now, keeping its duration."""
+    from pathlib import Path as _Path
+
+    data = load_created(created_path)
+    best = None
+    for eid, rec in data.items():
+        try:
+            start = datetime.fromisoformat(rec.get("start") or "")
+        except ValueError:
+            continue
+        gap = abs((start - now).total_seconds())
+        if gap <= 90 * 60 and (best is None or gap < best[0]):
+            best = (gap, eid, rec, start)
+    if not best:
+        return None
+    _, eid, rec, old_start = best
+    try:
+        old_end = datetime.fromisoformat(rec.get("end") or "")
+        duration = old_end - old_start
+    except ValueError:
+        duration = timedelta(minutes=SLOT_MINUTES)
+    new_end = new_start + duration
+    notes = rec.get("notes") or ""
+    if note:
+        notes = (notes + "\n" if notes else "") + note
+    update_event(env, eid, new_start.isoformat(), new_end.isoformat(),
+                 notes=notes or None)
+    rec["start"] = new_start.isoformat()
+    rec["end"] = new_end.isoformat()
+    rec["notes"] = notes
+    rec["attendee_reminded"] = False
+    _Path(created_path).write_text(json.dumps(data, indent=1,
+                                              ensure_ascii=False))
+    # The 10-minute reminder keys off the event id; move its start too.
+    try:
+        state = json.loads(_Path(state_path).read_text())
+        if eid in (state.get("meetings") or {}):
+            state["meetings"][eid]["start"] = new_start.isoformat()
+            state["meetings"][eid]["status"] = "scheduled"
+            _Path(state_path).write_text(json.dumps(state))
+    except (OSError, ValueError):
+        pass
+    by_email = email_to_slack()
+    from .notify import send_dm_to
+
+    text = (f"*Rescheduled*\n{new_start:%a %d %b %H:%M}–{new_end:%H:%M} · "
+            f"{rec.get('title', '')}" + (f"\n_{note}_" if note else ""))
+    for person in rec.get("attendees") or []:
+        uid = by_email.get((person.get("email") or "").lower())
+        if not uid or uid == rec.get("creator"):
+            continue
+        try:
+            send_dm_to(env, uid, text)
+        except Exception:  # noqa: BLE001 - one bad DM must not block the move
+            continue
+    return (f"Rescheduled: {rec.get('title', '')} — "
+            f"{new_start:%a %d %b %H:%M}" + (f" ({note})" if note else ""))

@@ -63,7 +63,8 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
         ["`remind me to send the deck in 2 minutes` — Slack schedules it",
          "`remind @Arman to send the deck at 3pm` — DM someone else",
          "`reminders` — sent, pending, replied",
-         "Meeting DM — reply `yes`, `no <reason>`, or `moved` / `rescheduled`"],
+         "Meeting DM — reply `yes`, `no <reason>`, `moved <note>`, or "
+         "`reschedule to <time> <note>`"],
     ),
     "team": (
         "Team and setup",

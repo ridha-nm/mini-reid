@@ -138,7 +138,11 @@ when the task title was rewritten.
 The watcher schedules a Slack DM 10 minutes before each meeting starts: time, title,
 join link, and "Are you attending?". Reply `yes`, `no <reason>`, or `moved` /
 `rescheduled` / `postponed`; a note after the word is kept. The answer is
-recorded in `meeting_reminders.json` and confirmed in the DM. Slack keeps the schedule,
+recorded in `created_meetings.json` and confirmed in the DM. Meetings created
+through the bot also DM every attendee who maps to a Slack user, with
+**Attending** / **Can't attend** buttons. The organiser can reply
+`reschedule to <time> <note>`; the Google event moves, keeps its duration, and
+attendees are DMed. `moved <note>` records the note only. Slack keeps the schedule,
 so a sleeping Mac does not lose it. Each meeting is reminded once.
 
 The 09:15 job writes `digest_delivered.json` only after Slack accepts the DM. If it

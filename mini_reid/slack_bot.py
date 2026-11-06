@@ -2728,6 +2728,21 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
 
         if (user == owner or member) and channel.startswith("D"):
+            resched = re.match(
+                r"^(?:reschedule|move|moved)\s+(?:it\s+)?to\s+(.+)$",
+                (body or "").strip(), re.I)
+            if resched and user == owner:
+                fields, _ = parse_remind(resched.group(1), datetime.now(MYT))
+                if fields and not fields.get("immediate"):
+                    from .meetings import reschedule_nearest
+
+                    moved = reschedule_nearest(
+                        env, datetime.fromisoformat(fields["remind_at"]),
+                        fields["what"].strip(" ,-"), datetime.now(MYT))
+                    if moved:
+                        say(moved)
+                        _mark(ts)
+                        return
             try:
                 from .watcher import record_meeting_reply
 
@@ -3101,6 +3116,48 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
+                if action_id in {"meet_rsvp_yes", "meet_rsvp_no"}:
+                    from .meetings import email_to_slack, load_created
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    eid = action.get("value") or ""
+                    data = load_created()
+                    rec = data.get(eid)
+                    if not rec:
+                        continue
+                    by_email = email_to_slack()
+                    for uid, prof in load_profiles().items():
+                        email = (prof.get("email") or "").lower()
+                        if email:
+                            by_email[email] = uid
+                    emails = {(a.get("email") or "").lower()
+                              for a in rec.get("attendees") or []}
+                    allowed = (clicker == rec.get("creator")
+                               or any(by_email.get(e) == clicker for e in emails))
+                    if not allowed:
+                        continue
+                    verdict = "yes" if action_id == "meet_rsvp_yes" else "no"
+                    rec.setdefault("rsvps", {})[clicker] = verdict
+                    Path("created_meetings.json").write_text(
+                        json.dumps(data, indent=1, ensure_ascii=False))
+                    label = "attending" if verdict == "yes" else "not attending"
+                    text = f"Recorded: {label} — {rec.get('title', '')}"
+                    try:
+                        send_dm_to(env, clicker, text)
+                    except Exception:  # noqa: BLE001 - best effort
+                        pass
+                    container = payload.get("container") or {}
+                    ch = container.get("channel_id") or ""
+                    msg_ts = container.get("message_ts") or ""
+                    if ch and msg_ts:
+                        try:
+                            web.chat_update(
+                                channel=ch, ts=msg_ts, text=text,
+                                blocks=[{"type": "section", "text": {
+                                    "type": "mrkdwn", "text": text}}])
+                        except Exception:  # noqa: BLE001 - click applied
+                            pass
+                    continue
                 if action_id in {"note_keep", "note_to_task", "note_discard"}:
                     from .listview import _title
 
@@ -3240,7 +3297,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     continue
                 if action_id == "meet_slot":
                     from .meeting_ui import confirmation_blocks
-                    from .meetings import create_event
+                    from .meetings import create_event, remember_meeting
 
                     clicker = (payload.get("user") or {}).get("id") or ""
                     value = action.get("value") or ""
@@ -3271,6 +3328,16 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                             web.chat_update(channel=channel, ts=msg_ts,
                                             text=message)
                         continue
+                    attendees = pending.get("attendees") or [{
+                        "name": pending.get("attendee", "Attendee"),
+                        "email": (pending.get("emails") or [""])[0]}]
+                    try:
+                        remember_meeting(
+                            event, pending["topic"], slot["start"], slot["end"],
+                            attendees, clicker, pending.get("notes", ""))
+                    except Exception as ex:  # noqa: BLE001 - event exists
+                        print(f"  remember meeting failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
                     state_now["pending_meet"].pop(token, None)
                     Path(STATE).write_text(json.dumps(state_now))
                     link = event.get("hangoutLink") or event.get("htmlLink") or ""

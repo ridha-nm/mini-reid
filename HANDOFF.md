@@ -108,6 +108,15 @@ links still never become notes.
 Weekly release notes live in `docs/WEEKLY-UPDATE.md` — append a dated
 capability snapshot every Friday. First entry covers week ending 2026-11-06.
 
+2026-11-06 attendee reminders and reschedule: meetings created through the bot
+are stored in `created_meetings.json` with event id and attendees. Ten minutes
+before, mapped Slack attendees get a DM with **Attending** / **Can't attend**
+buttons (`meet_rsvp_yes` / `meet_rsvp_no`), recorded in the same file. The
+organiser can reply `reschedule to 3pm <note>`; `meetings.reschedule_nearest`
+patches the Google event, keeps the duration, appends the note, moves the
+stored start and reminder state, and DMs attendees. `moved <note>` only records
+the note.
+
 2026-11-06 Jira approval and note prompt: Jira issues no longer auto-open; they
 wait in Inbox for **Add to list**. A long paste from Ridha is saved as a note
 and the reply carries **Keep as note** / **Make it a task** / **Discard**
@@ -371,7 +380,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-388 tests passing as of 2026-11-06.
+390 tests passing as of 2026-11-06.
 ## Next, agreed
 
 1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's

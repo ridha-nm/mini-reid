@@ -154,3 +154,70 @@ def test_remind_meetings_schedules_once_and_sends_late_discovery_now(tmp_path, m
     assert len(scheduled) == 1 and len(sent) == 1
     assert "Are you attending?" in scheduled[0][1]
     assert watcher.remind_meetings({"SLACK_OWNER_ID": "U1"}, NOW, state) == 0
+
+
+def test_attendee_reminders_only_for_mapped_people(tmp_path, monkeypatch):
+    import json
+    from datetime import timedelta
+
+    from mini_reid import meetings, notify, watcher
+
+    created = tmp_path / "created.json"
+    start = NOW + timedelta(minutes=20)
+    end = start + timedelta(minutes=30)
+    created.write_text(json.dumps({"e1": {
+        "title": "Deck review", "start": start.isoformat(),
+        "end": end.isoformat(), "link": "https://meet/x",
+        "attendees": [{"name": "A", "email": "a@pantas.com"},
+                      {"name": "Outsider", "email": "x@elsewhere.com"}],
+        "creator": "UOWNER", "rsvps": {}, "attendee_reminded": False}}))
+    monkeypatch.setattr(meetings, "email_to_slack",
+                        lambda path="directory.json": {"a@pantas.com": "UA"})
+    sent = []
+    monkeypatch.setattr(notify, "schedule_dm",
+                        lambda env, uid, text, at, blocks=None:
+                        sent.append(uid) or "Q1")
+    n = watcher.remind_attendees({}, NOW, str(created))
+    assert n == 1 and sent == ["UA"]
+    assert json.loads(created.read_text())["e1"]["attendee_reminded"]
+    assert watcher.remind_attendees({}, NOW, str(created)) == 0
+
+
+def test_reschedule_moves_event_and_keeps_duration(tmp_path, monkeypatch):
+    import json
+    from datetime import timedelta
+
+    from mini_reid import meetings, notify
+
+    created = tmp_path / "created.json"
+    start = NOW + timedelta(minutes=60)
+    end = start + timedelta(minutes=45)
+    created.write_text(json.dumps({"e1": {
+        "title": "Deck review", "start": start.isoformat(),
+        "end": end.isoformat(), "notes": "",
+        "attendees": [{"name": "A", "email": "a@pantas.com"}],
+        "creator": "UOWNER", "rsvps": {}, "attendee_reminded": True}}))
+    state = tmp_path / "state.json"
+    state.write_text(json.dumps({"date": "2026-11-02", "meetings": {
+        "e1": {"title": "Deck review", "status": "scheduled",
+               "start": start.isoformat()}}}))
+    calls = []
+    monkeypatch.setattr(meetings, "update_event",
+                        lambda env, eid, s, e, notes=None, **k:
+                        calls.append((eid, s, e, notes)) or {})
+    monkeypatch.setattr(meetings, "email_to_slack",
+                        lambda path="directory.json": {"a@pantas.com": "UA"})
+    dms = []
+    monkeypatch.setattr(notify, "send_dm_to",
+                        lambda env, uid, text: dms.append(uid))
+    new_start = start + timedelta(minutes=30)
+    reply = meetings.reschedule_nearest(
+        {}, new_start, "client call", NOW, str(created), str(state))
+    assert reply.startswith("Rescheduled: Deck review")
+    eid, s, e, notes = calls[0]
+    assert eid == "e1" and notes == "client call"
+    assert datetime.fromisoformat(e) - datetime.fromisoformat(s) == timedelta(
+        minutes=45)
+    saved = json.loads(created.read_text())["e1"]
+    assert saved["start"] == new_start.isoformat()
+    assert dms == ["UA"]

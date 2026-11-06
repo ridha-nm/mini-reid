@@ -71,8 +71,11 @@ members never see each other's lists.
 - `meet: @A and @B about <topic>` (also `on`, `to discuss`, `review`) reads all
   calendars, shows busy blocks, offers five 30-minute free slots, lets you edit
   title/notes, then creates the Google event with a Meet link and invites
-  everyone. Meeting reply: `yes`, `no <reason>`, `moved`/`rescheduled`.
-- 10-minute reminder DM before each meeting.
+  everyone. Meeting reply: `yes`, `no <reason>`, `moved <note>`, or
+  `reschedule to <time> <note>` (moves the event, keeps the duration, notifies
+  attendees).
+- 10-minute reminder DM before each meeting. Attendees of bot-created meetings
+  get their own DM with **Attending** / **Can't attend** buttons.
 
 ### Asking questions
 
@@ -107,7 +110,7 @@ members never see each other's lists.
 - Catch-up sweep replays commands the socket missed while the Mac slept.
 - Everything runs locally on the Mac and only while it is awake. No cloud
   database; client content does not leave the machine for extraction.
-- 388 tests pass.
+- 390 tests pass.
 
 ### Changed this week
 
@@ -121,6 +124,7 @@ members never see each other's lists.
   open tasks.
 - Jira issues now ask for approval before joining the list; long pastes offer
   Keep as note / Make it a task / Discard.
+- Meeting attendees get RSVP buttons; the organiser can reschedule with a note.
 - Removed Gmail/Jira link unfurls: unused, and they rendered a card per task
   link in the digest.
 
