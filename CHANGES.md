@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-06 (greetings are not tasks)
+
+- Festive and social greetings no longer become candidates: "Happy Deepavali",
+  "Wishing you…", "Have fun.", "Congrats", "Merry Christmas" and similar are
+  dropped even when they tag people. A greeting that also contains an explicit
+  ask ("Happy Diwali! Can you send the deck?") is still captured.
+- 400 tests passing.
+
 ## 2026-11-06 (safe questions for non-members)
 
 - A non-member who asks a question now gets a private DM answer from the

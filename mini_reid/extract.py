@@ -40,6 +40,12 @@ MENTION = re.compile(r"<@[A-Z0-9]+>")
 CHATTER = re.compile(
     r"\b(lol|haha+|bahaha+|im tired|i'?m tired|no worries|working on it|"
     r"noted|got it|sure|yep|yeah|okay|ok|thanks|thank you|see you|hmm)\b", re.I)
+# Festive and social messages are not commitments, even when they tag people.
+GREETING = re.compile(
+    r"^(?:happy|merry|wishing|wish|congrats|congratulations|cheers|"
+    r"have fun|well done|kudos)\b"
+    r"|\b(?:wishing you|happy (?:diwali|deepavali|birthday|holidays|new year)|"
+    r"merry christmas|eid mubarak|gong xi|selamat hari raya|have fun)\b", re.I)
 # Playful requests to the bot are never commitments, tagged or not.
 PLAY_REQUEST = re.compile(
     r"(?:\b(?:give|send)\s+"
@@ -231,6 +237,12 @@ def extract(item: dict, client: dict | None, now: datetime,
 
     gate_text = f"{item.get('subject') or ''} {text}".strip()
     if not looks_actionable(gate_text, item):
+        return []
+    # A greeting that tags people is still a greeting, unless it also asks.
+    if (GREETING.search(gate_text)
+            and not (REQUEST_MODAL.search(gate_text)
+                     or REQUEST_POLITE.search(gate_text)
+                     or REQUEST_NEED.search(gate_text))):
         return []
 
     if item.get("due"):

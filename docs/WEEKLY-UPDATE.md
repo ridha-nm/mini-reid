@@ -116,7 +116,7 @@ members never see each other's lists.
 - Catch-up sweep replays commands the socket missed while the Mac slept.
 - Everything runs locally on the Mac and only while it is awake. No cloud
   database; client content does not leave the machine for extraction.
-- 399 tests pass.
+- 400 tests pass.
 
 ### Changed this week
 
@@ -136,7 +136,7 @@ members never see each other's lists.
 - Slack List now mirrors every live task (was capped at 50); done rows drop off
   it and stay archived in the ledger.
 - Non-members can ask general questions privately (KB only); immediate
-  reminders drop a leading "now".
+  reminders drop a leading "now"; festive greetings no longer become tasks.
 - Removed Gmail/Jira link unfurls: unused, and they rendered a card per task
   link in the digest.
 

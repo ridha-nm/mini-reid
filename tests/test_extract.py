@@ -274,3 +274,15 @@ def test_extract_stamps_capture_mode():
     row = extract(item, None, NOW)[0]
     assert row["capture"] == "auto"
     assert row["capture_why"] == "slack-direct-ask"
+
+
+def test_festive_greetings_are_not_candidates():
+    base = {"source": "slack", "native_id": "g1", "kind": "mention",
+            "author": "max", "link": "l",
+            "ts": "2026-11-06T15:10:00+08:00"}
+    for text in ("Happy Deepavali to all celebrating, esp. <@U1> and <@U2>. "
+                 "Wishing you and your loved ones joy",
+                 "Have fun."):
+        assert extract(dict(base, text=text), None, NOW) == []
+    keeps = dict(base, text="Happy Deepavali! Can you send the deck tomorrow?")
+    assert extract(keeps, None, NOW)

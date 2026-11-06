@@ -104,7 +104,9 @@ a channel mention. Channel mentions are always kept unless they are pure chatter
 - Kept: requests, first-person commitments, Gmail with a direct address or a dated
   request, Jira assignments.
 - Rejected: bots, `bd-triager-agent` tags, calendar responses, Jira notification mail,
-  sent mail, chatter, playful requests (`give … a hug`, `high five …`),
+  sent mail, chatter, festive/social greetings ("Happy Deepavali", "Have fun",
+  "Congrats") unless they also contain an explicit ask,
+  playful requests (`give … a hug`, `high five …`),
   questions with no ask ("do you have access?"), status updates ("Update: …"), other
   people's own plans ("I try to get … today"), Google boilerplate, URLs, newsletters.
 
