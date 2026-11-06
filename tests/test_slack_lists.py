@@ -114,3 +114,11 @@ def test_sync_creates_missing_rows_and_updates_changed_ones(tmp_path, monkeypatc
     assert row["slack_synced_at"] == "2026-11-05T10:00:00+08:00"
     assert slack_lists.sync_user({"SLACK_BOT_TOKEN": "x"}, "U1", "Ridha",
                                  ledger, state) == 0
+
+
+def test_list_url_uses_the_app_deep_link(tmp_path, monkeypatch):
+    state = tmp_path / "lists.json"
+    state.write_text('{"U1": {"list_id": "F1"}}')
+    monkeypatch.setattr(slack_lists, "_TEAM_ID", "T1")
+    assert slack_lists.list_url({"SLACK_BOT_TOKEN": "x"}, "U1",
+                                str(state)) == "slack://list?team=T1&id=F1"

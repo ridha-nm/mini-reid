@@ -63,8 +63,8 @@ def list_url(env: dict, user: str, state_path: str = STATE) -> str | None:
                 _TEAM_ID = json.load(response).get("team_id") or ""
         except Exception:  # noqa: BLE001 - link is optional
             return None
-    team = env.get("SLACK_TEAM", "gopantas")
-    return f"https://{team}.slack.com/lists/{_TEAM_ID}/{list_id}"
+    # slack:// hands off to the desktop app; the https link opens a browser.
+    return f"slack://list?team={_TEAM_ID}&id={list_id}"
 
 
 def ensure_list(env: dict, user: str, name: str,
