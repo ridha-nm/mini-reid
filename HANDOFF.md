@@ -123,6 +123,11 @@ patches the Google event, keeps the duration, appends the note, moves the
 stored start and reminder state, and DMs attendees. `moved <note>` only records
 the note.
 
+2026-11-06 non-member questions: anyone outside the owner/member list who asks
+a question gets a private DM answer from the local KB only — no ledger, files
+or live Slack search, and nothing posted in the channel. Immediate reminders
+drop a leading "now".
+
 2026-11-06 Jira approval and note prompt: Jira issues no longer auto-open; they
 wait in Inbox for **Add to list**. A long paste from Ridha is saved as a note
 and the reply carries **Keep as note** / **Make it a task** / **Discard**
@@ -397,7 +402,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-398 tests passing as of 2026-11-06.
+399 tests passing as of 2026-11-06.
 ## Next, agreed
 
 1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's

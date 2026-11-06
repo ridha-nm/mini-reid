@@ -2,6 +2,15 @@
 
 Append-only. Newest first.
 
+## 2026-11-06 (safe questions for non-members)
+
+- A non-member who asks a question now gets a private DM answer from the
+  knowledge base only. No ledger, files or live Slack search; never posted in
+  the channel. If the KB has nothing, the DM explains that Ridha can add them.
+- Immediate reminders drop the word "now": `remind @Nish now not to stuff too
+  much` sends `not to stuff too much`.
+- 399 tests passing.
+
 ## 2026-11-06 (done rows leave the Slack List)
 
 - A row marked `done` is deleted from the Slack List on the next sync, so the

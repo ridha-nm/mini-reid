@@ -91,7 +91,9 @@ Gmail, Jira and Google Calendar.
   local documents. `ask:` answers pending/open/due questions from the ledger first,
   then ingested Slack files (PDF, DOCX, XLSX, text), then live Slack Real-time
   Search, then the local passages. Shared files auto-ingest; react 📄 to ingest
-  a file on an older message. Summary goes to Ridha only.
+  a file on an older message. Summary goes to Ridha only. A non-member who asks
+  a question gets a private DM answer from the local passages only — never the
+  ledger, files or live Slack.
 - **App Home**: per-person dashboard with a table of 10 task stats, today's
   meetings, top 3 focus items, Open Slack List, Triage Inbox and Refresh. Non-authorised users get a capabilities page with
   **Request access** (DMs you an **Authorise** button) and **Message Ridha**,

@@ -1350,3 +1350,12 @@ def test_meeting_cancel_forms():
     assert meeting_cancel_query("cancel meeting BD") == "BD"
     assert meeting_cancel_query("cancel") == ""
     assert meeting_cancel_query("drop: deck") is None
+
+
+def test_immediate_reminder_drops_the_word_now():
+    from mini_reid.slack_bot import parse_remind
+
+    fields, what = parse_remind("now not to stuff too much", NOW)
+    assert fields["immediate"] is True
+    assert what == "not to stuff too much"
+    assert fields["what"] == "not to stuff too much"

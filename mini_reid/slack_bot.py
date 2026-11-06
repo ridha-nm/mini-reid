@@ -479,6 +479,8 @@ def parse_remind(body: str, now) -> tuple[dict | None, str]:
     # No time and no date: remind now. A reminder that needs a schedule is
     # friction; "remind me to X" should just send it.
     if date_iso is None and hour is None:
+        clean = re.sub(r"^(?:(?:right\s+)?now|immediately|straight\s+away)\b\s*",
+                       "", clean, flags=re.I).strip(" ,-") or clean
         return ({"remind_at": now.replace(microsecond=0).isoformat(timespec="seconds"),
                  "due": now.date().isoformat(), "what": clean or body,
                  "immediate": True}, clean or body)
@@ -2487,17 +2489,16 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
 
         if action == "ask":
             allow = {u.strip() for u in env.get("KB_ALLOWLIST", "").split(",") if u.strip()}
-            if user != owner and user not in allow:
-                say("You are not on the list for that. Ask Ridha to add you.")
-                return
+            full = user == owner or user in allow
             reply = ""
-            try:
-                from .ask_ledger import answer_ledger
+            if full:
+                try:
+                    from .ask_ledger import answer_ledger
 
-                reply = answer_ledger(body, load(user_ledger), clients) or ""
-            except Exception as ex:  # noqa: BLE001 - fall through to search/KB
-                print(f"  ledger ask failed: {type(ex).__name__}: {ex}",
-                      flush=True)
+                    reply = answer_ledger(body, load(user_ledger), clients) or ""
+                except Exception as ex:  # noqa: BLE001 - fall through to search/KB
+                    print(f"  ledger ask failed: {type(ex).__name__}: {ex}",
+                          flush=True)
             if not reply and user == owner:
                 try:
                     from .files import search as file_search
@@ -2529,7 +2530,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
 
                     index = kb_load()
                     if not index:
-                        reply = "Knowledge base is empty. Ridha needs to run the index build."
+                        reply = ("Knowledge base is empty. Ridha needs to run "
+                                 "the index build.") if full else ""
                     else:
                         body_text, hits = kb_answer(body, index)
                         sources = "\n".join(
@@ -2538,9 +2540,19 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                         reply = f"{body_text}\n\n{sources}"
                 except Exception as ex:  # noqa: BLE001
                     reply = f"Could not answer: {type(ex).__name__}"
+            if not reply and not full:
+                reply = ("I only answer from my notes for now. For your own "
+                         "tasks and reminders, ask Ridha to add you to Mini-Reid.")
             if late:
                 reply = "_(answered late, I was offline)_\n" + reply
-            say(reply[:3900])
+            if full:
+                say(reply[:3900])
+            else:
+                # A non-member's answer is private and never touches a ledger.
+                try:
+                    send_dm_to(env, user, reply[:3900])
+                except Exception:  # noqa: BLE001 - best effort
+                    pass
             _mark(ts)
             return
 

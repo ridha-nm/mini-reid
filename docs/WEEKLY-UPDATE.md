@@ -84,6 +84,9 @@ members never see each other's lists.
 
 - `ask:` order: ledger → ingested Slack files → live Slack search → local
   knowledge base. Answers are extractive with sources, never invented.
+- Anyone outside the member list can ask a general question: the answer is a
+  private DM from the local knowledge base only (no ledger, files or live
+  Slack).
 - File ingestion: share a file (text, Markdown, CSV, JSON, PDF, DOCX, XLSX) in
   a channel the bot is in; react 📄 to ingest older files. Summary goes to the
   owner only.
@@ -113,7 +116,7 @@ members never see each other's lists.
 - Catch-up sweep replays commands the socket missed while the Mac slept.
 - Everything runs locally on the Mac and only while it is awake. No cloud
   database; client content does not leave the machine for extraction.
-- 398 tests pass.
+- 399 tests pass.
 
 ### Changed this week
 
@@ -132,6 +135,8 @@ members never see each other's lists.
   any upcoming meeting by name with `cancel: <name>`.
 - Slack List now mirrors every live task (was capped at 50); done rows drop off
   it and stay archived in the ledger.
+- Non-members can ask general questions privately (KB only); immediate
+  reminders drop a leading "now".
 - Removed Gmail/Jira link unfurls: unused, and they rendered a card per task
   link in the digest.
 

@@ -199,7 +199,7 @@ ledger), `reassign: <item> to <person>`,
 ignores that title), `remind` (absolute or `in 2 minutes`),
 `ask:` (pending/open/due/task questions use the ledger with a client filter;
 then ingested Slack files; then owner live Slack Real-time Search; then the
-local KB),
+local KB; a non-member gets a private DM answer from the local KB only),
 `find:`, `list`, `notes`, `meet: @Name about <topic>`, `allow: @Name`,
 `banter on|off|status`, `help`, `/mini-reid` (list/help ephemeral, other commands
 in DM). `meet:` accepts one or more attendees
@@ -286,7 +286,8 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   the Pantas workspace: `remind me …`, `remind @Arman …`, `remind Arman Rahman …`,
   `add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed
   reminders are scheduled in Slack (server-side). Only the recipient gets the reminder
-  row; it is not a task for the sender. An unknown name gets a reply, never a silent
+  row; it is not a task for the sender. An immediate reminder drops a leading
+  "now" from its text. An unknown name gets a reply, never a silent
   reminder to the sender. `remind` is the one command a non-member may use; it grants
   no ledger access.
   Several people in one command: `remind @Raj, @XieYi and @Lynnette to send updates at
