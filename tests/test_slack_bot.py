@@ -1304,3 +1304,38 @@ def test_abuse_words_are_flagged_not_noted():
     assert ABUSE.search("molest <@U1>")
     assert ABUSE.search("do not rape anyone")
     assert not ABUSE.search("a grape and a drape")
+
+
+def test_multi_remind_shared_text_for_several_people():
+    from mini_reid.slack_bot import parse_multi_remind
+
+    users = {"raj": "UR", "xieyi": "UX", "lynnette": "UL"}
+    out = parse_multi_remind(
+        "@Raj, @XieYi and @Lynnette to send your updates at 5pm today",
+        users, NOW)
+    assert [uid for uid, _ in out] == ["UR", "UX", "UL"]
+    assert all(f["remind_at"].endswith("17:00:00+08:00")
+               for _, f in out)
+    assert all(f["what"] == "send your updates" for _, f in out)
+
+
+def test_multi_remind_line_per_person():
+    from mini_reid.slack_bot import parse_multi_remind
+
+    users = {"raj": "UR", "xieyi": "UX"}
+    out = parse_multi_remind(
+        "@Raj audit agents gameplan\n@XieYi brain implementation\nat 5pm today",
+        users, NOW)
+    assert [(uid, f["what"]) for uid, f in out] == [
+        ("UR", "audit agents gameplan"),
+        ("UX", "brain implementation"),
+    ]
+    assert all(f["remind_at"].endswith("17:00:00+08:00")
+               for _, f in out)
+
+
+def test_single_reminder_is_not_multi():
+    from mini_reid.slack_bot import parse_multi_remind
+
+    assert parse_multi_remind("@Raj to send the deck at 5pm",
+                              {"raj": "UR"}, NOW) is None

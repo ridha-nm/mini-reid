@@ -497,6 +497,55 @@ def parse_remind(body: str, now) -> tuple[dict | None, str]:
     return {"remind_at": at, "due": date_iso, "what": clean or body}, clean
 
 
+def parse_multi_remind(body: str, users: dict[str, str],
+                       now: "datetime") -> list[tuple[str, dict]] | None:
+    """Two forms: one shared text for several people, or one line per person.
+
+    remind @Raj, @XieYi and @Lynnette to send updates at 5pm
+    remind
+    @Raj audit agents gameplan
+    @XieYi brain implementation gameplan
+    at 5pm today
+    """
+    text = re.sub(r"^\s*remind\s*:?\s*", "", (body or "").strip(), flags=re.I)
+    if not text:
+        return None
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) > 1:
+        per_person, tail = [], []
+        for line in lines:
+            m = re.match(r"^(@[^\s]+|<@[A-Z0-9]+(?:\|[^>]*)?>)\s+(.+)$", line)
+            if m:
+                per_person.append((m.group(1), m.group(2)))
+            elif re.match(r"^(?:at|by|on|before)\b", line, re.I):
+                tail.append(line)
+            else:
+                tail.append(line)
+        if per_person:
+            suffix = " ".join(tail)
+            out = []
+            for mention, what in per_person:
+                targets = _meeting_people(mention, users)
+                if len(targets) != 1:
+                    return None
+                fields, _ = parse_remind(f"{what} {suffix}".strip(), now)
+                if fields is None:
+                    return None
+                out.append((targets[0], fields))
+            return out if len(out) > 1 else None
+        return None
+    m = re.match(r"^(?P<who>.+?)\s+to\s+(?P<rest>.+)$", text, re.I)
+    if not m:
+        return None
+    targets = _meeting_people(m.group("who"), users)
+    if len(targets) < 2:
+        return None
+    fields, _ = parse_remind(m.group("rest"), now)
+    if fields is None:
+        return None
+    return [(uid, fields) for uid in targets]
+
+
 def send_reminder(env: dict, recipient: str, what: str,
                   at: datetime | None = None) -> tuple[str, str]:
     """Deliver now or schedule. Returns (scheduled_id, kind)."""
@@ -1042,6 +1091,10 @@ def natural_command(body: str) -> tuple[str, str] | None:
     text = POLITE_PREFIX.sub("", (body or "").strip()).strip()
     if not text:
         return None
+    # A reminder list starts with the verb alone on its line.
+    m = re.match(r"^remind\b\s*:?\s*\n(.+)$", text, re.I | re.S)
+    if m:
+        return "remind", m.group(1).strip()
     if re.search(r"\?\s*$", text) or re.match(
             r"^(?:what|when|where|who|why|how|which|do you|tell me)\b", text, re.I):
         return "ask", text
@@ -2472,6 +2525,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         target, rest = (split_target(body, users, user,
                                      bare_name=(action == "remind"))
                         if action in {"add", "remind", "allow"} else (None, body))
+        multi_remind = (parse_multi_remind(body, users, datetime.now(MYT))
+                        if action == "remind" else None)
         if action == "allow":
             if user != owner:
                 say("Only Ridha can allow people.")
@@ -2514,6 +2569,46 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 _mark(ts)
                 return
             say(f"Allowed {name}. Setup link sent to their DM.")
+            _mark(ts)
+            return
+        if action == "remind" and multi_remind:
+            now = datetime.now(MYT)
+            set_for, failed = [], []
+            for recipient, fields in multi_remind:
+                at = datetime.fromisoformat(fields["remind_at"])
+                name = _person_name(recipient, users)
+                if at <= now:
+                    failed.append(f"{name} (time in the past)")
+                    continue
+                recipient_ledger = (
+                    ledger_path if recipient == owner
+                    else (profiles.get(recipient) or {}).get("ledger"))
+                if recipient_ledger:
+                    add_reminder_row(recipient_ledger, fields["what"], fields,
+                                     now)
+                try:
+                    from .notify import REMINDER_LOG, log_reminder, schedule_dm
+
+                    sid = schedule_dm(env, recipient,
+                                      f"*Reminder*\n{fields['what'][:300]}",
+                                      int(at.timestamp()))
+                    log_reminder(
+                        REMINDER_LOG, asked_by=user,
+                        asked_by_name=_person_name(user, users),
+                        to=recipient, to_name=name, what=fields["what"],
+                        post_at=at.isoformat(), scheduled_id=sid,
+                        channel=channel)
+                except Exception as ex:  # noqa: BLE001 - report, keep others
+                    print(f"  multi remind failed: {type(ex).__name__}: {ex}",
+                          flush=True)
+                    failed.append(f"{name} ({type(ex).__name__})")
+                    continue
+                set_for.append(f"{name} {at:%H:%M}")
+            if set_for:
+                say(f"Reminders set for {len(set_for)}: " + ", ".join(set_for))
+            if failed:
+                say("Could not set: " + ", ".join(failed))
+            react_ack(web, channel, ts, EMOJI_ACKS["remind"])
             _mark(ts)
             return
         if action == "remind" and target is None:
@@ -2649,7 +2744,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 _mark(ts)
                 return
 
-        if user != owner and not member:
+        if user != owner and not member and action != "remind":
             if not late:
                 try:
                     web.reactions_add(channel=channel, timestamp=ts, name="white_check_mark")

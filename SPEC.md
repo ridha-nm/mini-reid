@@ -275,7 +275,12 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   `add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed
   reminders are scheduled in Slack (server-side). Only the recipient gets the reminder
   row; it is not a task for the sender. An unknown name gets a reply, never a silent
-  reminder to the sender.
+  reminder to the sender. `remind` is the one command a non-member may use; it grants
+  no ledger access.
+  Several people in one command: `remind @Raj, @XieYi and @Lynnette to send updates at
+  5pm` sends the same text to each; starting with `remind` on its own line and one
+  `@Name <item>` per line gives each person their own text. A shared time line applies
+  to every entry. Each recipient gets a separate Slack DM and reminder row.
   A successful reminder is acknowledged with a ⏰ reaction on the command message.
 - `list` numbers open items; `#N` works with `combine`, `done`, `due`, `snooze`, `drop`,
   `waiting`, `not`, `status` and `edit`. Each row also carries a stable short id

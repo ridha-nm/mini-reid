@@ -2,6 +2,16 @@
 
 Append-only. Newest first.
 
+## 2026-11-06 (multi-recipient reminders)
+
+- `remind` accepts several people at once. Shared text:
+  `remind @Raj, @XieYi and @Lynnette to send your updates at 5pm today`.
+  Per-person lines: `remind` then one `@Name <item>` per line, with the time
+  on its own line. Each recipient gets their own scheduled DM and reminder row.
+- Any workspace member can use `remind`, not only allowlisted users. It grants
+  no ledger access; other commands stay owner/member-only.
+- 387 tests passing.
+
 ## 2026-11-06 (list sections, Clear Inbox, done acks)
 
 - `list` is split into **My reminders**, **Reminders I sent**, **My tasks**,

@@ -105,6 +105,12 @@ digest rendered a card per task link. The Slack scopes, event and domains are
 gone from the manifest; reinstall the app so Slack drops them. Bare pasted
 links still never become notes.
 
+2026-11-06 multi-recipient reminders: `remind` takes several people, either a
+shared text (`remind @Raj, @XieYi and @Lynnette to send updates at 5pm`) or
+`remind` on its own line followed by one `@Name <item>` per line and a shared
+time line. Each recipient gets a scheduled DM and a reminder row. Non-members
+may use `remind` only; it grants no ledger access.
+
 2026-11-06 list sections and acks: `list` now shows My reminders, Reminders I
 sent, My tasks, Tagged by others, Inbox and Notes; numbering stays global.
 `Clear Inbox (N)` pages ten pending rows through a modal — tick the ones that
@@ -357,7 +363,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-382 tests passing as of 2026-11-06.
+387 tests passing as of 2026-11-06.
 ## Next, agreed
 
 1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's
