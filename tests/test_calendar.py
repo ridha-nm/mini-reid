@@ -253,3 +253,23 @@ def test_cancel_nearest_deletes_and_notifies(tmp_path, monkeypatch):
     assert deleted == ["e1"]
     assert json.loads(created.read_text()) == {}
     assert dms and dms[0][0] == "UA" and "Cancelled" in dms[0][1]
+
+
+def test_cancel_falls_back_to_reminder_state(tmp_path, monkeypatch):
+    import json
+    from datetime import timedelta
+
+    from mini_reid import meetings
+
+    state = tmp_path / "state.json"
+    start = NOW + timedelta(minutes=10)
+    state.write_text(json.dumps({"date": "2026-11-02", "meetings": {
+        "e9": {"title": "Change Request", "status": "scheduled",
+               "start": start.isoformat()}}}))
+    deleted = []
+    monkeypatch.setattr(meetings, "delete_event",
+                        lambda env, eid, **k: deleted.append(eid))
+    reply = meetings.cancel_by_reminder({}, NOW, "occupied", str(state))
+    assert reply == "Cancelled: Change Request · 09:10 — occupied"
+    assert deleted == ["e9"]
+    assert json.loads(state.read_text())["meetings"] == {}

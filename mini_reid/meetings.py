@@ -327,3 +327,34 @@ def cancel_nearest(env: dict, now: datetime, note: str = "",
             continue
     return (f"Cancelled: {rec.get('title', '')}"
             + (f" — {note}" if note else ""))
+
+
+def cancel_by_reminder(env: dict, now: datetime, note: str = "",
+                       state_path: str = "meeting_reminders.json"
+                       ) -> str | None:
+    """Cancel a calendar meeting known only from the reminder state."""
+    from pathlib import Path as _Path
+
+    try:
+        state = json.loads(_Path(state_path).read_text())
+    except (OSError, ValueError):
+        return None
+    best = None
+    for mid, rec in (state.get("meetings") or {}).items():
+        if rec.get("status") not in {"scheduled", "sent", "attending"}:
+            continue
+        try:
+            start = datetime.fromisoformat(rec.get("start") or "")
+        except ValueError:
+            continue
+        gap = abs((start - now).total_seconds())
+        if gap <= 3 * 60 * 60 and (best is None or gap < best[0]):
+            best = (gap, mid, rec, start)
+    if not best:
+        return None
+    _, mid, rec, start = best
+    delete_event(env, mid)
+    (state.get("meetings") or {}).pop(mid, None)
+    _Path(state_path).write_text(json.dumps(state))
+    return (f"Cancelled: {rec.get('title', '')} · {start:%H:%M}"
+            + (f" — {note}" if note else ""))

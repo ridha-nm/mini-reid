@@ -2738,10 +2738,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if (user == owner or member) and channel.startswith("D"):
             cancel = re.match(r"^cancel\b(.*)$", (body or "").strip(), re.I)
             if cancel and user == owner:
-                from .meetings import cancel_nearest
+                from .meetings import cancel_by_reminder, cancel_nearest
 
-                done = cancel_nearest(env, datetime.now(MYT),
-                                      cancel.group(1).strip(" ,:-"))
+                note = cancel.group(1).strip(" ,:-")
+                state_file = ("meeting_reminders.json" if user == owner
+                              else f"data/{user}/meeting_reminders.json")
+                done = (cancel_nearest(env, datetime.now(MYT), note)
+                        or cancel_by_reminder(env, datetime.now(MYT), note,
+                                              state_file))
                 if done:
                     say(done)
                     _mark(ts)

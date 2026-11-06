@@ -12,7 +12,9 @@ Append-only. Newest first.
 - The organiser can reply `cancel <note>` to the 10-minute meeting reminder.
   The Google event is deleted with attendee notifications, the stored meeting
   and reminder are removed, and mapped Slack attendees get a `Cancelled` DM.
-- 394 tests passing.
+  Meetings created before `created_meetings.json` existed fall back to the
+  reminder state, so older calendar meetings cancel too.
+- 395 tests passing.
 
 ## 2026-11-06 (attendee reminders, reschedule with note)
 
