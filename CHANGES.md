@@ -13,6 +13,9 @@ Append-only. Newest first.
   **Add to list** / **Not a task**.
 - When someone marks a task you tagged them in as done, you get one DM:
   `✅ <name> marked done: <title>`. Slack-tagged rows only, once per row.
+- Marking done from the Slack List now DMs the person who did it:
+  `✅ Marked done: <title>` (up to five titles per message). Command and
+  Triage-modal done paths already reply.
 - 382 tests passing.
 
 ## 2026-11-06 (unfurl removed)

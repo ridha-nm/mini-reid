@@ -137,3 +137,13 @@ def test_mail_rows_keep_the_web_link(monkeypatch):
     row = {"source": "gmail", "native_id": "m1",
            "source_link": "https://mail.google.com/mail/u/0/#all/abc"}
     assert slack_lists._source_link({}, row) == row["source_link"]
+
+
+def test_newly_done_only_flags_edges():
+    from mini_reid.slack_lists import newly_done
+
+    rows = [{"id": "a", "status": "done", "what": "A"},
+            {"id": "b", "status": "done", "what": "B"},
+            {"id": "c", "status": "open", "what": "C"}]
+    assert [r["id"] for r in newly_done(
+        {"a": "open", "b": "done", "c": "open"}, rows)] == ["a"]

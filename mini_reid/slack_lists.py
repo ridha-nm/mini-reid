@@ -226,14 +226,35 @@ def _fields(env: dict, cfg: dict, row: dict) -> list[dict]:
     return out
 
 
+def newly_done(before: dict[str, str | None],
+               rows: list[dict]) -> list[dict]:
+    """Rows a person marked done in the List, for the confirmation DM."""
+    return [r for r in rows if (r.get("status") or "") == "done"
+            and before.get(r.get("id")) not in {None, "done"}]
+
+
 def sync_user(env: dict, user: str, name: str, ledger_path: str,
               state_path: str = STATE, limit: int = 50) -> int:
     """Create or update Slack List rows for the most recent ledger rows."""
     cfg = ensure_list(env, user, name, state_path)
     token = env["SLACK_BOT_TOKEN"]
     rows = load(ledger_path)
+    before = {r.get("id"): r.get("status") for r in rows}
     pulled = apply_list_changes(rows, _list_items(token, cfg["list_id"]),
                                 datetime.now(MYT))
+    finished = newly_done(before, rows)
+    if finished:
+        from .notify import send_dm_to
+
+        names = [(r.get("action") or r.get("what") or "")[:80]
+                 for r in finished[:5]]
+        text = "✅ Marked done: " + "; ".join(names)
+        if len(finished) > 5:
+            text += f" (+{len(finished) - 5} more)"
+        try:
+            send_dm_to(env, user, text)
+        except Exception as ex:  # noqa: BLE001 - the ledger is already saved
+            print(f"  done ack failed: {type(ex).__name__}: {ex}", flush=True)
     tasks = [r for r in rows if r.get("kind") not in {"note", "reminder"}]
     tasks.sort(key=lambda r: r.get("last_activity") or "", reverse=True)
     changed = pulled

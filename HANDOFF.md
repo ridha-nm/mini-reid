@@ -111,7 +111,9 @@ sent, My tasks, Tagged by others, Inbox and Notes; numbering stays global.
 are NOT tasks, add the rest, auto-advance. New captures keep their per-item DM
 buttons. When a tagged task is marked done by the recipient, the original asker
 gets one `✅ ... marked done` DM; `from_user` is captured per row and
-`done_ack_sent` stops repeats.
+`done_ack_sent` stops repeats. A person marking rows done in the Slack List
+gets `✅ Marked done: ...` for their own edit; `done:` and the Triage modal
+already reply.
 
 ## Running now
 
