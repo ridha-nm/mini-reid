@@ -1,6 +1,7 @@
 """Slack Block Kit for the list and its triage modal."""
 from __future__ import annotations
 
+import json
 from datetime import datetime
 
 from .listview import _title, format_list, ordered_rows
@@ -14,6 +15,10 @@ VERDICTS = [
 ]
 CHUNK = 10        # Slack allows 10 options per checkboxes block
 MAX_SELECTABLE = 40
+
+
+def _inbox(rows: list[dict]) -> list[dict]:
+    return [r for r in rows if (r.get("status") or "").lower() == "inbox"]
 
 
 def _selectable(rows: list[dict], now: datetime) -> list[dict]:
@@ -49,8 +54,9 @@ def _sections(text: str, limit: int = SECTION_LIMIT) -> list[dict]:
 
 
 def list_blocks(rows: list[dict], now: datetime,
-                list_url: str | None = None) -> list[dict]:
-    blocks = _sections(format_list(rows, now))
+                list_url: str | None = None,
+                sent: list[dict] | None = None) -> list[dict]:
+    blocks = _sections(format_list(rows, now, sent=sent))
     selectable = _selectable(rows, now)
     elements = []
     if list_url:
@@ -64,6 +70,13 @@ def list_blocks(rows: list[dict], now: datetime,
             "text": {"type": "plain_text",
                      "text": f"Triage & update ({len(selectable)})"},
             "style": "primary",
+        })
+    inbox = _inbox(rows)
+    if inbox:
+        elements.append({
+            "type": "button", "action_id": "inbox_clear_open",
+            "text": {"type": "plain_text",
+                     "text": f"Clear Inbox ({len(inbox)})"},
         })
     if elements:
         blocks.append({"type": "actions", "elements": elements})
@@ -283,3 +296,72 @@ def apply_triage(rows: list[dict], ids: list[str], verdict: str,
             row.pop("stalled_since", None)
             row.pop("stalled_reason", None)
     return rows, changed
+
+
+INBOX_PAGE = 10
+
+
+def inbox_clear_modal(rows: list[dict],
+                      page_ids: list[str] | None = None) -> dict:
+    """Tick the false positives; everything else on the page becomes a task."""
+    inbox = _inbox(rows)
+    page_ids = list(page_ids or [r.get("id") for r in inbox[:INBOX_PAGE]])
+    by_id = {r.get("id"): r for r in inbox}
+    page = [by_id[i] for i in page_ids if i in by_id]
+    options = [{
+        "text": {"type": "mrkdwn",
+                 "text": f"[{r.get('id', '')[:6]}] {_title(r)[:70]}"},
+        "value": r.get("id", ""),
+    } for r in page]
+    blocks: list[dict] = [{
+        "type": "section",
+        "text": {"type": "mrkdwn",
+                 "text": "Tick the ones that are *NOT* tasks. Everything "
+                         "else on this page is added to your list."},
+    }]
+    if options:
+        blocks.append({
+            "type": "input",
+            "block_id": "not_tasks",
+            "label": {"type": "plain_text", "text": "Not a task"},
+            "element": {"type": "checkboxes", "action_id": "not_tasks",
+                        "options": options},
+            "optional": True,
+        })
+    remaining = max(0, len(inbox) - len(page))
+    if remaining:
+        blocks.append({"type": "context", "elements": [{
+            "type": "mrkdwn", "text": f"{remaining} more after this page"}]})
+    return {
+        "type": "modal",
+        "callback_id": "inbox_clear_apply",
+        "title": {"type": "plain_text", "text": "Clear Inbox"},
+        "submit": {"type": "plain_text", "text": "Apply"},
+        "close": {"type": "plain_text", "text": "Cancel"},
+        "private_metadata": json.dumps(list(page_ids)),
+        "blocks": blocks,
+    }
+
+
+def apply_inbox_page(rows: list[dict], page_ids: list[str],
+                     ticked: list[str], now: datetime
+                     ) -> tuple[list[dict], int, int, list[str]]:
+    """Apply one page: ticked rows are not tasks, the rest become tasks."""
+    page = [i for i in page_ids if i]
+    ticked_set = {i for i in ticked if i in page}
+    keep = [i for i in page if i not in ticked_set]
+    rows, added = apply_triage(rows, keep, "open", now)
+    rows, dropped = apply_triage(rows, list(ticked_set), "dropped", now)
+    return rows, added, dropped, [r.get("id") for r in _inbox(rows)][:INBOX_PAGE]
+
+
+def inbox_done_modal(added: int, dropped: int) -> dict:
+    return {
+        "type": "modal",
+        "title": {"type": "plain_text", "text": "Inbox cleared"},
+        "close": {"type": "plain_text", "text": "Done"},
+        "blocks": [{"type": "section", "text": {
+            "type": "mrkdwn",
+            "text": f"Added *{added}* to your list, marked *{dropped}* "
+                    "not a task."}}],
+    }

@@ -161,12 +161,20 @@ activity today are DMed, up to five at a time, each with an inline status picker
 is nudged at most three times; a status change through triage or the picker resets the
 count. Inbox rows are never nudged as stale or overdue.
 
-`list` is grouped as In progress / Blocked / Overdue / Due today / This week / Later /
-No date (newest first), followed by Inbox and Notes, up to 40 rows. The reply carries a **Triage & update** button that opens a
-modal: select rows (checkboxes chunked ten per Slack block, at most forty selectable),
-choose one status, apply once. **Select all** / **Clear** rebuild the modal with every
-row ticked or none; Slack has no shift-select. Long lists split across section
-blocks on line boundaries so no link is cut at Slack's 3000-char limit.
+`list` is split into My reminders, Reminders I sent, My tasks, Tagged by others,
+Inbox and Notes, up to 40 numbered rows. Inside each section the due buckets keep
+the old order (In progress / Blocked / Overdue / Due today / This week / Later /
+No date). Numbering stays global and matches the order every command uses.
+**Triage & update** opens a modal: select rows (checkboxes chunked ten per Slack
+block), choose one status, apply once; **Select all** / **Clear** rebuild it.
+**Clear Inbox (N)** opens a modal of ten inbox rows: tick the ones that are NOT
+tasks, everything else is added, and submitting advances to the next page. New
+items still arrive as per-item **Add to list** / **Not a task** DMs. Long lists
+split on line boundaries so no link is cut at Slack's 3000-char limit.
+
+A row captured from a Slack tag carries the asker's Slack id. When the row is
+marked done by someone else, the asker gets one DM acknowledgement. Rows closed
+before the id was captured, and email/Jira rows, never produce an ack.
 
 ## Bot commands
 

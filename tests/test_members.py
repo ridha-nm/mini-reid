@@ -69,3 +69,26 @@ def test_member_refresh_keeps_the_auto_capture_decision(tmp_path, monkeypatch):
     assert [r["capture"] for r in out] == ["auto"]
     assert [r["status"] for r in out] == ["open"]
     assert load(profile["ledger"])[0]["status"] == "open"
+
+
+def test_done_ack_dms_the_asker_once(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    from mini_reid import members
+    from mini_reid.ledger import load, save
+
+    p = tmp_path / "ledger.json"
+    save(str(p), [
+        {"id": "a", "what": "Review the deck", "status": "done",
+         "from_user": "UASKER"},
+        {"id": "b", "what": "My own task", "status": "done",
+         "from_user": "UOWNER"},
+    ])
+    sent = []
+    monkeypatch.setattr(members, "send_dm_to",
+                        lambda env, uid, text: sent.append((uid, text)))
+    now = datetime(2026, 11, 6, 10, 0, tzinfo=timezone(timedelta(hours=8)))
+    assert members.ack_done({}, {}, "UOWNER", str(p), now) == 1
+    assert sent[0][0] == "UASKER" and "Review the deck" in sent[0][1]
+    assert load(str(p))[0]["done_ack_sent"]
+    assert members.ack_done({}, {}, "UOWNER", str(p), now) == 0

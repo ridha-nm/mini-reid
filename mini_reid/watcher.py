@@ -79,6 +79,7 @@ def triage_rows(fresh: list[dict], rewritten: list[dict]) -> list[dict]:
             out.append(dict(better, status=status,
                             capture=row.get("capture", "inbox"),
                             capture_why=row.get("capture_why", ""),
+                            from_user=row.get("from_user") or "",
                             client=row.get("client"),
                             asker=row.get("asker") or better.get("asker")))
         else:
@@ -667,6 +668,16 @@ def main() -> int:
             print(f"[{now:%H:%M:%S}] members checked: {handled}", flush=True)
     except Exception as ex:  # noqa: BLE001 - member work must not stop the owner
         print(f"[{now:%H:%M:%S}] member cycle: {type(ex).__name__}: {ex}", flush=True)
+    try:
+        from .members import ack_done
+        from .profiles import load as load_profiles
+
+        acked = ack_done(env, load_profiles(), owner, ledger_path, now)
+        if acked:
+            print(f"[{now:%H:%M:%S}] done acks sent: {acked}", flush=True)
+    except Exception as ex:  # noqa: BLE001 - ack must not stop capture
+        print(f"[{now:%H:%M:%S}] done ack: {type(ex).__name__}: {ex}",
+              flush=True)
     print(f"[{now:%H:%M:%S}] checked {len(items)} items, {len(fresh)} new", flush=True)
     if errors:
         print(f"[{now:%H:%M:%S}] source errors: {errors}", flush=True)

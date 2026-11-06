@@ -2719,11 +2719,13 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         blocks = None
         if action == "list" and (user == owner or member):
             try:
+                from .notify import sent_reminders
                 from .slack_lists import list_url
                 from .triage_ui import list_blocks
 
                 blocks = list_blocks(load(user_ledger), datetime.now(MYT),
-                                     list_url(env, user))
+                                     list_url(env, user),
+                                     sent=sent_reminders(user))
             except Exception as ex:  # noqa: BLE001 - plain text still works
                 print(f"  list blocks failed: {type(ex).__name__}", flush=True)
         if action == "help" and (user == owner or member):
@@ -2820,12 +2822,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 return
             route = slash_route(text)
             if route == "list":
+                from .notify import sent_reminders
                 from .slack_lists import list_url
                 from .triage_ui import list_blocks
 
                 now = datetime.now(MYT)
                 respond("Your list",
-                        list_blocks(load(target), now, list_url(env, user)))
+                        list_blocks(load(target), now, list_url(env, user),
+                                    sent=sent_reminders(user)))
                 return
             if route == "help":
                 respond(HELP)
@@ -2924,6 +2928,44 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                         text=f"Meeting proposal: {pending['topic']}",
                         blocks=slot_blocks(token, pending["topic"], people,
                                            slots, busy))
+                return
+            if view.get("callback_id") == "inbox_clear_apply":
+                from .triage_ui import (apply_inbox_page, inbox_clear_modal,
+                                        inbox_done_modal)
+
+                clicker = (payload.get("user") or {}).get("id") or ""
+                target = ledger_for_viewer(clicker)
+                if not target:
+                    return
+                try:
+                    page_ids = json.loads(view.get("private_metadata") or "[]")
+                except ValueError:
+                    page_ids = []
+                values = (view.get("state") or {}).get("values") or {}
+                chosen = ((values.get("not_tasks") or {})
+                          .get("not_tasks") or {}).get("selected_options") or []
+                ticked = [o.get("value") for o in chosen if o.get("value")]
+                rows, added, dropped, remaining = apply_inbox_page(
+                    load(target), page_ids, ticked, datetime.now(MYT))
+                save(target, rows)
+                view_id = view.get("id") or ""
+                try:
+                    if remaining:
+                        web.views_update(
+                            view_id=view_id,
+                            view=inbox_clear_modal(rows, remaining))
+                    else:
+                        web.views_update(view_id=view_id,
+                                         view=inbox_done_modal(added, dropped))
+                except Exception as ex:  # noqa: BLE001 - the ledger is saved
+                    print(f"  inbox modal update failed: "
+                          f"{type(ex).__name__}: {ex}", flush=True)
+                    try:
+                        send_dm_to(env, clicker,
+                                   f"Inbox: added {added}, marked {dropped} "
+                                   "not a task.")
+                    except Exception:  # noqa: BLE001 - best effort
+                        pass
                 return
             if view.get("callback_id") == "triage_apply":
                 from .triage_ui import apply_triage
@@ -3127,10 +3169,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                         continue
                     rows = load(target)
                     now = datetime.now(MYT)
+                    from .notify import sent_reminders
+
+                    sent = sent_reminders(clicker)
                     try:
                         web.chat_postMessage(
-                            channel=channel, text=format_list(rows, now),
-                            blocks=list_blocks(rows, now))
+                            channel=channel,
+                            text=format_list(rows, now, sent=sent),
+                            blocks=list_blocks(rows, now, sent=sent))
                     except Exception as ex:  # noqa: BLE001 - user can retry
                         print(f"  help list failed: "
                               f"{type(ex).__name__}: {ex}", flush=True)
@@ -3156,6 +3202,21 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     except Exception as ex:  # noqa: BLE001 - user can retry
                         print(f"  triage select failed: "
                               f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
+                if action_id == "inbox_clear_open":
+                    trigger = payload.get("trigger_id") or ""
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target = ledger_for_viewer(clicker)
+                    if not target:
+                        continue
+                    try:
+                        from .triage_ui import inbox_clear_modal
+
+                        web.views_open(trigger_id=trigger,
+                                       view=inbox_clear_modal(load(target)))
+                    except Exception as ex:  # noqa: BLE001 - user can retry
+                        print(f"  inbox modal failed: {type(ex).__name__}: {ex}",
+                              flush=True)
                     continue
                 if action_id == "triage_open":
                     trigger = payload.get("trigger_id") or ""

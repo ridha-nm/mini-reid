@@ -140,6 +140,7 @@ def slack_mentions(env: dict, user: str, profile: dict, days: int,
                 "channel": name,
                 "channel_id": cid,
                 "author": slack_user_name(env["SLACK_BOT_TOKEN"], author),
+                "from_user": author,
                 "ts": datetime.fromtimestamp(ts, MYT).isoformat(),
                 "text": text.strip(),
                 "link": f"https://{team}.slack.com/archives/{cid}/"
@@ -308,3 +309,35 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def ack_done(env: dict, profiles: dict[str, dict], owner: str,
+             owner_ledger: str, now: datetime) -> int:
+    """DM the asker when a task they tagged someone in is marked done."""
+    targets = [(owner, "Ridha", owner_ledger)]
+    targets += [(uid, p.get("name") or uid,
+                 p.get("ledger") or f"data/{uid}/ledger.json")
+                for uid, p in profiles.items()]
+    sent = 0
+    for uid, name, path in targets:
+        if not Path(path).exists():
+            continue
+        rows = load(path)
+        changed = False
+        for row in rows:
+            asker = row.get("from_user") or ""
+            if (row.get("status") != "done" or not asker or asker == uid
+                    or row.get("done_ack_sent")):
+                continue
+            try:
+                send_dm_to(env, asker,
+                           f"✅ {name} marked done: "
+                           f"{(row.get('what') or '')[:120]}")
+            except Exception:  # noqa: BLE001 - retry on the next cycle
+                continue
+            row["done_ack_sent"] = now.isoformat()
+            changed = True
+            sent += 1
+        if changed:
+            save(path, rows)
+    return sent

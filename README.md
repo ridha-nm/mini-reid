@@ -34,10 +34,12 @@ Gmail, Jira and Google Calendar.
   `banter on/off/status` controls sassy replies; only tagged abuse triggers one.
   Untagged messages are always ignored. Banter is allowed only in `#ee-leads-only`
   and `#probies`.
-  `list` prints a stable short id per row, grouped by status and due date with
-  relative due labels (`3d overdue`, `today`, `in 2d`), plus an Inbox section for
-  items awaiting confirmation, then Notes; its **Triage & update** button lets you
-  set a status on several rows at once, with **Select all** / **Clear**. `185045` or `id:185045` works in every command;
+  `list` prints a stable short id per row, split into My reminders, Reminders I
+  sent, My tasks, Tagged by others, Inbox and Notes; priority and relative due
+  labels (`3d overdue`, `today`, `in 2d`) still show. **Triage & update** sets a
+  status on selected rows; **Clear Inbox (N)** opens 10 pending rows, where you
+  tick the ones that are NOT tasks and add the rest in one pass. When someone
+  marks a task you tagged them in as done, you get one DM acknowledgement. `185045` or `id:185045` works in every command;
   `done`/`not` also take bulk refs (`done 7, 9`) or a pasted list, one bullet per
   line; the `[abc123]` ids in the paste pick the exact rows, and titles are
   matched as a fallback. `not:` also matches notes.

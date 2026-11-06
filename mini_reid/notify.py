@@ -109,3 +109,19 @@ def dm_reply_count(env: dict, user_id: str, since_ts: float) -> int:
         return 0
     return sum(1 for m in d.get("messages") or []
                if m.get("user") == user_id and not m.get("subtype"))
+
+
+def sent_reminders(user_id: str, limit: int = 3,
+                   path: str = REMINDER_LOG) -> list[dict]:
+    """Reminders this person scheduled for someone else, newest first."""
+    try:
+        rows = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return []
+    if not isinstance(rows, list):
+        return []
+    mine = [r for r in rows
+            if r.get("asked_by") == user_id and r.get("to") != user_id
+            and r.get("status") in {"scheduled", "sent"}]
+    mine.sort(key=lambda r: r.get("post_at") or "", reverse=True)
+    return mine[:limit]

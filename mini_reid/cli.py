@@ -145,6 +145,7 @@ def main(argv: list[str] | None = None) -> int:
                 # Client comes from rules, never from the model. It invents "ioi".
                 # The rule row also owns the capture decision; the model only renames.
                 better = dict(better, client=r.get("client"), asker=r.get("asker"),
+                              from_user=r.get("from_user") or "",
                               capture=r.get("capture", "inbox"),
                               capture_why=r.get("capture_why", ""))
             merged.append(better or r)

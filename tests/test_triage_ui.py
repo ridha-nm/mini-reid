@@ -196,3 +196,38 @@ def test_apply_triage_completed_sets_closed_fields():
     assert out[0]["status"] == "done"
     assert out[0]["closed_at"] == NOW.isoformat()
     assert out[0]["last_activity"] == NOW.isoformat()
+
+
+def test_inbox_clear_modal_ticks_the_false_positives():
+    import json as _json
+
+    from mini_reid.triage_ui import inbox_clear_modal
+
+    rows = [_row(f"id{i}", f"Item {i}", status="inbox") for i in range(12)]
+    view = inbox_clear_modal(rows)
+    text = _json.dumps(view)
+    assert "NOT" in text
+    assert len(_json.loads(view["private_metadata"])) == 10
+    assert "2 more after this page" in text
+
+
+def test_apply_inbox_page_adds_unticked_and_drops_ticked():
+    from mini_reid.triage_ui import apply_inbox_page
+
+    rows = [_row("a", "Keep A", status="inbox"),
+            _row("b", "Junk B", status="inbox"),
+            _row("c", "Keep C", status="inbox")]
+    rows, added, dropped, remaining = apply_inbox_page(
+        rows, ["a", "b", "c"], ["b"], NOW)
+    status = {r["id"]: r["status"] for r in rows}
+    assert status == {"a": "open", "b": "dropped", "c": "open"}
+    assert (added, dropped, remaining) == (2, 1, [])
+
+
+def test_list_offers_clear_inbox_button_with_count():
+    blocks = list_blocks([_row("a", "Real task"),
+                          _row("b", "Maybe", status="inbox"),
+                          _row("c", "Maybe too", status="inbox")], NOW)
+    button = [e for block in blocks if block.get("type") == "actions"
+              for e in block["elements"] if e.get("action_id") == "inbox_clear_open"]
+    assert button and "2" in button[0]["text"]["text"]

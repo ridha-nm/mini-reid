@@ -2,6 +2,19 @@
 
 Append-only. Newest first.
 
+## 2026-11-06 (list sections, Clear Inbox, done acks)
+
+- `list` is split into **My reminders**, **Reminders I sent**, **My tasks**,
+  **Tagged by others**, **Inbox** and **Notes**. Numbering stays global and
+  follows the same order commands use.
+- **Clear Inbox (N)** opens a modal of 10 pending rows. Tick the ones that are
+  NOT tasks; everything else on the page is added. Submitting advances to the
+  next page automatically. New items still arrive as per-item DMs with
+  **Add to list** / **Not a task**.
+- When someone marks a task you tagged them in as done, you get one DM:
+  `✅ <name> marked done: <title>`. Slack-tagged rows only, once per row.
+- 382 tests passing.
+
 ## 2026-11-06 (unfurl removed)
 
 - Removed the Gmail/Jira link cards. Not used in practice, and it rendered a
