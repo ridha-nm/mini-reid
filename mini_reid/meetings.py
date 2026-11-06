@@ -269,9 +269,11 @@ def strip_duration(text: str) -> str:
 
 
 def delete_event(env: dict, event_id: str, token_path: str | None = None,
-                 client_path: str | None = None) -> None:
+                 client_path: str | None = None,
+                 calendar_id: str = "primary") -> None:
     access = gmail_access(env, token_path, client_path)
-    url = ("https://www.googleapis.com/calendar/v3/calendars/primary/events/"
+    url = ("https://www.googleapis.com/calendar/v3/calendars/"
+           + urllib.parse.quote(calendar_id, safe="") + "/events/"
            + urllib.parse.quote(event_id, safe="") + "?"
            + urllib.parse.urlencode({"sendUpdates": "all"}))
     req = urllib.request.Request(
@@ -363,20 +365,39 @@ def cancel_by_reminder(env: dict, now: datetime, note: str = "",
 def upcoming_events(env: dict, now: datetime, days: int = 14,
                     query: str = "", token_path: str | None = None,
                     client_path: str | None = None) -> list[dict]:
-    """Primary-calendar events in the next `days`, optionally name-filtered."""
+    """Events in the next `days` across every readable calendar."""
+    from .calendar import _calendar_list
     from .sources import _get_json
 
     access = gmail_access(env, token_path, client_path)
     start = now.astimezone(timezone.utc).isoformat()
     end = (now + timedelta(days=days)).astimezone(timezone.utc).isoformat()
-    url = ("https://www.googleapis.com/calendar/v3/calendars/primary/events?"
-           + urllib.parse.urlencode({
-               "timeMin": start, "timeMax": end, "singleEvents": "true",
-               "orderBy": "startTime", "maxResults": 100, "q": query or "",
-               "fields": "items(id,summary,start,status)"}))
-    data = _get_json(url, {"Authorization": f"Bearer {access}"})
-    return [e for e in data.get("items") or []
-            if e.get("status") != "cancelled"]
+    out: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for cal in _calendar_list(access):
+        cid = cal.get("id")
+        if not cid:
+            continue
+        url = ("https://www.googleapis.com/calendar/v3/calendars/"
+               + urllib.parse.quote(cid, safe="") + "/events?"
+               + urllib.parse.urlencode({
+                   "timeMin": start, "timeMax": end, "singleEvents": "true",
+                   "orderBy": "startTime", "maxResults": 100,
+                   "fields": "items(id,summary,start,status)"}))
+        try:
+            data = _get_json(url, {"Authorization": f"Bearer {access}"})
+        except Exception:  # noqa: BLE001 - one bad calendar must not hide the rest
+            continue
+        for event in data.get("items") or []:
+            if event.get("status") == "cancelled":
+                continue
+            key = (cid, event.get("id") or "")
+            if key in seen:
+                continue
+            seen.add(key)
+            event["_calendar"] = cid
+            out.append(event)
+    return out
 
 
 def cancel_by_title(env: dict, query: str, now: datetime, days: int = 14,
@@ -401,6 +422,7 @@ def cancel_by_title(env: dict, query: str, now: datetime, days: int = 14,
 
     event = min(matches, key=start_of)
     start = start_of(event)
-    delete_event(env, event.get("id") or "", token_path, client_path)
+    delete_event(env, event.get("id") or "", token_path, client_path,
+                 calendar_id=event.get("_calendar") or "primary")
     return (f"Cancelled: {event.get('summary') or query} · "
             f"{start:%a %d %b %H:%M}")

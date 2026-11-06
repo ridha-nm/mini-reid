@@ -497,6 +497,23 @@ def parse_remind(body: str, now) -> tuple[dict | None, str]:
     return {"remind_at": at, "due": date_iso, "what": clean or body}, clean
 
 
+def meeting_cancel_query(text: str) -> str | None:
+    """`cancel`, `cancel: <name>`, `Meeting: cancel <name>`.
+
+    Returns the meeting-name query, "" for the nearest meeting, or None when
+    the text is not a meeting-cancel request.
+    """
+    raw = (text or "").strip()
+    m = re.match(
+        r"^(?:meeting\s*:\s*)?cancel\s*:?\s+"
+        r"(?:the\s+)?(?:meeting\s+)?(.+)$", raw, re.I)
+    if m:
+        return m.group(1).strip(" ,-")
+    if re.fullmatch(r"(?:meeting\s*:\s*)?cancel", raw, re.I):
+        return ""
+    return None
+
+
 def parse_multi_remind(body: str, users: dict[str, str],
                        now: "datetime") -> list[tuple[str, dict]] | None:
     """Two forms: one shared text for several people, or one line per person.
@@ -2736,30 +2753,28 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
 
         if (user == owner or member) and channel.startswith("D"):
-            if action == "drop" and user == owner:
-                query = re.sub(r"^(?:the\s+)?meeting\s+", "", body.strip(),
-                               flags=re.I)
-                try:
-                    from .meetings import cancel_by_title
+            raw_text = LEADING_MENTION.sub("", text or "").strip()
+            query = meeting_cancel_query(raw_text)
+            if query is not None and user == owner:
+                from .meetings import (cancel_by_reminder, cancel_by_title,
+                                       cancel_nearest)
 
-                    done = cancel_by_title(env, query, datetime.now(MYT))
-                except Exception as ex:  # noqa: BLE001 - report, keep drop path
-                    done = (f"Could not cancel that meeting: "
-                            f"{type(ex).__name__}: {ex}")
-                if done:
-                    say(done)
-                    _mark(ts)
-                    return
-            cancel = re.match(r"^cancel\b(.*)$", (body or "").strip(), re.I)
-            if cancel and user == owner:
-                from .meetings import cancel_by_reminder, cancel_nearest
-
-                note = cancel.group(1).strip(" ,:-")
+                now = datetime.now(MYT)
                 state_file = ("meeting_reminders.json" if user == owner
                               else f"data/{user}/meeting_reminders.json")
-                done = (cancel_nearest(env, datetime.now(MYT), note)
-                        or cancel_by_reminder(env, datetime.now(MYT), note,
-                                              state_file))
+                if query:
+                    try:
+                        done = cancel_by_title(env, query, now)
+                    except Exception as ex:  # noqa: BLE001 - report it
+                        done = (f"Could not cancel that meeting: "
+                                f"{type(ex).__name__}: {ex}")
+                    if not done and (action == "note"
+                                     or raw_text.lower().startswith("meeting")):
+                        done = f"No upcoming meeting matches “{query}”."
+                else:
+                    done = (cancel_nearest(env, now)
+                            or cancel_by_reminder(env, now, "", state_file)
+                            or "No meeting in the next few hours to cancel.")
                 if done:
                     say(done)
                     _mark(ts)

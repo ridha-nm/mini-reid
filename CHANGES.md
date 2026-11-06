@@ -15,9 +15,12 @@ Append-only. Newest first.
   Meetings created before `created_meetings.json` existed fall back to the
   reminder state, so older calendar meetings cancel too.
 - `cancel: <meeting name>` in a DM cancels the nearest upcoming calendar event
-  whose title contains that text (next 14 days). If nothing matches, it falls
-  back to the normal task `drop:` behaviour.
-- 396 tests passing.
+  whose title contains that text (next 14 days, across every readable
+  calendar). `Meeting: cancel <name>`, `cancel meeting <name>` and bare `cancel`
+  work too; a bare cancel uses the nearest reminder. No match falls back to the
+  normal task `drop:` behaviour only for a plain `cancel:`, and answers
+  "No upcoming meeting matches" for a `Meeting:` request instead of noting it.
+- 397 tests passing.
 
 ## 2026-11-06 (attendee reminders, reschedule with note)
 

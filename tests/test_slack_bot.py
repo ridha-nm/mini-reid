@@ -1339,3 +1339,14 @@ def test_single_reminder_is_not_multi():
 
     assert parse_multi_remind("@Raj to send the deck at 5pm",
                               {"raj": "UR"}, NOW) is None
+
+
+def test_meeting_cancel_forms():
+    from mini_reid.slack_bot import meeting_cancel_query
+
+    assert meeting_cancel_query("cancel: BD Command Centre") == "BD Command Centre"
+    assert meeting_cancel_query("Meeting: cancel BD Command Centre") == (
+        "BD Command Centre")
+    assert meeting_cancel_query("cancel meeting BD") == "BD"
+    assert meeting_cancel_query("cancel") == ""
+    assert meeting_cancel_query("drop: deck") is None
