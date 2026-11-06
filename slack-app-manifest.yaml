@@ -13,9 +13,6 @@ features:
       callback_id: add_to_mini_reid
       type: message
       description: Add this message as a task
-  unfurl_domains:
-    - mail.google.com
-    - pantas.atlassian.net
   app_home:
     home_tab_enabled: true
     messages_tab_enabled: true
@@ -63,8 +60,6 @@ oauth_config:
       - chat:write
       - dnd:read
       - files:read
-      - links:write
-      - links:read
       - channels:history
       - channels:read
       - groups:history
@@ -99,7 +94,6 @@ settings:
       - reaction_added
       - app_home_opened
       - file_shared
-      - link_shared
   interactivity:
     is_enabled: true
   org_deploy_enabled: false

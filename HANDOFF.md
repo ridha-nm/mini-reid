@@ -100,15 +100,10 @@ kept in `capture_why`. Everything else stays `inbox` with **Add to list** /
 titles, existing rows are not migrated, and members run the same rules on their
 own ledger.
 
-2026-11-05 link unfurls: a tracked Gmail or Jira link posted in Slack shows a
-task card with status, due date and **Mark done**. Lookup spans every ledger;
-the button closes only the clicker's own task. Untracked Jira links show
-"not on your list" in DMs and nothing in channels. Gmail matches only the exact
-stored `#all/...` form; browser-copied `#label/.../Qgrc...` links cannot be
-matched because the Gmail API rejects that id form. Bare-link messages are never
-captured as notes. App has `links:read`/`links:write`, bot event `link_shared`
-and unfurl domains `mail.google.com` + `pantas.atlassian.net`; reinstall after
-changing them.
+2026-11-06 unfurls removed: the link cards were never used in practice and the
+digest rendered a card per task link. The Slack scopes, event and domains are
+gone from the manifest; reinstall the app so Slack drops them. Bare pasted
+links still never become notes.
 
 ## Running now
 
@@ -329,9 +324,6 @@ kept or a real ask was missed.
   default 300) replays commands and questions missed while asleep or disconnected.
   Vercel is not a fit: Socket Mode, local ledger files, the 2-minute watcher and
   local Ollama need a daemon, and Hobby forbids commercial use.
-- Link unfurls match the exact stored source link. Gmail browser-copied
-  `#label/.../Qgrc...` links cannot map to the stored `#all/...` rows; the Gmail
-  API rejects that id form.
 - Auto-capture is deliberately narrow. Imperative-only channel mentions, undated
   DMs without an explicit ask, and shared-alias mail without a direct To stay in
   Inbox. A rare phrasing such as "please note the deck needs review" can still

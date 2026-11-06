@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-06 (unfurl removed)
+
+- Removed the Gmail/Jira link cards. Not used in practice, and it rendered a
+  card per task link in the digest. Deleted the handler, module and tests;
+  removed `links:read`/`links:write`, the `link_shared` event and the unfurl
+  domains from the manifest. Reinstall the app so Slack drops them.
+- Bare pasted links still never become notes.
+
 ## 2026-11-06 (spam fixes)
 
 - The daily 06:00 model job no longer adds rows the rules rejected. The model

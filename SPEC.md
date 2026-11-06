@@ -302,10 +302,9 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
 ### Slack app
 
 Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
-`message.groups`, `reaction_added`, `app_home_opened`, `file_shared`,
-`link_shared`. Bot scopes include `files:read`, `dnd:read`,
-`lists:read`/`lists:write` and `links:read`/`links:write`; unfurl domains are
-`mail.google.com` and `pantas.atlassian.net`. Every Slack message id is claimed once in `bot_state.json` before a
+`message.groups`, `reaction_added`, `app_home_opened`, `file_shared`. Bot
+scopes include `files:read`, `dnd:read` and `lists:read`/`lists:write`. Every
+Slack message id is claimed once in `bot_state.json` before a
 reply, so Slack delivering both `app_mention` and `message.channels` (or a restart
 replaying an event) cannot produce a second response. An edit releases the claim once so
 the corrected text can run. Channel messages that do not mention the bot are ignored. An edit that
@@ -314,13 +313,6 @@ still mentions the bot gets a ✅; if Ridha changed the text, the command is re-
 replayed. Replies to Ridha's own commands go to his DM, never to the channel, so a
 command does not ping everyone. The channel only gets the ➕ / 📝 / ⏰ reaction where
 applicable.
-
-A tracked Gmail or Jira link posted in Slack unfurls into a task card with
-status, due date and **Mark done**. Lookup spans the owner's and every member's
-ledger; the button only closes the clicker's own task. A Jira link not on any
-list gets a "not on your list" card in DMs and no card in channels. Gmail
-matches only the exact stored form (`#all/...`); a browser-copied
-`#label/...` link cannot be matched.
 
 Slack sends no events from a DM the bot is not in, so the watcher polls Ridha's recently
 active DMs with the user token every two minutes. Only owner-authored messages that

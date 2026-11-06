@@ -62,10 +62,6 @@ Gmail, Jira and Google Calendar.
   Silly requests work too (`give @Raj a hug`). Profanity gets a defensive
   reply; slurs get 🚩 on the message and a private DM. Accepted commands are
   logged locally and feed the task-vs-chatter classifier — no external training.
-- **Link cards**: a Gmail or Pantas Jira link posted in Slack unfurls into a
-  Mini-Reid card with task title, status, due date and **Mark done** when the
-  link matches a row. Untracked Jira links stay quiet in channels and show
-  "not on your list" in a DM. Gmail matches only the exact stored link form.
 - **Teammates**: Ridha runs `allow: @Charanya`. The bot creates an isolated profile,
   DMs a one-time setup link, and starts capture for that member. Their commands, ledger,
   Slack mention alerts, reminders, meeting reminders and 09:15 digest stay private;
@@ -120,11 +116,10 @@ and reminders until the next cycle. The catch-up sweep replays what the bot miss
 ## Slack app
 
 Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
-`message.groups`, `reaction_added`, `app_home_opened`, `file_shared`,
-`link_shared` (manifest: `slack-app-manifest.yaml`). Bot scopes include
-`files:read`, `dnd:read`, `lists:read`/`lists:write` and
-`links:read`/`links:write`; unfurl domains are `mail.google.com` and
-`pantas.atlassian.net`. Reinstall after changing scopes, events or domains.
+`message.groups`, `reaction_added`, `app_home_opened`, `file_shared`
+(manifest: `slack-app-manifest.yaml`). Bot scopes include `files:read`,
+`dnd:read`, `lists:read`/`lists:write`. Reinstall after changing scopes or
+events.
 Interactivity is on for the reminder clarification buttons. The two message subscriptions exist so an edited
 mention can be acknowledged with ✅; every other channel message is ignored unless it
 addresses the bot. Each message id is answered once; `bot_state.json` tracks handled
