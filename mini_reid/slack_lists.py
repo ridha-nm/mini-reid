@@ -234,7 +234,7 @@ def newly_done(before: dict[str, str | None],
 
 
 def sync_user(env: dict, user: str, name: str, ledger_path: str,
-              state_path: str = STATE, limit: int = 50) -> int:
+              state_path: str = STATE, limit: int = 500) -> int:
     """Create or update Slack List rows for the most recent ledger rows."""
     cfg = ensure_list(env, user, name, state_path)
     token = env["SLACK_BOT_TOKEN"]

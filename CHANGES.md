@@ -2,6 +2,15 @@
 
 Append-only. Newest first.
 
+## 2026-11-06 (Slack List covers every task)
+
+- The Slack List mirror was capped at the 50 most recently active tasks, so
+  older open work never appeared. Raised to 500 and backfilled the owner's
+  list: 95 live tasks now mirrored.
+- Notes, reminders and Inbox items stay out of the List by design; they remain
+  in `list`, the Inbox modal and the reminder sections.
+- 398 tests passing.
+
 ## 2026-11-06 (meeting duration and cancel)
 
 - `meet:` accepts a duration: `meet: @Kasib about the deck for 45 minutes`,

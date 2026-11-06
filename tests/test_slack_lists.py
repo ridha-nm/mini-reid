@@ -147,3 +147,28 @@ def test_newly_done_only_flags_edges():
             {"id": "c", "status": "open", "what": "C"}]
     assert [r["id"] for r in newly_done(
         {"a": "open", "b": "done", "c": "open"}, rows)] == ["a"]
+
+
+def test_sync_mirrors_more_than_fifty_tasks(tmp_path, monkeypatch):
+    state = str(tmp_path / "state.json")
+    ledger = str(tmp_path / "ledger.json")
+    save(ledger, [{"id": f"i{i}", "what": f"Task {i}", "status": "open",
+                   "last_activity": "2026-11-05T10:00:00+08:00"}
+                  for i in range(60)])
+    made = []
+
+    def fake(method, token, body):
+        if method == "slackLists.create":
+            return {"ok": True, "list_id": "F1", "list_metadata": {"schema": [
+                {"key": "title", "id": "ColT"}]}}
+        if method == "slackLists.items.list":
+            return {"ok": True, "items": []}
+        if method == "slackLists.items.create":
+            made.append(body)
+            return {"ok": True, "item": {"id": f"Rec{len(made)}"}}
+        return {"ok": True}
+
+    monkeypatch.setattr(slack_lists, "_post", fake)
+    slack_lists.sync_user({"SLACK_BOT_TOKEN": "x"}, "U1", "Ridha",
+                          ledger, state)
+    assert len(made) == 60
