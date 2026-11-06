@@ -3292,6 +3292,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
         event = (req.payload or {}).get("event") or {}
         if event.get("type") == "link_shared":
+            if event.get("is_sharing_user_bot"):
+                return  # never unfurl our own digest and alerts
             from .unfurl import find_task, task_blocks, unknown_blocks
 
             people = load_profiles()

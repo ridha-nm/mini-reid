@@ -67,10 +67,9 @@ def triage_rows(fresh: list[dict], rewritten: list[dict]) -> list[dict]:
     row waits in the inbox for a person. A row the model rewrote keeps its
     wording. A row the model omitted, rejected or failed on keeps the rule
     text. Nothing is dropped here: confirming or dismissing an inbox row is the
-    person's click, not the model's call — and the model never moves a row.
+    person's click, not the model's call — and the model never adds a row.
     """
     model_by_nid = {r["native_id"]: r for r in rewritten if r.get("native_id")}
-    seen = {r.get("native_id") for r in fresh}
     out: list[dict] = []
     for row in fresh:
         nid = row.get("native_id")
@@ -84,8 +83,6 @@ def triage_rows(fresh: list[dict], rewritten: list[dict]) -> list[dict]:
                             asker=row.get("asker") or better.get("asker")))
         else:
             out.append(dict(row, status=status))
-    out.extend(dict(r, status="inbox") for nid, r in model_by_nid.items()
-               if nid not in seen)
     return out
 
 

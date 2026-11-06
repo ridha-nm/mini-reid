@@ -51,6 +51,13 @@ def test_triage_keeps_rows_the_model_did_not_rewrite():
     assert out[0]["status"] == "inbox"
 
 
+def test_triage_drops_model_rows_the_rules_rejected():
+    from mini_reid.watcher import triage_rows
+
+    model_only = [dict(_rule("chat1"), what="Respond to Kasib")]
+    assert triage_rows([], model_only) == []
+
+
 def test_triage_keeps_the_rule_client_and_asker():
     from mini_reid.watcher import triage_rows
 

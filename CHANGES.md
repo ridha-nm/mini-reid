@@ -2,6 +2,18 @@
 
 Append-only. Newest first.
 
+## 2026-11-06 (spam fixes)
+
+- The daily 06:00 model job no longer adds rows the rules rejected. The model
+  only renames rule-captured rows in both the watcher and the CLI, so chatter
+  DMs and boilerplate email can no longer become open tasks.
+- The bot no longer unfurls links inside its own messages
+  (`is_sharing_user_bot`), so a digest no longer turns into a wall of
+  Mini-Reid task cards.
+- Removed 41 model-invented Slack DM rows from the ledger; backup at
+  `ledger.json.bak-20261106-spam`.
+- 379 tests passing.
+
 ## 2026-11-05 (auto-capture)
 
 - A new candidate that matches an auto rule now lands already open

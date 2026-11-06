@@ -148,7 +148,8 @@ def main(argv: list[str] | None = None) -> int:
                               capture=r.get("capture", "inbox"),
                               capture_why=r.get("capture_why", ""))
             merged.append(better or r)
-        incoming += merged + list(by_nid.values())
+        # The model never introduces a row the rules rejected.
+        incoming += merged
     else:
         incoming += rule_rows
 
