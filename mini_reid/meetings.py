@@ -358,3 +358,49 @@ def cancel_by_reminder(env: dict, now: datetime, note: str = "",
     _Path(state_path).write_text(json.dumps(state))
     return (f"Cancelled: {rec.get('title', '')} · {start:%H:%M}"
             + (f" — {note}" if note else ""))
+
+
+def upcoming_events(env: dict, now: datetime, days: int = 14,
+                    query: str = "", token_path: str | None = None,
+                    client_path: str | None = None) -> list[dict]:
+    """Primary-calendar events in the next `days`, optionally name-filtered."""
+    from .sources import _get_json
+
+    access = gmail_access(env, token_path, client_path)
+    start = now.astimezone(timezone.utc).isoformat()
+    end = (now + timedelta(days=days)).astimezone(timezone.utc).isoformat()
+    url = ("https://www.googleapis.com/calendar/v3/calendars/primary/events?"
+           + urllib.parse.urlencode({
+               "timeMin": start, "timeMax": end, "singleEvents": "true",
+               "orderBy": "startTime", "maxResults": 100, "q": query or "",
+               "fields": "items(id,summary,start,status)"}))
+    data = _get_json(url, {"Authorization": f"Bearer {access}"})
+    return [e for e in data.get("items") or []
+            if e.get("status") != "cancelled"]
+
+
+def cancel_by_title(env: dict, query: str, now: datetime, days: int = 14,
+                    token_path: str | None = None,
+                    client_path: str | None = None) -> str | None:
+    """Cancel the nearest upcoming event whose title contains the query."""
+    q = (query or "").strip().lower()
+    if not q:
+        return None
+    matches = [e for e in upcoming_events(env, now, days, query,
+                                          token_path, client_path)
+               if q in (e.get("summary") or "").lower()]
+    if not matches:
+        return None
+
+    def start_of(event: dict) -> datetime:
+        raw = (event.get("start") or {}).get("dateTime") or ""
+        try:
+            return datetime.fromisoformat(raw)
+        except ValueError:
+            return now
+
+    event = min(matches, key=start_of)
+    start = start_of(event)
+    delete_event(env, event.get("id") or "", token_path, client_path)
+    return (f"Cancelled: {event.get('summary') or query} · "
+            f"{start:%a %d %b %H:%M}")

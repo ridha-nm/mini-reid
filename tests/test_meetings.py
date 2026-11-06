@@ -142,3 +142,25 @@ def test_edit_modal_includes_editable_duration():
     blocks = {b.get("block_id"): b for b in view["blocks"] if b.get("block_id")}
     assert blocks["duration"]["element"]["initial_value"] == "45"
     assert blocks["duration"]["label"]["text"] == "Duration (minutes)"
+
+
+def test_cancel_by_title_picks_the_nearest_match(monkeypatch):
+    from mini_reid import meetings
+
+    events = [
+        {"id": "e2", "summary": "Change Request Workflow",
+         "start": {"dateTime": (NOW + timedelta(hours=3)).isoformat()}},
+        {"id": "e1", "summary": "Change Request Workflow",
+         "start": {"dateTime": (NOW + timedelta(hours=1)).isoformat()}},
+        {"id": "e3", "summary": "Unrelated",
+         "start": {"dateTime": NOW.isoformat()}},
+    ]
+    monkeypatch.setattr(meetings, "upcoming_events",
+                        lambda env, now, *a, **k: events)
+    deleted = []
+    monkeypatch.setattr(meetings, "delete_event",
+                        lambda env, eid, *a, **k: deleted.append(eid))
+    reply = meetings.cancel_by_title({}, "change request", NOW)
+    assert deleted == ["e1"]
+    assert reply.startswith("Cancelled: Change Request Workflow")
+    assert meetings.cancel_by_title({}, "nothing like this", NOW) is None

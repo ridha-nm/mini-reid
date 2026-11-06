@@ -54,6 +54,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
         ["`meet: @Kasib about BD Command Centre`",
          "`meet: @Kasib and @Charanya about the deck` — multiple people",
          "`meet: @Kasib about the deck for 45 minutes` — any duration 15–180",
+         "`cancel: Change Request` — cancel the nearest matching meeting",
          "or just `set meeting with Kasib to discuss BD Command Centre`",
          "I propose five 30-minute slots in the next five working days",
          "Pick a slot — Google Calendar event + Meet link + invite sent"],

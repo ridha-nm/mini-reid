@@ -2736,6 +2736,20 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
 
         if (user == owner or member) and channel.startswith("D"):
+            if action == "drop" and user == owner:
+                query = re.sub(r"^(?:the\s+)?meeting\s+", "", body.strip(),
+                               flags=re.I)
+                try:
+                    from .meetings import cancel_by_title
+
+                    done = cancel_by_title(env, query, datetime.now(MYT))
+                except Exception as ex:  # noqa: BLE001 - report, keep drop path
+                    done = (f"Could not cancel that meeting: "
+                            f"{type(ex).__name__}: {ex}")
+                if done:
+                    say(done)
+                    _mark(ts)
+                    return
             cancel = re.match(r"^cancel\b(.*)$", (body or "").strip(), re.I)
             if cancel and user == owner:
                 from .meetings import cancel_by_reminder, cancel_nearest

@@ -14,7 +14,10 @@ Append-only. Newest first.
   and reminder are removed, and mapped Slack attendees get a `Cancelled` DM.
   Meetings created before `created_meetings.json` existed fall back to the
   reminder state, so older calendar meetings cancel too.
-- 395 tests passing.
+- `cancel: <meeting name>` in a DM cancels the nearest upcoming calendar event
+  whose title contains that text (next 14 days). If nothing matches, it falls
+  back to the normal task `drop:` behaviour.
+- 396 tests passing.
 
 ## 2026-11-06 (attendee reminders, reschedule with note)
 
