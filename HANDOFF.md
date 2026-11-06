@@ -108,6 +108,12 @@ links still never become notes.
 Weekly release notes live in `docs/WEEKLY-UPDATE.md` — append a dated
 capability snapshot every Friday. First entry covers week ending 2026-11-06.
 
+2026-11-06 meeting duration and cancel: `meet:` parses
+`for 45 minutes` / `for 1 hour` (15–180), strips it from the title, and uses it
+for slots and the event. The organiser can reply `cancel <note>` to the meeting
+reminder; the Google event is deleted, the stored record and reminder removed,
+and mapped Slack attendees are DMed.
+
 2026-11-06 attendee reminders and reschedule: meetings created through the bot
 are stored in `created_meetings.json` with event id and attendees. Ten minutes
 before, mapped Slack attendees get a DM with **Attending** / **Can't attend**
@@ -380,7 +386,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-390 tests passing as of 2026-11-06.
+393 tests passing as of 2026-11-06.
 ## Next, agreed
 
 1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's

@@ -221,3 +221,35 @@ def test_reschedule_moves_event_and_keeps_duration(tmp_path, monkeypatch):
     saved = json.loads(created.read_text())["e1"]
     assert saved["start"] == new_start.isoformat()
     assert dms == ["UA"]
+
+
+def test_cancel_nearest_deletes_and_notifies(tmp_path, monkeypatch):
+    import json
+    from datetime import timedelta
+
+    from mini_reid import meetings, notify
+
+    created = tmp_path / "created.json"
+    start = NOW + timedelta(minutes=20)
+    created.write_text(json.dumps({"e1": {
+        "title": "Deck review", "start": start.isoformat(),
+        "end": (start + timedelta(minutes=30)).isoformat(),
+        "attendees": [{"name": "A", "email": "a@pantas.com"}],
+        "creator": "UOWNER", "rsvps": {}, "attendee_reminded": True}}))
+    state = tmp_path / "state.json"
+    state.write_text(json.dumps({"date": "2026-11-02", "meetings": {
+        "e1": {"title": "Deck review", "status": "scheduled",
+               "start": start.isoformat()}}}))
+    deleted, dms = [], []
+    monkeypatch.setattr(meetings, "delete_event",
+                        lambda env, eid, **k: deleted.append(eid))
+    monkeypatch.setattr(meetings, "email_to_slack",
+                        lambda path="directory.json": {"a@pantas.com": "UA"})
+    monkeypatch.setattr(notify, "send_dm_to",
+                        lambda env, uid, text: dms.append((uid, text)))
+    reply = meetings.cancel_nearest({}, NOW, "client moved it", str(created),
+                                    str(state))
+    assert reply == "Cancelled: Deck review — client moved it"
+    assert deleted == ["e1"]
+    assert json.loads(created.read_text()) == {}
+    assert dms and dms[0][0] == "UA" and "Cancelled" in dms[0][1]

@@ -109,3 +109,27 @@ def test_busy_snapshot_skips_midnight_boundary_and_labels_all_day():
                datetime(2026, 11, 12, 0, 0, tzinfo=MYT))
     assert _busy_on([boundary], day) == "free"
     assert _busy_on([all_day], day) == "all day"
+
+
+def test_parse_duration_phrases():
+    from mini_reid.meetings import parse_duration, strip_duration
+
+    assert parse_duration("Change Request for 45 minutes") == 45
+    assert parse_duration("deck for 1 hour") == 60
+    assert parse_duration("deck for an hour") == 60
+    assert parse_duration("no duration") is None
+    assert strip_duration("Change Request for 45 minutes") == "Change Request"
+
+
+def test_slot_blocks_show_the_chosen_duration():
+    from datetime import datetime, timedelta
+
+    from mini_reid.meeting_ui import slot_blocks
+
+    start = datetime(2026, 11, 6, 12, 0, tzinfo=MYT)
+    slots = [{"start": start.isoformat(),
+              "end": (start + timedelta(minutes=45)).isoformat()}]
+    blocks = slot_blocks("t", "Deck", [{"name": "A", "email": "a@x"}],
+                         slots, duration=45)
+    text = str(blocks)
+    assert "45 minutes" in text

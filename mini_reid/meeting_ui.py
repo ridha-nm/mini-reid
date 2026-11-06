@@ -45,7 +45,8 @@ def _snapshot(busy: dict, attendees: list[dict], slots: list[dict]) -> str:
 
 
 def slot_blocks(token: str, topic: str, attendees: list[dict],
-                slots: list[dict], busy: dict | None = None) -> list[dict]:
+                slots: list[dict], busy: dict | None = None,
+                duration: int = SLOT_MINUTES) -> list[dict]:
     if isinstance(attendees, str):
         attendees = [{"name": attendees, "email": ""}]
     with_email = "\n".join(
@@ -57,7 +58,7 @@ def slot_blocks(token: str, topic: str, attendees: list[dict],
         {"type": "section", "fields": [
             {"type": "mrkdwn", "text": f"*Title*\n{topic}"},
             {"type": "mrkdwn", "text": f"*With*\n{with_email}"},
-            {"type": "mrkdwn", "text": f"*Duration*\n{SLOT_MINUTES} minutes"},
+            {"type": "mrkdwn", "text": f"*Duration*\n{duration} minutes"},
             {"type": "mrkdwn", "text": "*Time zone*\nMYT (Asia/Kuala_Lumpur)"},
         ]},
     ]

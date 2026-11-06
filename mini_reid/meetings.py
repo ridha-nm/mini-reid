@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import urllib.error
 import urllib.parse
@@ -242,3 +243,87 @@ def reschedule_nearest(env: dict, new_start: datetime, note: str,
             continue
     return (f"Rescheduled: {rec.get('title', '')} — "
             f"{new_start:%a %d %b %H:%M}" + (f" ({note})" if note else ""))
+
+
+DURATION_RE = re.compile(
+    r"\b(?:for\s+)?(\d{1,3})\s*(?:min|mins|minutes)\b"
+    r"|\b(?:for\s+)?(\d{1,2})\s*(?:hours?|hrs?)\b"
+    r"|\b(?:for\s+)?an?\s+hour\b", re.I)
+
+
+def parse_duration(text: str) -> int | None:
+    m = DURATION_RE.search(text or "")
+    if not m:
+        return None
+    if m.group(1):
+        minutes = int(m.group(1))
+    elif m.group(2):
+        minutes = int(m.group(2)) * 60
+    else:
+        minutes = 60
+    return max(15, min(180, minutes))
+
+
+def strip_duration(text: str) -> str:
+    return re.sub(r"\s+", " ", DURATION_RE.sub(" ", text or "")).strip(" ,-")
+
+
+def delete_event(env: dict, event_id: str, token_path: str | None = None,
+                 client_path: str | None = None) -> None:
+    access = gmail_access(env, token_path, client_path)
+    url = ("https://www.googleapis.com/calendar/v3/calendars/primary/events/"
+           + urllib.parse.quote(event_id, safe="") + "?"
+           + urllib.parse.urlencode({"sendUpdates": "all"}))
+    req = urllib.request.Request(
+        url, method="DELETE",
+        headers={"Authorization": f"Bearer {access}"})
+    with urllib.request.urlopen(req, timeout=30):
+        return None
+
+
+def cancel_nearest(env: dict, now: datetime, note: str = "",
+                   created_path: str = CREATED,
+                   state_path: str = "meeting_reminders.json"
+                   ) -> str | None:
+    """Cancel the bot-created meeting whose start is closest to now."""
+    from pathlib import Path as _Path
+
+    data = load_created(created_path)
+    best = None
+    for eid, rec in data.items():
+        try:
+            start = datetime.fromisoformat(rec.get("start") or "")
+        except ValueError:
+            continue
+        gap = abs((start - now).total_seconds())
+        if gap <= 3 * 60 * 60 and (best is None or gap < best[0]):
+            best = (gap, eid, rec, start)
+    if not best:
+        return None
+    _, eid, rec, start = best
+    delete_event(env, eid)
+    data.pop(eid, None)
+    _Path(created_path).write_text(json.dumps(data, indent=1,
+                                              ensure_ascii=False))
+    try:
+        state = json.loads(_Path(state_path).read_text())
+        rec_state = (state.get("meetings") or {}).pop(eid, None)
+        if rec_state:
+            _Path(state_path).write_text(json.dumps(state))
+    except (OSError, ValueError):
+        pass
+    by_email = email_to_slack()
+    from .notify import send_dm_to
+
+    text = (f"*Cancelled*\n{rec.get('title', '')} · {start:%a %d %b %H:%M}"
+            + (f"\n_{note}_" if note else ""))
+    for person in rec.get("attendees") or []:
+        uid = by_email.get((person.get("email") or "").lower())
+        if not uid or uid == rec.get("creator"):
+            continue
+        try:
+            send_dm_to(env, uid, text)
+        except Exception:  # noqa: BLE001 - one DM must not block the cancel
+            continue
+    return (f"Cancelled: {rec.get('title', '')}"
+            + (f" — {note}" if note else ""))

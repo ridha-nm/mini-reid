@@ -142,7 +142,10 @@ recorded in `created_meetings.json` and confirmed in the DM. Meetings created
 through the bot also DM every attendee who maps to a Slack user, with
 **Attending** / **Can't attend** buttons. The organiser can reply
 `reschedule to <time> <note>`; the Google event moves, keeps its duration, and
-attendees are DMed. `moved <note>` records the note only. Slack keeps the schedule,
+attendees are DMed. `cancel <note>` deletes the event, removes the stored
+meeting and reminder, and DMs attendees. `moved <note>` records the note only.
+`meet:` accepts `for 45 minutes` / `for 1 hour` (15–180) and strips it from the
+title. Slack keeps the schedule,
 so a sleeping Mac does not lose it. Each meeting is reminded once.
 
 The 09:15 job writes `digest_delivered.json` only after Slack accepts the DM. If it

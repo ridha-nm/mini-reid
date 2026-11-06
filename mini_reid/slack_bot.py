@@ -2353,9 +2353,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 return
             emails = [a["email"] for a in attendees]
             names = ", ".join(a["name"] for a in attendees)
+            from .meetings import (SLOT_MINUTES, parse_duration,
+                                   strip_duration)
+
+            duration = parse_duration(body) or SLOT_MINUTES
+            topic = strip_duration(topic) or topic
             busy: dict = {}
             try:
-                slots = propose_slots(env, emails, busy_out=busy)
+                slots = propose_slots(env, emails, busy_out=busy,
+                                      duration=duration)
             except Exception as ex:  # noqa: BLE001 - tell the owner why
                 say(f"Could not read calendars: {type(ex).__name__}: {ex}")
                 _mark(ts)
@@ -2371,12 +2377,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             pending = state_now.setdefault("pending_meet", {})
             pending[token] = {"topic": topic, "emails": emails,
                               "attendees": attendees, "attendee": names,
-                              "slots": slots, "user": user, "channel": channel}
+                              "slots": slots, "user": user, "channel": channel,
+                              "duration": duration}
             if len(pending) > 50:
                 state_now["pending_meet"] = dict(list(pending.items())[-50:])
             Path(STATE).write_text(json.dumps(state_now))
             sent = say(f"Free slots with {names}:",
-                       blocks=slot_blocks(token, topic, attendees, slots, busy))
+                       blocks=slot_blocks(token, topic, attendees, slots,
+                                          busy, duration=duration))
             if sent:
                 pending[token]["channel"] = sent.get("channel") or channel
                 pending[token]["message_ts"] = sent.get("ts") or ""
@@ -2728,6 +2736,16 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
 
         if (user == owner or member) and channel.startswith("D"):
+            cancel = re.match(r"^cancel\b(.*)$", (body or "").strip(), re.I)
+            if cancel and user == owner:
+                from .meetings import cancel_nearest
+
+                done = cancel_nearest(env, datetime.now(MYT),
+                                      cancel.group(1).strip(" ,:-"))
+                if done:
+                    say(done)
+                    _mark(ts)
+                    return
             resched = re.match(
                 r"^(?:reschedule|move|moved)\s+(?:it\s+)?to\s+(.+)$",
                 (body or "").strip(), re.I)
@@ -3029,9 +3047,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 pending["notes"] = notes[:8000]
                 if title.strip():
                     pending["topic"] = title.strip()[:200]
+                dur = int(pending.get("duration") or 30)
                 busy: dict = {}
                 try:
-                    slots = propose_slots(env, pending["emails"], busy_out=busy)
+                    slots = propose_slots(env, pending["emails"], busy_out=busy,
+                                          duration=dur)
                     pending["slots"] = slots
                 except Exception:  # noqa: BLE001 - keep the previous slots
                     slots = pending.get("slots") or []
@@ -3046,7 +3066,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                         channel=channel, ts=msg_ts,
                         text=f"Meeting proposal: {pending['topic']}",
                         blocks=slot_blocks(token, pending["topic"], people,
-                                           slots, busy))
+                                           slots, busy, duration=dur))
                 return
             if view.get("callback_id") == "inbox_clear_apply":
                 from .triage_ui import (apply_inbox_page, inbox_clear_modal,
@@ -3273,10 +3293,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                             web.chat_update(channel=channel, ts=msg_ts,
                                             text="Meeting proposal cancelled.")
                         continue
+                    dur = int(pending.get("duration") or 30)
                     busy: dict = {}
                     try:
                         slots = propose_slots(env, pending["emails"],
-                                              busy_out=busy)
+                                              busy_out=busy, duration=dur)
                     except Exception as ex:  # noqa: BLE001 - keep old message
                         if channel and msg_ts:
                             web.chat_update(
@@ -3290,7 +3311,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                             "name": pending.get("attendee", "Attendee"),
                             "email": (pending.get("emails") or [""])[0]}]
                         blocks = slot_blocks(
-                            token, pending["topic"], people, slots, busy)
+                            token, pending["topic"], people, slots, busy,
+                            duration=dur)
                         web.chat_update(channel=channel, ts=msg_ts,
                                         text=f"Free slots with {pending['attendee']}",
                                         blocks=blocks)

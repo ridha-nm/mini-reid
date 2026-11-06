@@ -317,7 +317,8 @@ def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE,
         text = (f"*Meeting in 10 minutes*\n{span(meeting)} · {meeting['title']}"
                 + (f"\n<{meeting['link']}|join>" if meeting.get("link") else "")
                 + "\n\nAre you attending? Reply `yes`, `no <reason>`, "
-                  "`moved <note>`, or `reschedule to <time> <note>`.")
+                  "`moved <note>`, `reschedule to <time> <note>`, or "
+                  "`cancel <note>`.")
         remind_at = start - timedelta(minutes=10)
         if remind_at <= now:
             if user_id:

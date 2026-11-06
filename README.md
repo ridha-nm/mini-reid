@@ -29,9 +29,10 @@ Gmail, Jira and Google Calendar.
 - **Bot** (`@minireid`): add, assign, reassign, note, tonote/convert, status, priority,
   combine, uncombine, undo, done, due, edit, snooze, waiting, drop, not, remind,
   meet, find, list, notes, ask, clients, help. `meet: @Kasib about X` (or
-  `meet: @Kasib and @Charanya about X`) checks every calendar, shows a busy snapshot
-  with formal details, offers free slots, lets you edit the title/notes, and creates
-  the Meet invite for everyone. `clients` shows the email filter;
+  `meet: @Kasib and @Charanya about X`, plus `for 45 minutes` / `for 1 hour`)
+  checks every calendar, shows a busy snapshot with formal details, offers free
+  slots at that duration, lets you edit the title/notes, and creates the Meet
+  invite for everyone. `clients` shows the email filter;
   `clients: Eupe, Gamuda` replaces it. Portfolios GHB/GVC/SAFE are accepted.
   `banter on/off/status` controls sassy replies; only tagged abuse triggers one.
   Untagged messages are always ignored. Banter is allowed only in `#ee-leads-only`
