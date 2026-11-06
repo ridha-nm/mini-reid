@@ -100,7 +100,8 @@ def slot_blocks(token: str, topic: str, attendees: list[dict],
     return blocks
 
 
-def edit_modal(token: str, topic: str, notes: str = "") -> dict:
+def edit_modal(token: str, topic: str, notes: str = "",
+               duration: int = SLOT_MINUTES) -> dict:
     return {
         "type": "modal",
         "callback_id": "meet_edit",
@@ -114,6 +115,10 @@ def edit_modal(token: str, topic: str, notes: str = "") -> dict:
              "element": {"type": "plain_text_input", "action_id": "value",
                          "initial_value": topic[:200],
                          "max_length": 200}},
+            {"type": "input", "block_id": "duration",
+             "label": {"type": "plain_text", "text": "Duration (minutes)"},
+             "element": {"type": "plain_text_input", "action_id": "value",
+                         "initial_value": str(duration)}},
             {"type": "input", "block_id": "notes", "optional": True,
              "label": {"type": "plain_text", "text": "Notes (event description)"},
              "element": {"type": "plain_text_input", "action_id": "value",

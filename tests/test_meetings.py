@@ -133,3 +133,12 @@ def test_slot_blocks_show_the_chosen_duration():
                          slots, duration=45)
     text = str(blocks)
     assert "45 minutes" in text
+
+
+def test_edit_modal_includes_editable_duration():
+    from mini_reid.meeting_ui import edit_modal
+
+    view = edit_modal("t", "Deck", duration=45)
+    blocks = {b.get("block_id"): b for b in view["blocks"] if b.get("block_id")}
+    assert blocks["duration"]["element"]["initial_value"] == "45"
+    assert blocks["duration"]["label"]["text"] == "Duration (minutes)"

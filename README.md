@@ -31,8 +31,8 @@ Gmail, Jira and Google Calendar.
   meet, find, list, notes, ask, clients, help. `meet: @Kasib about X` (or
   `meet: @Kasib and @Charanya about X`, plus `for 45 minutes` / `for 1 hour`)
   checks every calendar, shows a busy snapshot with formal details, offers free
-  slots at that duration, lets you edit the title/notes, and creates the Meet
-  invite for everyone. `clients` shows the email filter;
+  slots at that duration, lets you edit the title, duration and notes, and creates
+  the Meet invite for everyone. `clients` shows the email filter;
   `clients: Eupe, Gamuda` replaces it. Portfolios GHB/GVC/SAFE are accepted.
   `banter on/off/status` controls sassy replies; only tagged abuse triggers one.
   Untagged messages are always ignored. Banter is allowed only in `#ee-leads-only`

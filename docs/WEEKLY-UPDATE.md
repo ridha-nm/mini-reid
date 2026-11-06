@@ -74,7 +74,8 @@ members never see each other's lists.
   everyone. Meeting reply: `yes`, `no <reason>`, `moved <note>`, or
   `reschedule to <time> <note>` (moves the event, keeps the duration, notifies
   attendees) or `cancel <note>`.
-- Any duration: `meet: @A about X for 45 minutes` / `for 1 hour` (15–180).
+- Any duration: `meet: @A about X for 45 minutes` / `for 1 hour` (15–180), or
+  change it in the **Edit** modal alongside title and notes.
 - 10-minute reminder DM before each meeting. Attendees of bot-created meetings
   get their own DM with **Attending** / **Can't attend** buttons.
 

@@ -7,10 +7,12 @@ Append-only. Newest first.
 - `meet:` accepts a duration: `meet: @Kasib about the deck for 45 minutes`,
   `for 1 hour`, `for an hour`. Clamped 15–180 minutes; the phrase is stripped
   from the title. Slots, the proposal card and the created event all use it.
+  The **Edit** modal has a Duration field next to the title; changing it
+  re-proposes slots at the new length.
 - The organiser can reply `cancel <note>` to the 10-minute meeting reminder.
   The Google event is deleted with attendee notifications, the stored meeting
   and reminder are removed, and mapped Slack attendees get a `Cancelled` DM.
-- 393 tests passing.
+- 394 tests passing.
 
 ## 2026-11-06 (attendee reminders, reschedule with note)
 

@@ -3040,6 +3040,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     .get("value") or ""
                 notes = ((values.get("notes") or {}).get("value") or {}) \
                     .get("value") or ""
+                dur_text = ((values.get("duration") or {}).get("value") or {}) \
+                    .get("value") or ""
                 state_now = _state()
                 pending = (state_now.get("pending_meet") or {}).get(token)
                 if not pending:
@@ -3047,7 +3049,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 pending["notes"] = notes[:8000]
                 if title.strip():
                     pending["topic"] = title.strip()[:200]
-                dur = int(pending.get("duration") or 30)
+                from .meetings import parse_duration
+
+                try:
+                    dur = int(float(dur_text))
+                except (TypeError, ValueError):
+                    dur = parse_duration(dur_text) or int(
+                        pending.get("duration") or 30)
+                dur = max(15, min(180, dur))
+                pending["duration"] = dur
                 busy: dict = {}
                 try:
                     slots = propose_slots(env, pending["emails"], busy_out=busy,
@@ -3268,8 +3278,10 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     try:
                         web.views_open(
                             trigger_id=payload.get("trigger_id") or "",
-                            view=edit_modal(token, pending["topic"],
-                                            pending.get("notes", "")))
+                            view=edit_modal(
+                                token, pending["topic"],
+                                pending.get("notes", ""),
+                                int(pending.get("duration") or 30)))
                     except Exception as ex:  # noqa: BLE001 - user can retry
                         print(f"  meet edit modal failed: "
                               f"{type(ex).__name__}: {ex}", flush=True)
