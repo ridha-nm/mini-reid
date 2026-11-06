@@ -105,6 +105,9 @@ digest rendered a card per task link. The Slack scopes, event and domains are
 gone from the manifest; reinstall the app so Slack drops them. Bare pasted
 links still never become notes.
 
+Weekly release notes live in `docs/WEEKLY-UPDATE.md` — append a dated
+capability snapshot every Friday. First entry covers week ending 2026-11-06.
+
 2026-11-06 multi-recipient reminders: `remind` takes several people, either a
 shared text (`remind @Raj, @XieYi and @Lynnette to send updates at 5pm`) or
 `remind` on its own line followed by one `@Name <item>` per line and a shared
