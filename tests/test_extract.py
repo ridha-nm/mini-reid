@@ -241,7 +241,7 @@ def test_auto_capture_matrix():
     mail = {"source": "gmail", "kind": "inbox",
             "to": "Ridha <ridha@pantas.com>"}
     jira = {"source": "jira", "kind": "issue"}
-    assert auto_reason(jira, "Audit data units", None, None) == "jira-assigned"
+    assert auto_reason(jira, "Audit data units", None, None) is None
     assert auto_reason(slack, "can you review the deck", None, None) == "slack-direct-ask"
     assert auto_reason(slack, "the office is closed tomorrow", None, None) is None
     # "please" alone is politeness, not an ask: it must not skip the click.

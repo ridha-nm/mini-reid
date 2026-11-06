@@ -165,8 +165,6 @@ def auto_reason(item: dict, text: str, due: str | None,
     """Why this row can skip the click, or None to keep it in Inbox."""
     source = item.get("source") or ""
     kind = item.get("kind") or ""
-    if source == "jira":
-        return "jira-assigned"
     ask = bool(EXPLICIT_ASK.search(text or ""))
     if source == "slack" and kind == "mention" and ask:
         return "slack-direct-ask"

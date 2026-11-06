@@ -231,3 +231,15 @@ def test_list_offers_clear_inbox_button_with_count():
     button = [e for block in blocks if block.get("type") == "actions"
               for e in block["elements"] if e.get("action_id") == "inbox_clear_open"]
     assert button and "2" in button[0]["text"]["text"]
+
+
+def test_note_actions_offer_keep_task_discard():
+    from mini_reid.triage_ui import note_action_blocks
+
+    blocks = note_action_blocks("abc123", "Interview notes " * 40)
+    actions = [e for b in blocks if b.get("type") == "actions"
+               for e in b["elements"]]
+    assert [a["action_id"] for a in actions] == [
+        "note_keep", "note_to_task", "note_discard"]
+    assert all(a["value"] == "abc123" for a in actions)
+    assert "Interview notes" in str(blocks)

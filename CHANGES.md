@@ -2,6 +2,16 @@
 
 Append-only. Newest first.
 
+## 2026-11-06 (Jira approval, note prompt)
+
+- Jira issues no longer auto-open. `jira-assigned` is removed from the auto
+  rules, so assigned issues land in Inbox with **Add to list** / **Not a task**
+  like other uncertain candidates. The other three auto rules are unchanged.
+- A long paste from Ridha (200+ chars or 3+ lines) is still saved as a note,
+  but the reply now carries **Keep as note** / **Make it a task** / **Discard**
+  instead of a silent `Noted.` Short notes keep the old behaviour.
+- 388 tests passing.
+
 ## 2026-11-06 (multi-recipient reminders)
 
 - `remind` accepts several people at once. Shared text:

@@ -51,8 +51,9 @@ def test_member_refresh_keeps_the_auto_capture_decision(tmp_path, monkeypatch):
     from mini_reid.ledger import load
 
     profile = {"name": "Charanya", "ledger": str(tmp_path / "ledger.json")}
-    item = {"source": "jira", "native_id": "j1", "kind": "issue",
-            "author": "Bo", "text": "Audit data units", "link": "https://x/j1",
+    item = {"source": "slack", "native_id": "C1:1", "kind": "mention",
+            "author": "Kasib", "text": "can you review the deck",
+            "link": "https://x/C1/p1",
             # Current time: refresh uses the real clock and apply_stalled would
             # otherwise stall the row once the hardcoded date ages out.
             "ts": datetime.now(timezone.utc).isoformat()}

@@ -2800,8 +2800,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 cross_assign(env, profiles, user, sender_name, assign_to,
                              what, ledger_path)
         print(f"  reply: {reply[:120]!r}", flush=True)
-        if action in EMOJI_ACKS and reply.startswith(
-                ("Added.", "Noted.", "Converted to note:")):
+        long_note = (action == "note" and raw_action == "unknown"
+                     and user == owner
+                     and (len(text) >= 200 or text.count("\n") >= 3))
+        if (not long_note and action in EMOJI_ACKS and reply.startswith(
+                ("Added.", "Noted.", "Converted to note:"))):
             try:
                 web.reactions_add(channel=channel, timestamp=ts,
                                   name=EMOJI_ACKS[action])
@@ -2812,6 +2815,12 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if late:
             reply = "_(answered late, I was offline)_\n" + reply
         blocks = None
+        if long_note:
+            from .triage_ui import note_action_blocks
+
+            blocks = note_action_blocks(
+                commitment_id("manual", body.lower(), body), text)
+            reply = "Saved as a note. Keep it, make it a task, or discard?"
         if action == "list" and (user == owner or member):
             try:
                 from .notify import sent_reminders
@@ -3092,6 +3101,49 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
+                if action_id in {"note_keep", "note_to_task", "note_discard"}:
+                    from .listview import _title
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target = ledger_for_viewer(clicker)
+                    if not target:
+                        continue
+                    row_id = action.get("value") or ""
+                    rows = load(target)
+                    row = next((r for r in rows if r.get("id") == row_id),
+                               None)
+                    if not row:
+                        continue
+                    now = datetime.now(MYT)
+                    if action_id == "note_to_task":
+                        row["kind"] = "manual"
+                        row["status"] = "open"
+                        row["via"] = "note"
+                        row["closed_at"] = None
+                        row["closed_how"] = None
+                    elif action_id == "note_discard":
+                        row["status"] = "dropped"
+                        row["closed_at"] = now.isoformat()
+                        row["closed_how"] = "not_commitment"
+                    row["last_activity"] = now.isoformat()
+                    save(target, rows)
+                    label = {"note_keep": "Kept as note",
+                             "note_to_task": "Added to tasks",
+                             "note_discard": "Discarded"}[action_id]
+                    label_text = f"{label}: {_title(row)[:120]}"
+                    container = payload.get("container") or {}
+                    ch = container.get("channel_id") or ""
+                    msg_ts = container.get("message_ts") or ""
+                    if ch and msg_ts:
+                        try:
+                            web.chat_update(
+                                channel=ch, ts=msg_ts, text=label_text,
+                                blocks=[{"type": "section", "text": {
+                                    "type": "mrkdwn", "text": label_text}}])
+                        except Exception as ex:  # noqa: BLE001 - click applied
+                            print(f"  note update failed: "
+                                  f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
                 if action_id == "request_access":
                     from .home_ui import access_request_blocks
 

@@ -17,18 +17,19 @@ members never see each other's lists.
 - Sources: Slack channel mentions, Slack DMs, Gmail inbox (read and unread),
   Jira issues assigned to the person.
 - **Auto-capture (rules only, no model):** obvious items open directly —
-  - any assigned, non-Done, non-Epic Jira issue;
   - a Slack @mention with an explicit ask (`can/could/would/will you`, `please`
     + a request verb, `action required`, `we need/need you`);
   - a Slack DM with an explicit ask or a due date;
   - a Gmail item addressed directly in To, with an ask or a due date.
-- Everything else waits in **Inbox**. Uncertain items arrive as a DM with
-  **Add to list** / **Not a task**.
+- Assigned Jira issues and everything else wait in **Inbox**. Uncertain items
+  arrive as a DM with **Add to list** / **Not a task**.
 - **Clear Inbox (N):** 10 pending rows at a time; tick the ones that are NOT
   tasks, the rest are added, then it advances to the next page.
 - Message shortcut **Add to Mini-Reid** and 📌 reaction capture a message into
   the clicker's ledger without tagging the bot.
 - Plain DM to the bot becomes a task for members, no prefix needed.
+- A long paste from Ridha is saved as a note, and the reply offers **Keep as
+  note** / **Make it a task** / **Discard** instead of silently noting it.
 - Clients: Gmail can be filtered to the person's client list; `clients` shows it,
   `clients: Eupe, Gamuda` changes it. Portfolios GHB/GVC/SAFE supported.
 - Extraction drops bots, the triager bot, calendar responses, Jira notification
@@ -106,7 +107,7 @@ members never see each other's lists.
 - Catch-up sweep replays commands the socket missed while the Mac slept.
 - Everything runs locally on the Mac and only while it is awake. No cloud
   database; client content does not leave the machine for extraction.
-- 387 tests pass.
+- 388 tests pass.
 
 ### Changed this week
 
@@ -118,6 +119,8 @@ members never see each other's lists.
 - Slack List links open in the Slack app.
 - Stopped model-invented rows (chatter DMs, boilerplate mail) from becoming
   open tasks.
+- Jira issues now ask for approval before joining the list; long pastes offer
+  Keep as note / Make it a task / Discard.
 - Removed Gmail/Jira link unfurls: unused, and they rendered a card per task
   link in the digest.
 

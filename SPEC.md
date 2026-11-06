@@ -108,8 +108,8 @@ a channel mention. Channel mentions are always kept unless they are pure chatter
   questions with no ask ("do you have access?"), status updates ("Update: …"), other
   people's own plans ("I try to get … today"), Google boilerplate, URLs, newsletters.
 
-Rules capture. Rows matching an auto rule (`jira-assigned`, `slack-direct-ask`,
-`slack-dm-ask`, `email-direct-ask`) are added directly; the rest wait in Inbox with
+Rules capture. Rows matching an auto rule (`slack-direct-ask`, `slack-dm-ask`,
+`email-direct-ask`) are added directly; Jira assignments and the rest wait in Inbox with
 **Add to list** / **Not a task**. The optional local model only rewrites the title
 for readability; it is told every message is a candidate and returns one item per
 message. It cannot drop a row and has no commitment verdict. A row the model rewrote

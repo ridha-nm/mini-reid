@@ -91,12 +91,12 @@ Slack/Gmail/Jira signal. Her 7-task snapshot: 3 benchmarked, strict recall 0/3.
 Runbook in `docs/EVAL.md`. That zero is the reason for the auto-capture plan.
 
 2026-11-05 auto-capture: rules decide whether a candidate needs a click.
-`jira-assigned` (any assigned, non-Done, non-Epic Jira issue), `slack-direct-ask`
-(channel @mention with an explicit ask), `slack-dm-ask` (DM with an ask or a due
-date) and `email-direct-ask` (inbox mail addressed to the person, with an ask or a
-due date) stamp `capture: "auto"` and open the row straight away; the reason is
-kept in `capture_why`. Everything else stays `inbox` with **Add to list** /
-**Not a task**. Rules only — no model, no network; the model still only rewrites
+`slack-direct-ask` (channel @mention with an explicit ask), `slack-dm-ask` (DM
+with an ask or a due date) and `email-direct-ask` (inbox mail addressed to the
+person, with an ask or a due date) stamp `capture: "auto"` and open the row
+straight away; the reason is kept in `capture_why`. Jira assignments are
+detected but ask for approval: they land in `inbox` with **Add to list** /
+**Not a task**. Everything else also stays `inbox`. Rules only — no model, no network; the model still only rewrites
 titles, existing rows are not migrated, and members run the same rules on their
 own ledger.
 
@@ -107,6 +107,11 @@ links still never become notes.
 
 Weekly release notes live in `docs/WEEKLY-UPDATE.md` — append a dated
 capability snapshot every Friday. First entry covers week ending 2026-11-06.
+
+2026-11-06 Jira approval and note prompt: Jira issues no longer auto-open; they
+wait in Inbox for **Add to list**. A long paste from Ridha is saved as a note
+and the reply carries **Keep as note** / **Make it a task** / **Discard**
+(`note_keep`, `note_to_task`, `note_discard`).
 
 2026-11-06 multi-recipient reminders: `remind` takes several people, either a
 shared text (`remind @Raj, @XieYi and @Lynnette to send updates at 5pm`) or
@@ -366,7 +371,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-387 tests passing as of 2026-11-06.
+388 tests passing as of 2026-11-06.
 ## Next, agreed
 
 1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's

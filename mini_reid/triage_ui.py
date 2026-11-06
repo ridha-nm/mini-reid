@@ -365,3 +365,22 @@ def inbox_done_modal(added: int, dropped: int) -> dict:
             "text": f"Added *{added}* to your list, marked *{dropped}* "
                     "not a task."}}],
     }
+
+
+def note_action_blocks(row_id: str, preview: str) -> list[dict]:
+    """A pasted note asks what it should become instead of vanishing."""
+    return [
+        {"type": "section", "text": {
+            "type": "mrkdwn",
+            "text": f"*Saved as a note*\n{preview[:200]}"}},
+        {"type": "actions", "elements": [
+            {"type": "button", "action_id": "note_keep", "value": row_id,
+             "text": {"type": "plain_text", "text": "Keep as note"}},
+            {"type": "button", "action_id": "note_to_task", "value": row_id,
+             "text": {"type": "plain_text", "text": "Make it a task"},
+             "style": "primary"},
+            {"type": "button", "action_id": "note_discard", "value": row_id,
+             "text": {"type": "plain_text", "text": "Discard"},
+             "style": "danger"},
+        ]},
+    ]
