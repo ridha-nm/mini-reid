@@ -63,6 +63,8 @@ def test_sync_deletes_dropped_and_inbox_rows(tmp_path, monkeypatch):
          "slack_item_id": "RecDrop", "last_activity": "2026-11-05T10:00:00+08:00"},
         {"id": "b", "what": "Waiting", "status": "inbox",
          "slack_item_id": "RecInbox", "last_activity": "2026-11-05T10:00:00+08:00"},
+        {"id": "c", "what": "Finished", "status": "done",
+         "slack_item_id": "RecDone", "last_activity": "2026-11-05T10:00:00+08:00"},
     ])
     calls = []
 
@@ -73,14 +75,15 @@ def test_sync_deletes_dropped_and_inbox_rows(tmp_path, monkeypatch):
                 {"key": "title", "id": "ColT"}]}}
         if method == "slackLists.items.list":
             return {"ok": True, "items": [{"id": "RecDrop"},
-                                          {"id": "RecInbox"}]}
+                                          {"id": "RecInbox"},
+                                          {"id": "RecDone"}]}
         return {"ok": True}
 
     monkeypatch.setattr(slack_lists, "_post", fake)
     assert slack_lists.sync_user({"SLACK_BOT_TOKEN": "x"}, "U1", "Ridha",
-                                 ledger, state) == 2
+                                 ledger, state) == 3
     deleted = [b["id"] for m, b in calls if m == "slackLists.items.delete"]
-    assert deleted == ["RecDrop", "RecInbox"]
+    assert deleted == ["RecDrop", "RecInbox", "RecDone"]
     assert all("slack_item_id" not in r for r in load(ledger))
 
 

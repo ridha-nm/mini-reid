@@ -23,7 +23,8 @@ Gmail, Jira and Google Calendar.
   with the join link and "Are you attending?". Attendees of meetings created through
   Mini-Reid get the same DM with **Attending** / **Can't attend** buttons, if they map
   to a Slack user. Answer `yes`, `no <reason>`, or `moved <note>`; the organiser can
-  reply `reschedule to <time> <note>` to move the event and notify attendees.
+  reply `reschedule to <time> <note>` to move the event and notify attendees, or
+  `cancel: <meeting name>` to cancel any upcoming matching event.
   The watcher also polls Ridha's DMs for `remind` commands in conversations the bot is
   not part of.
 - **Bot** (`@minireid`): add, assign, reassign, note, tonote/convert, status, priority,
@@ -98,7 +99,9 @@ Gmail, Jira and Google Calendar.
 - **Slack List mirror**: each user's ledger is mirrored into a native Slack List with
   title, status, due and source; created once and updated every watcher cycle.
   `list` includes an **Open Slack List** button. Edits in the List flow back to
-  the ledger; deleting a row there drops the task; non-tasks are removed.
+  the ledger; deleting a row there drops the task; non-tasks are removed. Rows
+  marked `done` are removed from the List on the next sync and archived in the
+  ledger.
 
 ## Run
 

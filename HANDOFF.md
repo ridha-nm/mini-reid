@@ -279,7 +279,9 @@ Slack, so they fire on time even when the Mac sleeps. Every reminder is also add
 the recipient's list as `kind: reminder`, open, with `reminded: True` so the watcher
 does not send it twice. An unknown name gets a reply, not a
 silent reminder to the sender. Other people's reminders never touch Ridha's ledger or
-digest. Slack keeps the queue; there is no local copy yet, so there is no cancel or list.
+digest. `reminder_log.json` keeps the audit; `list` shows **My reminders** and
+**Reminders I sent**; `reminders` prints the log. Any workspace member may use
+`remind` (no ledger access), and multi-recipient forms are supported.
 
 ## Digest layout
 
@@ -289,10 +291,13 @@ client name, relative due, sender and channel, source time, link. Email senders 
 their address; a rewritten Slack title quotes the original message.
 
 The watcher schedules a DM 10 minutes before each meeting with the join link and "Are
-you attending?". Reply `yes`, `no <reason>`, or `moved` / `rescheduled` /
-`postponed` (a note like "moved to 3pm" is kept); it is recorded in
-`meeting_reminders.json` and confirmed in the DM. Slack keeps the schedule, so the Mac
-can sleep. A single-instance lock (`.watcher.lock`) stops overlapping runs from
+you attending?". Reply `yes`, `no <reason>`, `moved <note>`, `reschedule to <time>
+<note>` (moves the Google event, keeps its duration, DMs attendees) or `cancel <note>`
+(deletes the event and DMs attendees). `cancel: <meeting name>` cancels the nearest
+upcoming matching event. Meetings created through the bot also DM each mapped Slack
+attendee with **Attending** / **Can't attend** buttons. State lives in
+`meeting_reminders.json` and `created_meetings.json`; Slack keeps the schedule, so the
+Mac can sleep. A single-instance lock (`.watcher.lock`) stops overlapping runs from
 scheduling duplicates.
 
 The daily overdue nudge (first watcher cycle after 09:00) uses the same row renderer as
@@ -367,6 +372,12 @@ kept or a real ask was missed.
   DMs without an explicit ask, and shared-alias mail without a direct To stay in
   Inbox. A rare phrasing such as "please note the deck needs review" can still
   auto-add because it contains a request word.
+- Attendee reminders and real reschedule (`reschedule to <time>`) only work for
+  meetings created after `created_meetings.json` existed. Older meetings can
+  still be cancelled with `cancel: <meeting name>` or by the 10-minute reminder.
+- Deleting a row directly in the Slack List drops that task in the ledger; use
+  `done:`/`not:` instead. Done rows are removed from the List automatically and
+  stay in the ledger as the archive.
 - Watcher takes about 55 s per cycle after parallel source fetches (sources ~12 s;
   the member cycle and meeting scheduling make up the rest), inside the two-minute
   interval. Before the parallel fix a cycle ran 2+ minutes.

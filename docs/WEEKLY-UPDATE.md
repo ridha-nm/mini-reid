@@ -51,8 +51,9 @@ members never see each other's lists.
 - **Done acknowledgements:** a Slack-tagged task marked done DMs the original
   asker once. Marking done in the Slack List DMs the person who did it.
 - Native **Slack List mirror** per person: title, status, due, source. Edits
-  flow back; deleting a List row drops the task. Source links for Slack rows
-  open the message inside Slack.
+  flow back; deleting a List row drops the task. Every live task is mirrored
+  (up to 500). Done rows are removed from the List and kept in the ledger as
+  the archive. Source links for Slack rows open the message inside Slack.
 
 ### Reminders
 
@@ -69,8 +70,8 @@ members never see each other's lists.
 ### Meetings
 
 - `meet: @A and @B about <topic>` (also `on`, `to discuss`, `review`) reads all
-  calendars, shows busy blocks, offers five 30-minute free slots, lets you edit
-  title/notes, then creates the Google event with a Meet link and invites
+  calendars, shows busy blocks, offers five free slots at the requested duration,
+  lets you edit title/duration/notes, then creates the Google event with a Meet link and invites
   everyone. Meeting reply: `yes`, `no <reason>`, `moved <note>`, or
   `reschedule to <time> <note>` (moves the event, keeps the duration, notifies
   attendees) or `cancel <note>`.
@@ -112,7 +113,7 @@ members never see each other's lists.
 - Catch-up sweep replays commands the socket missed while the Mac slept.
 - Everything runs locally on the Mac and only while it is awake. No cloud
   database; client content does not leave the machine for extraction.
-- 393 tests pass.
+- 398 tests pass.
 
 ### Changed this week
 
@@ -127,7 +128,10 @@ members never see each other's lists.
 - Jira issues now ask for approval before joining the list; long pastes offer
   Keep as note / Make it a task / Discard.
 - Meeting attendees get RSVP buttons; the organiser can reschedule or cancel
-  with a note, and pick any duration when setting the meeting.
+  with a note, pick any duration when setting the meeting or in Edit, and cancel
+  any upcoming meeting by name with `cancel: <name>`.
+- Slack List now mirrors every live task (was capped at 50); done rows drop off
+  it and stay archived in the ledger.
 - Removed Gmail/Jira link unfurls: unused, and they rendered a card per task
   link in the digest.
 

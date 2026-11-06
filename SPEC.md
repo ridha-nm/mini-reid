@@ -143,9 +143,12 @@ through the bot also DM every attendee who maps to a Slack user, with
 **Attending** / **Can't attend** buttons. The organiser can reply
 `reschedule to <time> <note>`; the Google event moves, keeps its duration, and
 attendees are DMed. `cancel <note>` deletes the event, removes the stored
-meeting and reminder, and DMs attendees. `moved <note>` records the note only.
-`meet:` accepts `for 45 minutes` / `for 1 hour` (15–180) and strips it from the
-title. Slack keeps the schedule,
+meeting and reminder, and DMs attendees. `cancel: <meeting name>` cancels the
+nearest upcoming matching event across readable calendars. `moved <note>`
+records the note only. Attendees of bot-created meetings get their own
+10-minute DM with **Attending** / **Can't attend** buttons. `meet:` accepts
+`for 45 minutes` / `for 1 hour` (15–180), strips it from the title, and the Edit
+modal changes it alongside title and notes. Slack keeps the schedule,
 so a sleeping Mac does not lose it. Each meeting is reminded once.
 
 The 09:15 job writes `digest_delivered.json` only after Slack accepts the DM. If it
@@ -201,10 +204,11 @@ local KB),
 `banter on|off|status`, `help`, `/mini-reid` (list/help ephemeral, other commands
 in DM). `meet:` accepts one or more attendees
 (`@Kasib and @Charanya`, comma/and-separated names), reads everyone's freeBusy, proposes five
-30-minute slots over five working days with a formal Title/With/Duration block and a
-busy snapshot of both calendars, then creates the Google event with a Meet link and
-invites the attendee. Edit title/notes, Refresh and Cancel buttons; notes become the
-event description, Meet is always created. Requires `calendar.events` consent.
+slots over five working days at the requested duration (default 30 minutes, 15–180)
+with a formal Title/With/Duration block and a busy snapshot of every calendar, then
+creates the Google event with a Meet link and invites the attendees. Edit title,
+duration and notes, Refresh and Cancel buttons; notes become the event description,
+Meet is always created. Requires `calendar.events` consent.
 Google does not expose the Gemini meeting-notes toggle through Calendar API.
 `help` is a topic picker (Capture, Update, Close, Find, Inbox, Reminders, Team,
 Fun) with **My list** and **Triage inbox** buttons, not a command dump.
@@ -233,11 +237,12 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   no other ledger is exposed.
 - Each user's ledger is mirrored into a native Slack List (“Mini-Reid — Name”)
   with title, status, due and source link. The list is created once and shared
-  write with that user; the watcher creates/updates the latest 50 rows. The
-  `list` reply includes an **Open Slack List** button with the deep link.
-  Two-way: a Slack edit to title/status/due updates the ledger on the next pull;
-  deleting a List row drops the ledger row; dropped and Inbox rows are deleted
-  from the List.
+  write with that user; the watcher creates/updates up to 500 live tasks, so
+  every open task is mirrored. The `list` reply includes an **Open Slack List**
+  button with the deep link. Two-way: a Slack edit to title/status/due updates
+  the ledger on the next pull; deleting a List row drops the ledger row;
+  dropped, Inbox and `done` rows are deleted from the List. A done row stays in
+  the ledger as the archive.
 - A member's plain DM to the bot becomes a task without an `add:` prefix;
   questions and channel messages keep their existing behaviour.
 - The **Add to Mini-Reid** message shortcut captures any message after a prefilled

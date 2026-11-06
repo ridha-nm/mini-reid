@@ -260,7 +260,7 @@ def sync_user(env: dict, user: str, name: str, ledger_path: str,
     changed = pulled
     for row in tasks[:limit]:
         status = (row.get("status") or "open").lower()
-        if status in {"dropped", "inbox"}:
+        if status in {"dropped", "inbox", "done"}:
             if row.get("slack_item_id"):
                 try:
                     data = _post("slackLists.items.delete", token, {

@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-06 (done rows leave the Slack List)
+
+- A row marked `done` is deleted from the Slack List on the next sync, so the
+  List shows live work only. The ledger row is kept as the archive (`done`,
+  `closed_at`, `closed_how`) and still appears in `list` history/undo paths.
+  Inbox and dropped rows were already removed.
+- 398 tests passing.
+
 ## 2026-11-06 (Slack List covers every task)
 
 - The Slack List mirror was capped at the 50 most recently active tasks, so

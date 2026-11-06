@@ -45,6 +45,9 @@ That is a permission boundary, not a parity gap.
 | Capture + inbox confirmation | yes | yes |
 | Auto-capture rules (obvious rows open without a click) | yes | yes |
 | Sectioned list, Clear Inbox, done acknowledgement | yes | yes |
+| Slack List mirrors every live task; done rows archived | yes | yes |
+| Meeting attendee reminder + Attending / Can't attend buttons | yes | yes |
+| Meeting duration edit, reschedule, cancel | yes | owner-only (members cannot create meetings) |
 | Add / Not a task buttons, click ack + lock | yes | yes |
 | Model title cleanup | yes | yes |
 | Grouped `list` + Inbox + Notes + Triage & update | yes | yes |
