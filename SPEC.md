@@ -104,16 +104,19 @@ a channel mention. Channel mentions are always kept unless they are pure chatter
 - Kept: requests, first-person commitments, Gmail with a direct address or a dated
   request, Jira assignments.
 - Rejected: bots, `bd-triager-agent` tags, calendar responses, Jira notification mail,
-  sent mail, chatter, playful requests (`give … a hug`, `high five …`),
+  sent mail, chatter, festive/social greetings ("Happy Deepavali", "Have fun",
+  "Congrats") unless they also contain an explicit ask,
+  playful requests (`give … a hug`, `high five …`),
   questions with no ask ("do you have access?"), status updates ("Update: …"), other
   people's own plans ("I try to get … today"), Google boilerplate, URLs, newsletters.
 
-Rules capture. Every captured row starts as `status: inbox` and waits for a person.
-The optional local model only rewrites the title for readability; it is told every
-message is a candidate and returns one item per message. It cannot drop a row and has
-no commitment verdict. A row the model rewrote keeps the cleaner wording; a row it
-omitted or failed on keeps the rule text. Either way it stays in the inbox until
-confirmed (**Add to list**) or dismissed (**Not a task**).
+Rules capture. Rows matching an auto rule (`slack-direct-ask`, `slack-dm-ask`,
+`email-direct-ask`) are added directly; Jira assignments and the rest wait in Inbox with
+**Add to list** / **Not a task**. The optional local model only rewrites the title
+for readability; it is told every message is a candidate and returns one item per
+message. It cannot drop a row and has no commitment verdict. A row the model rewrote
+keeps the cleaner wording and the rule row's capture decision; a row it omitted or
+failed on keeps the rule text.
 
 A tiny Naive Bayes classifier (`mini_reid/classifier.py`) gives a second opinion on
 bot-addressed social text, trained from the ledger, `not:` corrections and seed
@@ -137,7 +140,17 @@ when the task title was rewritten.
 The watcher schedules a Slack DM 10 minutes before each meeting starts: time, title,
 join link, and "Are you attending?". Reply `yes`, `no <reason>`, or `moved` /
 `rescheduled` / `postponed`; a note after the word is kept. The answer is
-recorded in `meeting_reminders.json` and confirmed in the DM. Slack keeps the schedule,
+recorded in `created_meetings.json` and confirmed in the DM. Meetings created
+through the bot also DM every attendee who maps to a Slack user, with
+**Attending** / **Can't attend** buttons. The organiser can reply
+`reschedule to <time> <note>`; the Google event moves, keeps its duration, and
+attendees are DMed. `cancel <note>` deletes the event, removes the stored
+meeting and reminder, and DMs attendees. `cancel: <meeting name>` cancels the
+nearest upcoming matching event across readable calendars. `moved <note>`
+records the note only. Attendees of bot-created meetings get their own
+10-minute DM with **Attending** / **Can't attend** buttons. `meet:` accepts
+`for 45 minutes` / `for 1 hour` (15–180), strips it from the title, and the Edit
+modal changes it alongside title and notes. Slack keeps the schedule,
 so a sleeping Mac does not lose it. Each meeting is reminded once.
 
 The 09:15 job writes `digest_delivered.json` only after Slack accepts the DM. If it
@@ -152,17 +165,31 @@ New items do not enter a digest bucket until confirmed. The capture DM carries o
 section per item with the sender, `via`, an **open source** link and **Add to list** /
 **Not a task** (at most ten per DM); the rest wait in the list Inbox. The header counts unanswered rows as `N to confirm`.
 
+Overdue, stale and local reminder DMs can check Slack DND and wait while the
+recipient is in Do Not Disturb. Off by default; `RESPECT_DND=1` enables it.
+
 A stale nudge runs at 18:00: open, in progress, blocked and stalled rows with no
 activity today are DMed, up to five at a time, each with an inline status picker. A row
 is nudged at most three times; a status change through triage or the picker resets the
 count. Inbox rows are never nudged as stale or overdue.
 
-`list` is grouped as In progress / Blocked / Overdue / Due today / This week / Later /
-No date (newest first), followed by Inbox and Notes, up to 40 rows. The reply carries a **Triage & update** button that opens a
-modal: select rows (checkboxes chunked ten per Slack block, at most forty selectable),
-choose one status, apply once. **Select all** / **Clear** rebuild the modal with every
-row ticked or none; Slack has no shift-select. Long lists split across section
-blocks on line boundaries so no link is cut at Slack's 3000-char limit.
+`list` is split into My reminders, Reminders I sent, Triage epic, My tasks,
+Tagged by others, Inbox and Notes, up to 40 numbered rows. **Triage epic**
+shows tickets in `tracked_epics.json` that Ridha assigned (Jira changelog),
+with mapped status, assignee and the latest Jira comment or channel message;
+the tracker runs every watcher cycle and closes Done tickets. Inside each section the due buckets keep
+the old order (In progress / Blocked / Overdue / Due today / This week / Later /
+No date). Numbering stays global and matches the order every command uses.
+**Triage & update** opens a modal: select rows (checkboxes chunked ten per Slack
+block), choose one status, apply once; **Select all** / **Clear** rebuild it.
+**Clear Inbox (N)** opens a modal of ten inbox rows: tick the ones that are NOT
+tasks, everything else is added, and submitting advances to the next page. New
+items still arrive as per-item **Add to list** / **Not a task** DMs. Long lists
+split on line boundaries so no link is cut at Slack's 3000-char limit.
+
+A row captured from a Slack tag carries the asker's Slack id. When the row is
+marked done by someone else, the asker gets one DM acknowledgement. Rows closed
+before the id was captured, and email/Jira rows, never produce an ack.
 
 ## Bot commands
 
@@ -175,13 +202,18 @@ ledger), `reassign: <item> to <person>`,
 `edit: <item> to <new name> [by <when>]`, `snooze:`, `waiting:`,
 `drop:` (also `remove:` / `delete:`), `not:` (also dismisses a meeting reminder and
 ignores that title), `remind` (absolute or `in 2 minutes`),
-`ask:`, `find:`, `list`, `notes`, `meet: @Name about <topic>`, `allow: @Name`,
-`banter on|off|status`, `help`. `meet:` accepts one or more attendees
+`ask:` (pending/open/due/task questions use the ledger with a client filter;
+then ingested Slack files; then owner live Slack Real-time Search; then the
+local KB; a non-member gets a private DM answer from the local KB only),
+`find:`, `list`, `notes`, `meet: @Name about <topic>`, `allow: @Name`,
+`banter on|off|status`, `help`, `/mini-reid` (list/help ephemeral, other commands
+in DM). `meet:` accepts one or more attendees
 (`@Kasib and @Charanya`, comma/and-separated names), reads everyone's freeBusy, proposes five
-30-minute slots over five working days with a formal Title/With/Duration block and a
-busy snapshot of both calendars, then creates the Google event with a Meet link and
-invites the attendee. Edit title/notes, Refresh and Cancel buttons; notes become the
-event description, Meet is always created. Requires `calendar.events` consent.
+slots over five working days at the requested duration (default 30 minutes, 15–180)
+with a formal Title/With/Duration block and a busy snapshot of every calendar, then
+creates the Google event with a Meet link and invites the attendees. Edit title,
+duration and notes, Refresh and Cancel buttons; notes become the event description,
+Meet is always created. Requires `calendar.events` consent.
 Google does not expose the Gemini meeting-notes toggle through Calendar API.
 `help` is a topic picker (Capture, Update, Close, Find, Inbox, Reminders, Team,
 Fun) with **My list** and **Triage inbox** buttons, not a command dump.
@@ -202,6 +234,25 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   The list's **Triage & update** modal can settle unanswered rows.
 - The owner mutates `ledger.json`; an allowlisted member mutates only their own
   `data/<slack_id>/ledger.json`. Nobody can read another user's ledger.
+- The App Home tab is a per-user dashboard: a table with 10 task stats,
+  today's meetings, top 3 focus items, Open Slack List, Triage Inbox, Refresh
+  and What I can do. A non-authorised viewer gets a capabilities page with
+  **Request access** (DMs Ridha the captured name/email/Jira and an
+  **Authorise** button that runs the normal `allow:`) and **Message Ridha**;
+  no other ledger is exposed.
+- Each user's ledger is mirrored into a native Slack List (“Mini-Reid — Name”)
+  with title, status, due and source link. The list is created once and shared
+  write with that user; the watcher creates/updates up to 500 live tasks, so
+  every open task is mirrored. The `list` reply includes an **Open Slack List**
+  button with the deep link. Two-way: a Slack edit to title/status/due updates
+  the ledger on the next pull; deleting a List row drops the ledger row;
+  dropped, Inbox and `done` rows are deleted from the List. A done row stays in
+  the ledger as the archive.
+- A member's plain DM to the bot becomes a task without an `add:` prefix;
+  questions and channel messages keep their existing behaviour.
+- The **Add to Mini-Reid** message shortcut captures any message after a prefilled
+  modal. Reacting with `CAPTURE_REACTION` (default `pushpin`) captures it without a
+  modal, into the reacting user's ledger. Both link back to the source message.
 - Bot-addressed chatter from a non-owner is answered with the default line in the
   triggering thread and never stored as a note. Only an explicit command from someone
   else is relayed to Ridha. Every channel reply uses the triggering `thread_ts`.
@@ -213,8 +264,10 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   Jira. Jira uses the shared workspace token, queried by the member's Jira account id;
   Gmail uses the member's own OAuth token. Their reminders, meeting reminders, overdue
   nudge, 18:00 stale nudge and 09:15 digest go only to their DM. New items use the same
-  model title cleanup and inbox confirmation DM; `list`, its **Triage & update** modal
-  and stale pickers all resolve that member's ledger, never the owner's.
+  rules: rows matching an auto rule open directly, and only uncertain ones get the
+  model title cleanup plus the inbox confirmation DM; `list`, its
+  **Triage & update** modal and stale pickers all resolve that member's ledger,
+  never the owner's.
 - `directory.json` (gitignored, mode 600) maps Slack id → name, email and Jira account.
   Rebuild with `python -m mini_reid.directory`. `allow:` reads it first, so any Pantas
   member can be set up without typing their email or Jira id.
@@ -238,8 +291,14 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   the Pantas workspace: `remind me …`, `remind @Arman …`, `remind Arman Rahman …`,
   `add: … at 2pm`. The time is optional; without one the DM is sent immediately. Timed
   reminders are scheduled in Slack (server-side). Only the recipient gets the reminder
-  row; it is not a task for the sender. An unknown name gets a reply, never a silent
-  reminder to the sender.
+  row; it is not a task for the sender. An immediate reminder drops a leading
+  "now" from its text. An unknown name gets a reply, never a silent
+  reminder to the sender. `remind` is the one command a non-member may use; it grants
+  no ledger access.
+  Several people in one command: `remind @Raj, @XieYi and @Lynnette to send updates at
+  5pm` sends the same text to each; starting with `remind` on its own line and one
+  `@Name <item>` per line gives each person their own text. A shared time line applies
+  to every entry. Each recipient gets a separate Slack DM and reminder row.
   A successful reminder is acknowledged with a ⏰ reaction on the command message.
 - `list` numbers open items; `#N` works with `combine`, `done`, `due`, `snooze`, `drop`,
   `waiting`, `not`, `status` and `edit`. Each row also carries a stable short id
@@ -274,7 +333,9 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
 ### Slack app
 
 Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
-`message.groups`. Every Slack message id is claimed once in `bot_state.json` before a
+`message.groups`, `reaction_added`, `app_home_opened`, `file_shared`. Bot
+scopes include `files:read`, `dnd:read` and `lists:read`/`lists:write`. Every
+Slack message id is claimed once in `bot_state.json` before a
 reply, so Slack delivering both `app_mention` and `message.channels` (or a restart
 replaying an event) cannot produce a second response. An edit releases the claim once so
 the corrected text can run. Channel messages that do not mention the bot are ignored. An edit that
@@ -310,6 +371,9 @@ Rebuild nightly at 02:00, incremental.
 | P5 grounded Q&A | done, extractive |
 | P6 learning from corrections | done: `not:` feeds the local classifier |
 | P7 stock-take hub | not started |
+| Flying-car S1 eval harness | done |
+| Flying-car S2 auto-capture (rules-only) | done |
+| Flying-car S3-S6 cloud runtime, actions, planner, pilot | not started |
 
 ## Acceptance criteria
 

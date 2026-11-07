@@ -22,8 +22,9 @@ not wanted, not used.]
 | `penpot` | design files | connected |
 | `bd-deploy` | deploy static apps | connected |
 | `pantas-brain` | wiki, decisions, risks | connected, **excluded by request** |
+| `slack-api` | official Slack MCP, user token, search/read/write | connected |
 
-Not installed: Slack, Jira, Calendar, Drive, web-search MCP.
+Not installed: Jira, Calendar, Drive, web-search MCP.
 
 ### Built-in tools in a Claude Code session
 
@@ -41,7 +42,6 @@ Not installed: Slack, Jira, Calendar, Drive, web-search MCP.
 
 ### APIs reachable but not wired
 
-- Slack search/history — direct user-token call, no MCP needed.
 - Google Drive/Docs/Sheets — extra OAuth scope.
 - Databricks — authentication.
 - Public web — Gemini key, Claude API, or a search API.
@@ -117,12 +117,14 @@ The assistant stops waiting to be asked:
 
 ## Experiments to run before committing
 
-1. Slack MCP as a read-only connector for the Claude session; compare with a
-   ten-line user-token search script.
-2. Live Slack search latency and result quality on real questions.
-3. Jira search via existing token: one query, cited.
-4. Gemini answer quality and cost on non-client questions.
-5. Databricks auth path, then one read-only SQL tool.
+1. ~~Slack MCP as a read-only connector~~ — enabled as `slack-api`.
+2. ~~Live Slack search latency and result quality~~ — wired into owner `ask:`.
+3. Slack List two-way sync under load: rate limits and lost-edit detection.
+4. File ingestion from `file_shared` for `ask:` context.
+5. DND/presence quiet hours for nudges and reminders.
+6. Jira search via existing token: one query, cited.
+7. Gemini answer quality and cost on non-client questions.
+8. Databricks auth path, then one read-only SQL tool.
 
 ## Metrics
 
@@ -135,8 +137,8 @@ The assistant stops waiting to be asked:
 ## Open questions
 
 1. Is any external model allowed, and for which data classes?
-2. Slack MCP or direct Slack API calls? Direct calls already work and add no
-   dependency.
+2. ~~Slack MCP or direct Slack API calls?~~ Both: official MCP enabled for
+   Claude sessions; the bot keeps direct Web API calls.
 3. Which Google scopes are acceptable for Drive/Docs/Sheets?
 4. Databricks: which catalog/schema is safe to expose, and to whom?
 5. Should non-owner members get tool answers at all, or only the owner?

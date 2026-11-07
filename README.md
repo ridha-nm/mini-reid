@@ -14,42 +14,55 @@ Gmail, Jira and Google Calendar.
   If delivery fails (no DNS at 09:15), the watcher rebuilds and delivers after 09:30,
   retrying every 10 minutes until Slack accepts it.
 - **Watcher** (every 2 min): new Slack mentions, DMs to you, inbox mail including
-  already-read mail, and Jira issues assigned to you. Every new item waits as Inbox and
-  gets a DM with the sender, an **open source** link and **Add to list** / **Not a
-  task**; the click updates that DM with the outcome and removes its buttons, Add
-  opens it on the list and ✅s the source. Nothing reaches the digest until confirmed. The first cycle after 09:00 also
+  already-read mail, and Jira issues assigned to you. Rows matching a Slack or
+  email auto-capture rule are added directly; Jira issues and the rest wait in
+  Inbox and get a DM with the sender, an **open source** link and **Add to list** /
+  **Not a task**; the click updates that DM with the outcome and removes its
+  buttons, Add opens it on the list and ✅s the source. The first cycle after 09:00 also
   DMs any overdue rows once a day. Each meeting gets a DM 10 minutes before it starts,
-  with the join link and "Are you attending?". Answer `yes`, `no <reason>`, or
-  `moved` / `rescheduled` / `postponed` in the DM.
+  with the join link and "Are you attending?". Attendees of meetings created through
+  Mini-Reid get the same DM with **Attending** / **Can't attend** buttons, if they map
+  to a Slack user. Answer `yes`, `no <reason>`, or `moved <note>`; the organiser can
+  reply `reschedule to <time> <note>` to move the event and notify attendees, or
+  `cancel: <meeting name>` to cancel any upcoming matching event.
   The watcher also polls Ridha's DMs for `remind` commands in conversations the bot is
   not part of.
 - **Bot** (`@minireid`): add, assign, reassign, note, tonote/convert, status, priority,
   combine, uncombine, undo, done, due, edit, snooze, waiting, drop, not, remind,
   meet, find, list, notes, ask, clients, help. `meet: @Kasib about X` (or
-  `meet: @Kasib and @Charanya about X`) checks every calendar, shows a busy snapshot
-  with formal details, offers free slots, lets you edit the title/notes, and creates
+  `meet: @Kasib and @Charanya about X`, plus `for 45 minutes` / `for 1 hour`)
+  checks every calendar, shows a busy snapshot with formal details, offers free
+  slots at that duration, lets you edit the title, duration and notes, and creates
   the Meet invite for everyone. `clients` shows the email filter;
   `clients: Eupe, Gamuda` replaces it. Portfolios GHB/GVC/SAFE are accepted.
   `banter on/off/status` controls sassy replies; only tagged abuse triggers one.
   Untagged messages are always ignored. Banter is allowed only in `#ee-leads-only`
   and `#probies`.
-  `list` prints a stable short id per row, grouped by status and due date with
-  relative due labels (`3d overdue`, `today`, `in 2d`), plus an Inbox section for
-  items awaiting confirmation, then Notes; its **Triage & update** button lets you
-  set a status on several rows at once, with **Select all** / **Clear**. `185045` or `id:185045` works in every command;
+  `list` prints a stable short id per row, split into My reminders, Triage epic
+  (tickets you assigned in a tracked Jira epic, with status, assignee and latest
+  chatter), My tasks, Tagged by others, Inbox and Notes; priority and relative due
+  labels (`3d overdue`, `today`, `in 2d`) still show. **Triage & update** sets a
+  status on selected rows; **Clear Inbox (N)** opens 10 pending rows, where you
+  tick the ones that are NOT tasks and add the rest in one pass. When someone
+  marks a task you tagged them in as done, you get one DM acknowledgement. `185045` or `id:185045` works in every command;
   `done`/`not` also take bulk refs (`done 7, 9`) or a pasted list, one bullet per
   line; the `[abc123]` ids in the paste pick the exact rows, and titles are
   matched as a fallback. `not:` also matches notes.
   `undo:` reverses the last change. Priority 1-5 sorts the digest and list.
   `help` opens a topic picker grouped by intent, with My list and Triage buttons.
+  `/mini-reid` opens the list ephemerally; `/mini-reid add: …`, `remind …`,
+  `meet: …` run in DM.
   Open rows untouched for a day get an evening DM (max 3 per row) with an inline
-  status picker.
+  status picker. Optional DND quiet hours for nudges/reminders: `RESPECT_DND=1`
+  (off by default).
   Successful `add:` reacts ➕; `note:` / `tonote:` react 📝; `remind:` reacts ⏰.
   Your command replies go to your DM, not the channel; channel replies to anyone else
   stay in the triggering thread. Only you can change your ledger.
   Anyone can set a private
-  reminder for themselves or a teammate — it never becomes a task for the sender;
-  the recipient gets it on their own list as a reminder row.
+  reminder for themselves, one teammate, or several at once — it never becomes a
+  task for the sender; each recipient gets it on their own list as a reminder row.
+  Several people: `remind @Raj, @XieYi and @Lynnette to send updates at 5pm`, or
+  one `@Name <item>` line per person with the time on its own line.
   Tagged messages work in plain language too (`please mark the deck done`,
   `can you remind xieyi he owes me the gameplan`), with typo-tolerant commands
   and names. An ambiguous `by Friday 2pm` asks **Now / At Friday / Both** with
@@ -61,7 +74,12 @@ Gmail, Jira and Google Calendar.
 - **Teammates**: Ridha runs `allow: @Charanya`. The bot creates an isolated profile,
   DMs a one-time setup link, and starts capture for that member. Their commands, ledger,
   Slack mention alerts, reminders, meeting reminders and 09:15 digest stay private;
-  new items get the same confirmation buttons, grouped list/triage and stale nudges.
+  new items get the same auto-capture rules (matching rows open directly, the rest
+  get confirmation buttons), grouped list/triage and stale nudges.
+  A member can DM the bot plain text and it becomes a task; no prefix needed.
+  Right-click any message and choose **Add to Mini-Reid**, or react with 📌, to
+  capture it without tagging the bot. 📌 sends an `Added:` DM, and both show under
+  **Just added** at the top of `list`.
   Jira activates automatically from the shared workspace token, scoped to their Jira
   account. Gmail uses a hosted Google OAuth page: one click, consent, done. The Cloud
   Run relay holds the code for seconds and the Mac picks it up. A profile's `clients`
@@ -71,7 +89,22 @@ Gmail, Jira and Google Calendar.
   `python -m mini_reid.accounts` rebuilds email → client accounts from the
   stocktake-hub config.
 - **Knowledge base**: local retrieval over your sent Slack, sent mail, received mail and
-  local documents. `ask:` returns passages from your own writing, with sources.
+  local documents. `ask:` answers pending/open/due questions from the ledger first,
+  then ingested Slack files (PDF, DOCX, XLSX, text), then live Slack Real-time
+  Search, then the local passages. Shared files auto-ingest; react 📄 to ingest
+  a file on an older message. Summary goes to Ridha only. A non-member who asks
+  a question gets a private DM answer from the local passages only — never the
+  ledger, files or live Slack.
+- **App Home**: per-person dashboard with a table of 10 task stats, today's
+  meetings, top 3 focus items, Open Slack List, Triage Inbox and Refresh. Non-authorised users get a capabilities page with
+  **Request access** (DMs you an **Authorise** button) and **Message Ridha**,
+  never another ledger.
+- **Slack List mirror**: each user's ledger is mirrored into a native Slack List with
+  title, status, due and source; created once and updated every watcher cycle.
+  `list` includes an **Open Slack List** button. Edits in the List flow back to
+  the ledger; deleting a row there drops the task; non-tasks are removed. Rows
+  marked `done` are removed from the List on the next sync and archived in the
+  ledger.
 
 ## Run
 
@@ -90,11 +123,17 @@ cd ~/mini-reid
 `./run.sh` is the digest job. `./run_bot.sh` is the listener. `./run_watcher.sh` is one
 watcher pass.
 
+The agents run on this Mac and only while it is awake; sleep pauses capture, digests
+and reminders until the next cycle. The catch-up sweep replays what the bot missed.
+
 ## Slack app
 
 Socket Mode. Bot events: `app_mention`, `message.im`, `message.channels`,
-`message.groups` (manifest: `slack-app-manifest.yaml`). Interactivity is on for the
-reminder clarification buttons. The two message subscriptions exist so an edited
+`message.groups`, `reaction_added`, `app_home_opened`, `file_shared`
+(manifest: `slack-app-manifest.yaml`). Bot scopes include `files:read`,
+`dnd:read`, `lists:read`/`lists:write`. Reinstall after changing scopes or
+events.
+Interactivity is on for the reminder clarification buttons. The two message subscriptions exist so an edited
 mention can be acknowledged with ✅; every other channel message is ignored unless it
 addresses the bot. Each message id is answered once; `bot_state.json` tracks handled
 ids across restarts. On startup, catch-up replays missed channel mentions and DMs —

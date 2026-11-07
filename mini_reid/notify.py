@@ -57,12 +57,15 @@ def send_dm(env: dict, text: str, blocks: list[dict] | None = None) -> dict:
     return send_dm_to(env, env["SLACK_OWNER_ID"], text, blocks=blocks)
 
 
-def schedule_dm(env: dict, user_id: str, text: str, post_at: int) -> str:
+def schedule_dm(env: dict, user_id: str, text: str, post_at: int,
+                blocks: list[dict] | None = None) -> str:
     """Slack-side scheduled DM. Survives this Mac sleeping."""
     token = env["SLACK_BOT_TOKEN"]
     ch = dm_channel(token, user_id)
-    d = _post("chat.scheduleMessage", token, channel=ch, text=text[:39000],
-              post_at=post_at)
+    data = {"channel": ch, "text": text[:39000], "post_at": post_at}
+    if blocks:
+        data["blocks"] = json.dumps(blocks)
+    d = _post("chat.scheduleMessage", token, **data)
     if not d.get("ok"):
         raise RuntimeError(f"chat.scheduleMessage: {d.get('error')}")
     return d.get("scheduled_message_id") or ""
@@ -109,3 +112,19 @@ def dm_reply_count(env: dict, user_id: str, since_ts: float) -> int:
         return 0
     return sum(1 for m in d.get("messages") or []
                if m.get("user") == user_id and not m.get("subtype"))
+
+
+def sent_reminders(user_id: str, limit: int = 3,
+                   path: str = REMINDER_LOG) -> list[dict]:
+    """Reminders this person scheduled for someone else, newest first."""
+    try:
+        rows = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return []
+    if not isinstance(rows, list):
+        return []
+    mine = [r for r in rows
+            if r.get("asked_by") == user_id and r.get("to") != user_id
+            and r.get("status") in {"scheduled", "sent"}]
+    mine.sort(key=lambda r: r.get("post_at") or "", reverse=True)
+    return mine[:limit]

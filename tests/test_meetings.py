@@ -23,6 +23,9 @@ def test_meeting_phrase_parses_to_meet():
     assert parse_meeting("Kasib, Charanya and Arman Rahman about the deck",
                          people, "U0") == (
         ["U1", "U2", "U3"], "the deck")
+    assert parse_meeting("Nish and Eden on the Change Request Workflow",
+                         {"nish": "U4", "eden": "U5"}, "U0") == (
+        ["U4", "U5"], "the Change Request Workflow")
 
 
 def test_propose_slots_skips_busy_and_weekend(monkeypatch):
@@ -92,3 +95,82 @@ def test_slot_blocks_show_both_calendars_busy():
                            slots, busy))
     assert "Availability snapshot" in text
     assert "09:00–10:00" in text and "10:00–11:00" in text
+
+
+def test_busy_snapshot_skips_midnight_boundary_and_labels_all_day():
+    from datetime import date
+
+    from mini_reid.meeting_ui import _busy_on
+
+    day = date(2026, 11, 11)
+    boundary = (datetime(2026, 11, 10, 23, 0, tzinfo=MYT),
+                datetime(2026, 11, 11, 0, 0, tzinfo=MYT))
+    all_day = (datetime(2026, 11, 11, 0, 0, tzinfo=MYT),
+               datetime(2026, 11, 12, 0, 0, tzinfo=MYT))
+    assert _busy_on([boundary], day) == "free"
+    assert _busy_on([all_day], day) == "all day"
+
+
+def test_parse_duration_phrases():
+    from mini_reid.meetings import parse_duration, strip_duration
+
+    assert parse_duration("Change Request for 45 minutes") == 45
+    assert parse_duration("deck for 1 hour") == 60
+    assert parse_duration("deck for an hour") == 60
+    assert parse_duration("no duration") is None
+    assert strip_duration("Change Request for 45 minutes") == "Change Request"
+
+
+def test_slot_blocks_show_the_chosen_duration():
+    from datetime import datetime, timedelta
+
+    from mini_reid.meeting_ui import slot_blocks
+
+    start = datetime(2026, 11, 6, 12, 0, tzinfo=MYT)
+    slots = [{"start": start.isoformat(),
+              "end": (start + timedelta(minutes=45)).isoformat()}]
+    blocks = slot_blocks("t", "Deck", [{"name": "A", "email": "a@x"}],
+                         slots, duration=45)
+    text = str(blocks)
+    assert "45 minutes" in text
+
+
+def test_edit_modal_includes_editable_duration():
+    from mini_reid.meeting_ui import edit_modal
+
+    view = edit_modal("t", "Deck", duration=45)
+    blocks = {b.get("block_id"): b for b in view["blocks"] if b.get("block_id")}
+    assert blocks["duration"]["element"]["initial_value"] == "45"
+    assert blocks["duration"]["label"]["text"] == "Duration (minutes)"
+
+
+def test_cancel_by_title_picks_the_nearest_match(monkeypatch):
+    from mini_reid import meetings
+
+    events = [
+        {"id": "e2", "summary": "Change Request Workflow",
+         "start": {"dateTime": (NOW + timedelta(hours=3)).isoformat()}},
+        {"id": "e1", "summary": "Change Request Workflow",
+         "start": {"dateTime": (NOW + timedelta(hours=1)).isoformat()}},
+        {"id": "e3", "summary": "Unrelated",
+         "start": {"dateTime": NOW.isoformat()}},
+    ]
+    monkeypatch.setattr(meetings, "upcoming_events",
+                        lambda env, now, *a, **k: events)
+    deleted = []
+    monkeypatch.setattr(meetings, "delete_event",
+                        lambda env, eid, *a, **k: deleted.append(eid))
+    reply = meetings.cancel_by_title({}, "change request", NOW)
+    assert deleted == ["e1"]
+    assert reply.startswith("Cancelled: Change Request Workflow")
+    assert meetings.cancel_by_title({}, "nothing like this", NOW) is None
+
+
+def test_email_to_slack_reads_the_directory(tmp_path):
+    import json
+
+    from mini_reid.meetings import email_to_slack
+
+    path = tmp_path / "directory.json"
+    path.write_text(json.dumps({"U1": {"email": "a@pantas.com"}}))
+    assert email_to_slack(str(path)) == {"a@pantas.com": "U1"}

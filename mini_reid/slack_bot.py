@@ -54,6 +54,12 @@ ABUSE = re.compile(
     r"\b(?:molests?|rap(?:e|es|ed|ing|ist|ists)|grop(?:e|es|ed|ing))\b", re.I)
 ABUSE_DM = ("That message was abusive and it isn't okay here. "
             "I flagged it — please be better.")
+LINK_ONLY = re.compile(r"<?https?://[^|>\s]+(?:\|[^>]*)?>?", re.I)
+
+
+def is_link_only(text: str) -> bool:
+    """A bare pasted link is never a note."""
+    return bool(LINK_ONLY.fullmatch((text or "").strip()))
 INSULT = re.compile(
     r"\b(shut\s+up|stfu|fuck\w*|fking|fkin|fck|fk|idiot|stupid|dumb|moron|"
     r"asshole|bastard|bitch\w*|ass|arse|shit\w*|crap|damn|piss\s+off|"
@@ -473,6 +479,8 @@ def parse_remind(body: str, now) -> tuple[dict | None, str]:
     # No time and no date: remind now. A reminder that needs a schedule is
     # friction; "remind me to X" should just send it.
     if date_iso is None and hour is None:
+        clean = re.sub(r"^(?:(?:right\s+)?now|immediately|straight\s+away)\b\s*",
+                       "", clean, flags=re.I).strip(" ,-") or clean
         return ({"remind_at": now.replace(microsecond=0).isoformat(timespec="seconds"),
                  "due": now.date().isoformat(), "what": clean or body,
                  "immediate": True}, clean or body)
@@ -489,6 +497,72 @@ def parse_remind(body: str, now) -> tuple[dict | None, str]:
             if candidate <= now:
                 at = (candidate + timedelta(days=1)).isoformat(timespec="seconds")
     return {"remind_at": at, "due": date_iso, "what": clean or body}, clean
+
+
+def meeting_cancel_query(text: str) -> str | None:
+    """`cancel`, `cancel: <name>`, `Meeting: cancel <name>`.
+
+    Returns the meeting-name query, "" for the nearest meeting, or None when
+    the text is not a meeting-cancel request.
+    """
+    raw = (text or "").strip()
+    m = re.match(
+        r"^(?:meeting\s*:\s*)?cancel\s*:?\s+"
+        r"(?:the\s+)?(?:meeting\s+)?(.+)$", raw, re.I)
+    if m:
+        return m.group(1).strip(" ,-")
+    if re.fullmatch(r"(?:meeting\s*:\s*)?cancel", raw, re.I):
+        return ""
+    return None
+
+
+def parse_multi_remind(body: str, users: dict[str, str],
+                       now: "datetime") -> list[tuple[str, dict]] | None:
+    """Two forms: one shared text for several people, or one line per person.
+
+    remind @Raj, @XieYi and @Lynnette to send updates at 5pm
+    remind
+    @Raj audit agents gameplan
+    @XieYi brain implementation gameplan
+    at 5pm today
+    """
+    text = re.sub(r"^\s*remind\s*:?\s*", "", (body or "").strip(), flags=re.I)
+    if not text:
+        return None
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) > 1:
+        per_person, tail = [], []
+        for line in lines:
+            m = re.match(r"^(@[^\s]+|<@[A-Z0-9]+(?:\|[^>]*)?>)\s+(.+)$", line)
+            if m:
+                per_person.append((m.group(1), m.group(2)))
+            elif re.match(r"^(?:at|by|on|before)\b", line, re.I):
+                tail.append(line)
+            else:
+                tail.append(line)
+        if per_person:
+            suffix = " ".join(tail)
+            out = []
+            for mention, what in per_person:
+                targets = _meeting_people(mention, users)
+                if len(targets) != 1:
+                    return None
+                fields, _ = parse_remind(f"{what} {suffix}".strip(), now)
+                if fields is None:
+                    return None
+                out.append((targets[0], fields))
+            return out if len(out) > 1 else None
+        return None
+    m = re.match(r"^(?P<who>.+?)\s+to\s+(?P<rest>.+)$", text, re.I)
+    if not m:
+        return None
+    targets = _meeting_people(m.group("who"), users)
+    if len(targets) < 2:
+        return None
+    fields, _ = parse_remind(m.group("rest"), now)
+    if fields is None:
+        return None
+    return [(uid, fields) for uid in targets]
 
 
 def send_reminder(env: dict, recipient: str, what: str,
@@ -586,7 +660,8 @@ def format_reminders(rows: list[dict], pending: set[str],
 
 
 QUERY = re.compile(
-    r"^\s*(what|when|who|how|show|list|any|status|which)\b|\?\s*$", re.I)
+    r"^\s*(what|whats|when|who|how|show|list|any|status|which)\b|\?\s*$",
+    re.I)
 
 
 def owner_action(action: str, body: str) -> str:
@@ -745,7 +820,7 @@ def parse_meeting(body: str, users: dict[str, str],
     text = re.sub(r"^with\s+", "", (body or "").strip(), flags=re.I)
     topic = ""
     m = re.search(
-        r"\s+(?:to\s+)?(?:discuss|talk\s+about|review|about|re)\s*:?\s+(.+)$",
+        r"\s+(?:to\s+)?(?:discuss|talk\s+about|review|about|on|re)\s*:?\s+(.+)$",
         text, re.I)
     if m:
         people_text, topic = text[:m.start()].strip(), m.group(1).strip()
@@ -804,6 +879,122 @@ def add_reminder_row(ledger_path: str, what: str, fields: dict,
     Path(ledger_path).parent.mkdir(parents=True, exist_ok=True)
     save(ledger_path, merge(load(ledger_path), [row]))
     return row
+
+
+def add_slack_capture(ledger_path: str, text: str, channel: str, ts: str,
+                      user: str, users: dict[str, str], now: datetime,
+                      permalink: str = "", team: str = "gopantas",
+                      via: str = "shortcut") -> dict:
+    """An explicit shortcut or reaction captures the message as an open task."""
+    clean = (text or "").strip()
+    link = permalink or (
+        f"https://{team}.slack.com/archives/{channel}/p{ts.replace('.', '')}")
+    row = {
+        "id": commitment_id("slack", f"{channel}:{ts}", clean),
+        "direction": "owed_by_me", "what": clean[:200],
+        "asker": _person_name(user, users) or None,
+        "via": via, "source": "slack", "native_id": f"{channel}:{ts}",
+        "kind": "mention", "source_link": link, "evidence": clean[:200],
+        "due": None, "due_confidence": 0.0, "cycle": None,
+        "status": "open", "stalled_since": None, "ack_policy": "bot_may_ack",
+        "closure": "open", "client": None,
+        "created_at": now.isoformat(), "last_activity": now.isoformat(),
+        "closed_at": None, "closed_how": None,
+    }
+    save(ledger_path, merge(load(ledger_path), [row]))
+    return row
+
+
+def capture_modal(text: str, metadata: dict) -> dict:
+    """Prefilled modal for the 'Add to Mini-Reid' message shortcut."""
+    blocks = [
+        {"type": "section",
+         "text": {"type": "mrkdwn",
+                  "text": "Turn this message into a task. Edit the title if needed."}},
+        {"type": "input", "block_id": "title",
+         "label": {"type": "plain_text", "text": "Task"},
+         "element": {"type": "plain_text_input", "action_id": "value",
+                     "initial_value": (text or "")[:200], "max_length": 200}},
+    ]
+    link = metadata.get("permalink") or ""
+    if link:
+        blocks.insert(1, {"type": "section",
+                          "text": {"type": "mrkdwn",
+                                   "text": f"<{link}|open source message>"}})
+    return {
+        "type": "modal", "callback_id": "mini_reid_capture",
+        "private_metadata": json.dumps(metadata)[:2900],
+        "title": {"type": "plain_text", "text": "Add to Mini-Reid"},
+        "submit": {"type": "plain_text", "text": "Add task"},
+        "close": {"type": "plain_text", "text": "Cancel"},
+        "blocks": blocks,
+    }
+
+
+def fetch_message_text(env: dict, channel: str, ts: str) -> str:
+    """Read the message behind a shortcut or reaction; bot token first."""
+    from .sources import _get_json
+
+    for key in ("SLACK_BOT_TOKEN", "SLACK_USER_TOKEN"):
+        token = env.get(key)
+        if not token:
+            continue
+        url = ("https://slack.com/api/conversations.history?"
+               + urllib.parse.urlencode({"channel": channel, "oldest": ts,
+                                         "latest": ts, "inclusive": "true",
+                                         "limit": 1}))
+        try:
+            d = _get_json(url, {"Authorization": f"Bearer {token}"})
+        except Exception:  # noqa: BLE001 - try the next token
+            continue
+        for message in d.get("messages") or []:
+            if message.get("ts") == ts and not message.get("bot_id"):
+                return (message.get("text") or "").strip()
+    return ""
+
+
+def file_reaction(event: dict, name: str) -> tuple[str, str, str] | None:
+    """(channel, message ts, reactor) for the file-ingest emoji."""
+    return capture_reaction(event, name)
+
+
+def capture_reaction(event: dict, name: str) -> tuple[str, str, str] | None:
+    """(channel, message ts, reacting user) for the capture emoji only."""
+    if event.get("type") != "reaction_added":
+        return None
+    if (event.get("reaction") or "").lower() != name.lower():
+        return None
+    item = event.get("item") or {}
+    if item.get("type") != "message":
+        return None
+    channel, ts = item.get("channel") or "", item.get("ts") or ""
+    user = event.get("user") or ""
+    return (channel, ts, user) if channel and ts and user else None
+
+
+def slash_route(text: str) -> str:
+    """list, help, add (plain task text), or command for /mini-reid."""
+    value = (text or "").strip()
+    low = value.lower()
+    if not value or low in {"list", "ls", "open"}:
+        return "list"
+    if low in {"help", "?"}:
+        return "help"
+    if re.search(r"^(?:what'?s|whats)\b.*\b(?:to-?do|to do)\b", low):
+        return "list"
+    action, _ = parse_command(value)
+    if (action in COMMANDS or action in {"ask", "find", "notes", "reminders"}
+            or value.rstrip().endswith("?")):
+        return "command"
+    return "add"
+
+
+def member_quick_add(channel: str, action: str, member: bool,
+                     text: str) -> bool:
+    """A member's plain DM becomes a task; no `add:` prefix needed."""
+    return bool(member and channel.startswith("D") and action == "unknown"
+                and (text or "").strip()
+                and not (text or "").rstrip().endswith("?"))
 
 
 def should_schedule_reminder(action: str, requester: str, owner: str,
@@ -884,7 +1075,8 @@ POLITE_PREFIX = re.compile(
     r"(?:(?:please|pls|kindly|can you|could you|would you|will you|can u)\s+)*",
     re.I)
 NATURAL_VERBS = ("add", "note", "done", "drop", "remind", "due", "snooze",
-                 "waiting", "find", "status", "assign", "list", "help")
+                 "waiting", "find", "status", "assign", "list", "help",
+                 "undo")
 VERB_ALIASES = {
     "close": "done", "complete": "done", "completed": "done",
     "finish": "done", "finished": "done", "mark": "done",
@@ -918,6 +1110,10 @@ def natural_command(body: str) -> tuple[str, str] | None:
     text = POLITE_PREFIX.sub("", (body or "").strip()).strip()
     if not text:
         return None
+    # A reminder list starts with the verb alone on its line.
+    m = re.match(r"^remind\b\s*:?\s*\n(.+)$", text, re.I | re.S)
+    if m:
+        return "remind", m.group(1).strip()
     if re.search(r"\?\s*$", text) or re.match(
             r"^(?:what|when|where|who|why|how|which|do you|tell me)\b", text, re.I):
         return "ask", text
@@ -955,6 +1151,8 @@ def natural_command(body: str) -> tuple[str, str] | None:
         return "list", ""
     if verb == "help":
         return "help", ""
+    if verb == "undo":
+        return "undo", ""
     if verb == "assign":
         m = re.match(r"^(.+?)\s+to\s+(.+)$", rest, re.I)
         if m:
@@ -1142,6 +1340,9 @@ def _pick(rows: list[dict], target: str) -> tuple[dict | None, str | None]:
     is stable across edits and reordering."""
     # People copy ids straight from `list`, brackets and all.
     t = (target or "").strip().strip("[]").strip()
+    if re.match(r"^(?:what'?s|whats|what is|show|list|any)\b", t, re.I) \
+            or t.endswith("?"):
+        return None, "That reads like a question. Use `list` or `find:` instead."
     m = re.fullmatch(r"(?:id:)?([0-9a-f]{4,40})", t, re.I)
     if m:
         prefix = m.group(1).lower()
@@ -1792,7 +1993,8 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
             learning.add(row.get("what", ""), reason=body,
                          source=row.get("source", ""))
             return f"Removed as not a commitment: {row['what'][:80]}"
-        if err and err.startswith("Which one?"):
+        if err and (err.startswith("Which one?")
+                    or "reads like a question" in err):
             return err
         learning.add(body, reason="manual correction", source="manual")
         return "Recorded. I will ignore similar messages from now on."
@@ -2018,6 +2220,10 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         member = user != owner and user in profiles
         user_ledger = ledger_for(profiles, user, ledger_path) if member else ledger_path
 
+        if is_link_only(text):
+            _mark(ts)
+            return
+
         def say(text: str, notify: bool | None = None,
                 blocks: list[dict] | None = None):
             """Reply to the command sender, privately for owner and members."""
@@ -2130,6 +2336,13 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         # Catch-up replays missed commands too, not only questions. Each
         # message is claimed once in bot_state.json, so a replay cannot repeat.
 
+        if member_quick_add(channel, action, member, text):
+            reply = _apply_command("add", text.strip(), datetime.now(MYT),
+                                   clients, user_ledger, users)
+            say(reply)
+            _mark(ts)
+            return
+
         if action == "meet":
             if user != owner:
                 say("Only Ridha can schedule meetings.")
@@ -2159,9 +2372,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 return
             emails = [a["email"] for a in attendees]
             names = ", ".join(a["name"] for a in attendees)
+            from .meetings import (SLOT_MINUTES, parse_duration,
+                                   strip_duration)
+
+            duration = parse_duration(body) or SLOT_MINUTES
+            topic = strip_duration(topic) or topic
             busy: dict = {}
             try:
-                slots = propose_slots(env, emails, busy_out=busy)
+                slots = propose_slots(env, emails, busy_out=busy,
+                                      duration=duration)
             except Exception as ex:  # noqa: BLE001 - tell the owner why
                 say(f"Could not read calendars: {type(ex).__name__}: {ex}")
                 _mark(ts)
@@ -2177,12 +2396,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             pending = state_now.setdefault("pending_meet", {})
             pending[token] = {"topic": topic, "emails": emails,
                               "attendees": attendees, "attendee": names,
-                              "slots": slots, "user": user, "channel": channel}
+                              "slots": slots, "user": user, "channel": channel,
+                              "duration": duration}
             if len(pending) > 50:
                 state_now["pending_meet"] = dict(list(pending.items())[-50:])
             Path(STATE).write_text(json.dumps(state_now))
             sent = say(f"Free slots with {names}:",
-                       blocks=slot_blocks(token, topic, attendees, slots, busy))
+                       blocks=slot_blocks(token, topic, attendees, slots,
+                                          busy, duration=duration))
             if sent:
                 pending[token]["channel"] = sent.get("channel") or channel
                 pending[token]["message_ts"] = sent.get("ts") or ""
@@ -2268,27 +2489,70 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
 
         if action == "ask":
             allow = {u.strip() for u in env.get("KB_ALLOWLIST", "").split(",") if u.strip()}
-            if user != owner and user not in allow:
-                say("You are not on the list for that. Ask Ridha to add you.")
-                return
-            try:
-                from .kb import answer as kb_answer
-                from .kb import load as kb_load
+            full = user == owner or user in allow
+            reply = ""
+            if full:
+                try:
+                    from .ask_ledger import answer_ledger
 
-                index = kb_load()
-                if not index:
-                    reply = "Knowledge base is empty. Ridha needs to run the index build."
-                else:
-                    body_text, hits = kb_answer(body, index)
-                    sources = "\n".join(
-                        f"[{i}] {h['source']} · {h['link']}"
-                        for i, h in enumerate(hits, 1) if h.get("link"))
-                    reply = f"{body_text}\n\n{sources}"
-            except Exception as ex:  # noqa: BLE001
-                reply = f"Could not answer: {type(ex).__name__}"
+                    reply = answer_ledger(body, load(user_ledger), clients) or ""
+                except Exception as ex:  # noqa: BLE001 - fall through to search/KB
+                    print(f"  ledger ask failed: {type(ex).__name__}: {ex}",
+                          flush=True)
+            if not reply and user == owner:
+                try:
+                    from .files import search as file_search
+
+                    file_hits = file_search(body)
+                    if file_hits:
+                        reply = "*From files*\n" + "\n".join(
+                            f"• *{h['name']}*: {h['text'][:300]}" +
+                            (f" — <{h['permalink']}|open>"
+                             if h.get("permalink") else "")
+                            for h in file_hits)
+                except Exception as ex:  # noqa: BLE001 - files are optional
+                    print(f"  file ask failed: {type(ex).__name__}: {ex}",
+                          flush=True)
+            if not reply and user == owner:
+                try:
+                    from .slack_search import format_hits, search as slack_search
+
+                    hits = slack_search(env, body)
+                    if hits:
+                        reply = "*From Slack*\n" + format_hits(hits)
+                except Exception as ex:  # noqa: BLE001 - fall back to the KB
+                    print(f"  live slack search failed: "
+                          f"{type(ex).__name__}: {ex}", flush=True)
+            if not reply:
+                try:
+                    from .kb import answer as kb_answer
+                    from .kb import load as kb_load
+
+                    index = kb_load()
+                    if not index:
+                        reply = ("Knowledge base is empty. Ridha needs to run "
+                                 "the index build.") if full else ""
+                    else:
+                        body_text, hits = kb_answer(body, index)
+                        sources = "\n".join(
+                            f"[{i}] {h['source']} · {h['link']}"
+                            for i, h in enumerate(hits, 1) if h.get("link"))
+                        reply = f"{body_text}\n\n{sources}"
+                except Exception as ex:  # noqa: BLE001
+                    reply = f"Could not answer: {type(ex).__name__}"
+            if not reply and not full:
+                reply = ("I only answer from my notes for now. For your own "
+                         "tasks and reminders, ask Ridha to add you to Mini-Reid.")
             if late:
                 reply = "_(answered late, I was offline)_\n" + reply
-            say(reply[:3900])
+            if full:
+                say(reply[:3900])
+            else:
+                # A non-member's answer is private and never touches a ledger.
+                try:
+                    send_dm_to(env, user, reply[:3900])
+                except Exception:  # noqa: BLE001 - best effort
+                    pass
             _mark(ts)
             return
 
@@ -2298,6 +2562,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         target, rest = (split_target(body, users, user,
                                      bare_name=(action == "remind"))
                         if action in {"add", "remind", "allow"} else (None, body))
+        multi_remind = (parse_multi_remind(body, users, datetime.now(MYT))
+                        if action == "remind" else None)
         if action == "allow":
             if user != owner:
                 say("Only Ridha can allow people.")
@@ -2340,6 +2606,46 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 _mark(ts)
                 return
             say(f"Allowed {name}. Setup link sent to their DM.")
+            _mark(ts)
+            return
+        if action == "remind" and multi_remind:
+            now = datetime.now(MYT)
+            set_for, failed = [], []
+            for recipient, fields in multi_remind:
+                at = datetime.fromisoformat(fields["remind_at"])
+                name = _person_name(recipient, users)
+                if at <= now:
+                    failed.append(f"{name} (time in the past)")
+                    continue
+                recipient_ledger = (
+                    ledger_path if recipient == owner
+                    else (profiles.get(recipient) or {}).get("ledger"))
+                if recipient_ledger:
+                    add_reminder_row(recipient_ledger, fields["what"], fields,
+                                     now)
+                try:
+                    from .notify import REMINDER_LOG, log_reminder, schedule_dm
+
+                    sid = schedule_dm(env, recipient,
+                                      f"*Reminder*\n{fields['what'][:300]}",
+                                      int(at.timestamp()))
+                    log_reminder(
+                        REMINDER_LOG, asked_by=user,
+                        asked_by_name=_person_name(user, users),
+                        to=recipient, to_name=name, what=fields["what"],
+                        post_at=at.isoformat(), scheduled_id=sid,
+                        channel=channel)
+                except Exception as ex:  # noqa: BLE001 - report, keep others
+                    print(f"  multi remind failed: {type(ex).__name__}: {ex}",
+                          flush=True)
+                    failed.append(f"{name} ({type(ex).__name__})")
+                    continue
+                set_for.append(f"{name} {at:%H:%M}")
+            if set_for:
+                say(f"Reminders set for {len(set_for)}: " + ", ".join(set_for))
+            if failed:
+                say("Could not set: " + ", ".join(failed))
+            react_ack(web, channel, ts, EMOJI_ACKS["remind"])
             _mark(ts)
             return
         if action == "remind" and target is None:
@@ -2459,6 +2765,47 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             return
 
         if (user == owner or member) and channel.startswith("D"):
+            raw_text = LEADING_MENTION.sub("", text or "").strip()
+            query = meeting_cancel_query(raw_text)
+            if query is not None and user == owner:
+                from .meetings import (cancel_by_reminder, cancel_by_title,
+                                       cancel_nearest)
+
+                now = datetime.now(MYT)
+                state_file = ("meeting_reminders.json" if user == owner
+                              else f"data/{user}/meeting_reminders.json")
+                if query:
+                    try:
+                        done = cancel_by_title(env, query, now)
+                    except Exception as ex:  # noqa: BLE001 - report it
+                        done = (f"Could not cancel that meeting: "
+                                f"{type(ex).__name__}: {ex}")
+                    if not done and (action == "note"
+                                     or raw_text.lower().startswith("meeting")):
+                        done = f"No upcoming meeting matches “{query}”."
+                else:
+                    done = (cancel_nearest(env, now)
+                            or cancel_by_reminder(env, now, "", state_file)
+                            or "No meeting in the next few hours to cancel.")
+                if done:
+                    say(done)
+                    _mark(ts)
+                    return
+            resched = re.match(
+                r"^(?:reschedule|move|moved)\s+(?:it\s+)?to\s+(.+)$",
+                (body or "").strip(), re.I)
+            if resched and user == owner:
+                fields, _ = parse_remind(resched.group(1), datetime.now(MYT))
+                if fields and not fields.get("immediate"):
+                    from .meetings import reschedule_nearest
+
+                    moved = reschedule_nearest(
+                        env, datetime.fromisoformat(fields["remind_at"]),
+                        fields["what"].strip(" ,-"), datetime.now(MYT))
+                    if moved:
+                        say(moved)
+                        _mark(ts)
+                        return
             try:
                 from .watcher import record_meeting_reply
 
@@ -2475,7 +2822,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 _mark(ts)
                 return
 
-        if user != owner and not member:
+        if user != owner and not member and action != "remind":
             if not late:
                 try:
                     web.reactions_add(channel=channel, timestamp=ts, name="white_check_mark")
@@ -2531,8 +2878,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 cross_assign(env, profiles, user, sender_name, assign_to,
                              what, ledger_path)
         print(f"  reply: {reply[:120]!r}", flush=True)
-        if action in EMOJI_ACKS and reply.startswith(
-                ("Added.", "Noted.", "Converted to note:")):
+        long_note = (action == "note" and raw_action == "unknown"
+                     and user == owner
+                     and (len(text) >= 200 or text.count("\n") >= 3))
+        if (not long_note and action in EMOJI_ACKS and reply.startswith(
+                ("Added.", "Noted.", "Converted to note:"))):
             try:
                 web.reactions_add(channel=channel, timestamp=ts,
                                   name=EMOJI_ACKS[action])
@@ -2543,11 +2893,21 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if late:
             reply = "_(answered late, I was offline)_\n" + reply
         blocks = None
+        if long_note:
+            from .triage_ui import note_action_blocks
+
+            blocks = note_action_blocks(
+                commitment_id("manual", body.lower(), body), text)
+            reply = "Saved as a note. Keep it, make it a task, or discard?"
         if action == "list" and (user == owner or member):
             try:
+                from .notify import sent_reminders
+                from .slack_lists import list_url
                 from .triage_ui import list_blocks
 
-                blocks = list_blocks(load(user_ledger), datetime.now(MYT))
+                blocks = list_blocks(load(user_ledger), datetime.now(MYT),
+                                     list_url(env, user),
+                                     sent=sent_reminders(user))
             except Exception as ex:  # noqa: BLE001 - plain text still works
                 print(f"  list blocks failed: {type(ex).__name__}", flush=True)
         if action == "help" and (user == owner or member):
@@ -2569,11 +2929,152 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         people = load_profiles()
         return ledger_for(people, user_id, ledger_path) if user_id in people else None
 
+    def publish_home(viewer: str) -> None:
+        if not viewer:
+            return
+        from .home_ui import home_blocks, public_home_blocks
+        from .slack_lists import list_url
+
+        target = ledger_for_viewer(viewer)
+        meetings = []
+        if target:
+            try:
+                from .calendar import meetings_for_day
+                from .profiles import load as load_profiles
+
+                profile = load_profiles().get(viewer)
+                if profile:
+                    token = str(
+                        Path(profile["ledger"]).parent / "google_token.json")
+                    if Path(token).exists():
+                        meetings = meetings_for_day(
+                            env, datetime.now(MYT), token_path=token,
+                            owner_email=profile.get("email"),
+                            client_path=profile.get("google_client"))
+                else:
+                    meetings = meetings_for_day(env, datetime.now(MYT))
+            except Exception as ex:  # noqa: BLE001 - meetings stay optional
+                print(f"  home meetings failed: {type(ex).__name__}: {ex}",
+                      flush=True)
+        blocks = (home_blocks(load(target), datetime.now(MYT),
+                              list_url(env, viewer), meetings)
+                  if target else public_home_blocks(
+                      env.get("SLACK_OWNER_ID", ""),
+                      env.get("SLACK_TEAM", "gopantas")))
+        for attempt in range(2):
+            try:
+                web.views_publish(
+                    user_id=viewer,
+                    view={"type": "home", "blocks": blocks})
+                return
+            except Exception as ex:  # noqa: BLE001 - Home is best effort
+                if attempt:
+                    print(f"  home publish failed: {type(ex).__name__}: {ex}",
+                          flush=True)
+
     def handle(_socket_client, req):
         client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
         payload = req.payload or {}
+        if payload.get("command") == "/mini-reid":
+            import urllib.request
+
+            user = payload.get("user_id") or ""
+            channel = payload.get("channel_id") or ""
+            text = (payload.get("text") or "").strip()
+            target = ledger_for_viewer(user)
+            response_url = payload.get("response_url") or ""
+
+            def respond(message: str, blocks: list[dict] | None = None) -> None:
+                if not response_url:
+                    return
+                body = {"response_type": "ephemeral", "text": message}
+                if blocks:
+                    body["blocks"] = blocks
+                request = urllib.request.Request(
+                    response_url, data=json.dumps(body).encode(),
+                    headers={"Content-Type": "application/json"})
+                try:
+                    urllib.request.urlopen(request, timeout=15).read()
+                except Exception as ex:  # noqa: BLE001 - best effort
+                    print(f"  slash reply failed: {type(ex).__name__}: {ex}",
+                          flush=True)
+
+            if not target:
+                respond("Ask Ridha to run `allow: @You` first.")
+                return
+            route = slash_route(text)
+            if route == "list":
+                from .notify import sent_reminders
+                from .slack_lists import list_url
+                from .triage_ui import list_blocks
+
+                now = datetime.now(MYT)
+                respond("Your list",
+                        list_blocks(load(target), now, list_url(env, user),
+                                    sent=sent_reminders(user)))
+                return
+            if route == "help":
+                respond(HELP)
+                return
+            if route == "add":
+                reply = _apply_command("add", text, datetime.now(MYT),
+                                       clients, target, users)
+                respond(reply)
+                return
+            process(channel, user, text, f"slash:{payload.get('trigger_id') or user}")
+            respond("Sent to your DM.")
+            return
+        if payload.get("type") == "message_action":
+            if payload.get("callback_id") == "add_to_mini_reid":
+                msg = payload.get("message") or {}
+                channel = (payload.get("channel") or {}).get("id") or ""
+                metadata = {
+                    "channel": channel,
+                    "ts": msg.get("ts") or "",
+                    "permalink": payload.get("permalink") or "",
+                    "author": msg.get("user") or "",
+                }
+                try:
+                    web.views_open(
+                        trigger_id=payload.get("trigger_id") or "",
+                        view=capture_modal(msg.get("text") or "", metadata))
+                except Exception as ex:  # noqa: BLE001 - user can retry
+                    print(f"  capture modal failed: {type(ex).__name__}: {ex}",
+                          flush=True)
+            return
         if payload.get("type") == "view_submission":
             view = payload.get("view") or {}
+            if view.get("callback_id") == "mini_reid_capture":
+                from .notify import react
+
+                clicker = (payload.get("user") or {}).get("id") or ""
+                target = ledger_for_viewer(clicker)
+                if not target:
+                    return
+                values = (view.get("state") or {}).get("values") or {}
+                title = ((values.get("title") or {}).get("value") or {}) \
+                    .get("value") or ""
+                metadata = json.loads(view.get("private_metadata") or "{}")
+                if title.strip():
+                    row = add_slack_capture(
+                        target, title.strip(), metadata.get("channel") or "",
+                        metadata.get("ts") or "", clicker, users,
+                        datetime.now(MYT),
+                        permalink=metadata.get("permalink") or "",
+                        team=env.get("SLACK_TEAM", "gopantas"),
+                        via="shortcut")
+                    if row.get("native_id"):
+                        channel_id, _, ts = row["native_id"].partition(":")
+                        try:
+                            react(env["SLACK_BOT_TOKEN"], channel_id, ts)
+                        except Exception:  # noqa: BLE001 - best effort
+                            pass
+                    try:
+                        send_dm_to(env, clicker,
+                                   f"Added: {title.strip()[:160]}")
+                    except Exception:  # noqa: BLE001 - best effort
+                        pass
+                return
             if view.get("callback_id") == "meet_edit":
                 from .meeting_ui import slot_blocks
                 from .meetings import propose_slots
@@ -2584,6 +3085,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     .get("value") or ""
                 notes = ((values.get("notes") or {}).get("value") or {}) \
                     .get("value") or ""
+                dur_text = ((values.get("duration") or {}).get("value") or {}) \
+                    .get("value") or ""
                 state_now = _state()
                 pending = (state_now.get("pending_meet") or {}).get(token)
                 if not pending:
@@ -2591,9 +3094,19 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 pending["notes"] = notes[:8000]
                 if title.strip():
                     pending["topic"] = title.strip()[:200]
+                from .meetings import parse_duration
+
+                try:
+                    dur = int(float(dur_text))
+                except (TypeError, ValueError):
+                    dur = parse_duration(dur_text) or int(
+                        pending.get("duration") or 30)
+                dur = max(15, min(180, dur))
+                pending["duration"] = dur
                 busy: dict = {}
                 try:
-                    slots = propose_slots(env, pending["emails"], busy_out=busy)
+                    slots = propose_slots(env, pending["emails"], busy_out=busy,
+                                          duration=dur)
                     pending["slots"] = slots
                 except Exception:  # noqa: BLE001 - keep the previous slots
                     slots = pending.get("slots") or []
@@ -2608,7 +3121,45 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                         channel=channel, ts=msg_ts,
                         text=f"Meeting proposal: {pending['topic']}",
                         blocks=slot_blocks(token, pending["topic"], people,
-                                           slots, busy))
+                                           slots, busy, duration=dur))
+                return
+            if view.get("callback_id") == "inbox_clear_apply":
+                from .triage_ui import (apply_inbox_page, inbox_clear_modal,
+                                        inbox_done_modal)
+
+                clicker = (payload.get("user") or {}).get("id") or ""
+                target = ledger_for_viewer(clicker)
+                if not target:
+                    return
+                try:
+                    page_ids = json.loads(view.get("private_metadata") or "[]")
+                except ValueError:
+                    page_ids = []
+                values = (view.get("state") or {}).get("values") or {}
+                chosen = ((values.get("not_tasks") or {})
+                          .get("not_tasks") or {}).get("selected_options") or []
+                ticked = [o.get("value") for o in chosen if o.get("value")]
+                rows, added, dropped, remaining = apply_inbox_page(
+                    load(target), page_ids, ticked, datetime.now(MYT))
+                save(target, rows)
+                view_id = view.get("id") or ""
+                try:
+                    if remaining:
+                        web.views_update(
+                            view_id=view_id,
+                            view=inbox_clear_modal(rows, remaining))
+                    else:
+                        web.views_update(view_id=view_id,
+                                         view=inbox_done_modal(added, dropped))
+                except Exception as ex:  # noqa: BLE001 - the ledger is saved
+                    print(f"  inbox modal update failed: "
+                          f"{type(ex).__name__}: {ex}", flush=True)
+                    try:
+                        send_dm_to(env, clicker,
+                                   f"Inbox: added {added}, marked {dropped} "
+                                   "not a task.")
+                    except Exception:  # noqa: BLE001 - best effort
+                        pass
                 return
             if view.get("callback_id") == "triage_apply":
                 from .triage_ui import apply_triage
@@ -2640,6 +3191,128 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         if req.type == "interactive" or payload.get("actions"):
             for action in payload.get("actions") or []:
                 action_id = action.get("action_id") or ""
+                if action_id in {"meet_rsvp_yes", "meet_rsvp_no"}:
+                    from .meetings import email_to_slack, load_created
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    eid = action.get("value") or ""
+                    data = load_created()
+                    rec = data.get(eid)
+                    if not rec:
+                        continue
+                    by_email = email_to_slack()
+                    for uid, prof in load_profiles().items():
+                        email = (prof.get("email") or "").lower()
+                        if email:
+                            by_email[email] = uid
+                    emails = {(a.get("email") or "").lower()
+                              for a in rec.get("attendees") or []}
+                    allowed = (clicker == rec.get("creator")
+                               or any(by_email.get(e) == clicker for e in emails))
+                    if not allowed:
+                        continue
+                    verdict = "yes" if action_id == "meet_rsvp_yes" else "no"
+                    rec.setdefault("rsvps", {})[clicker] = verdict
+                    Path("created_meetings.json").write_text(
+                        json.dumps(data, indent=1, ensure_ascii=False))
+                    label = "attending" if verdict == "yes" else "not attending"
+                    text = f"Recorded: {label} — {rec.get('title', '')}"
+                    try:
+                        send_dm_to(env, clicker, text)
+                    except Exception:  # noqa: BLE001 - best effort
+                        pass
+                    container = payload.get("container") or {}
+                    ch = container.get("channel_id") or ""
+                    msg_ts = container.get("message_ts") or ""
+                    if ch and msg_ts:
+                        try:
+                            web.chat_update(
+                                channel=ch, ts=msg_ts, text=text,
+                                blocks=[{"type": "section", "text": {
+                                    "type": "mrkdwn", "text": text}}])
+                        except Exception:  # noqa: BLE001 - click applied
+                            pass
+                    continue
+                if action_id in {"note_keep", "note_to_task", "note_discard"}:
+                    from .listview import _title
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target = ledger_for_viewer(clicker)
+                    if not target:
+                        continue
+                    row_id = action.get("value") or ""
+                    rows = load(target)
+                    row = next((r for r in rows if r.get("id") == row_id),
+                               None)
+                    if not row:
+                        continue
+                    now = datetime.now(MYT)
+                    if action_id == "note_to_task":
+                        row["kind"] = "manual"
+                        row["status"] = "open"
+                        row["via"] = "note"
+                        row["closed_at"] = None
+                        row["closed_how"] = None
+                    elif action_id == "note_discard":
+                        row["status"] = "dropped"
+                        row["closed_at"] = now.isoformat()
+                        row["closed_how"] = "not_commitment"
+                    row["last_activity"] = now.isoformat()
+                    save(target, rows)
+                    label = {"note_keep": "Kept as note",
+                             "note_to_task": "Added to tasks",
+                             "note_discard": "Discarded"}[action_id]
+                    label_text = f"{label}: {_title(row)[:120]}"
+                    container = payload.get("container") or {}
+                    ch = container.get("channel_id") or ""
+                    msg_ts = container.get("message_ts") or ""
+                    if ch and msg_ts:
+                        try:
+                            web.chat_update(
+                                channel=ch, ts=msg_ts, text=label_text,
+                                blocks=[{"type": "section", "text": {
+                                    "type": "mrkdwn", "text": label_text}}])
+                        except Exception as ex:  # noqa: BLE001 - click applied
+                            print(f"  note update failed: "
+                                  f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
+                if action_id == "request_access":
+                    from .home_ui import access_request_blocks
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    if clicker and env.get("SLACK_OWNER_ID"):
+                        try:
+                            from .directory import lookup as directory_lookup
+
+                            info = directory_lookup(clicker)
+                            details = {
+                                "name": info.get("real_name") or info.get("name"),
+                                "email": info.get("email"),
+                                "jira": info.get("jira_name"),
+                            }
+                            send_dm_to(env, env["SLACK_OWNER_ID"],
+                                       f"Access request from <@{clicker}>",
+                                       blocks=access_request_blocks(clicker,
+                                                                    details))
+                            send_dm_to(env, clicker,
+                                       "Request sent. Ridha will set you up.")
+                        except Exception as ex:  # noqa: BLE001 - best effort
+                            print(f"  access request failed: "
+                                  f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
+                if action_id == "approve_access":
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target_user = action.get("value") or ""
+                    if clicker != owner or not target_user:
+                        continue
+                    container = payload.get("container") or {}
+                    process(container.get("channel_id") or "",
+                            owner, f"allow: <@{target_user}>",
+                            f"access:{target_user}")
+                    continue
+                if action_id == "home_refresh":
+                    publish_home((payload.get("user") or {}).get("id") or "")
+                    continue
                 if action_id == "meet_edit":
                     from .meeting_ui import edit_modal
 
@@ -2650,8 +3323,10 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     try:
                         web.views_open(
                             trigger_id=payload.get("trigger_id") or "",
-                            view=edit_modal(token, pending["topic"],
-                                            pending.get("notes", "")))
+                            view=edit_modal(
+                                token, pending["topic"],
+                                pending.get("notes", ""),
+                                int(pending.get("duration") or 30)))
                     except Exception as ex:  # noqa: BLE001 - user can retry
                         print(f"  meet edit modal failed: "
                               f"{type(ex).__name__}: {ex}", flush=True)
@@ -2675,10 +3350,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                             web.chat_update(channel=channel, ts=msg_ts,
                                             text="Meeting proposal cancelled.")
                         continue
+                    dur = int(pending.get("duration") or 30)
                     busy: dict = {}
                     try:
                         slots = propose_slots(env, pending["emails"],
-                                              busy_out=busy)
+                                              busy_out=busy, duration=dur)
                     except Exception as ex:  # noqa: BLE001 - keep old message
                         if channel and msg_ts:
                             web.chat_update(
@@ -2692,14 +3368,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                             "name": pending.get("attendee", "Attendee"),
                             "email": (pending.get("emails") or [""])[0]}]
                         blocks = slot_blocks(
-                            token, pending["topic"], people, slots, busy)
+                            token, pending["topic"], people, slots, busy,
+                            duration=dur)
                         web.chat_update(channel=channel, ts=msg_ts,
                                         text=f"Free slots with {pending['attendee']}",
                                         blocks=blocks)
                     continue
                 if action_id == "meet_slot":
                     from .meeting_ui import confirmation_blocks
-                    from .meetings import create_event
+                    from .meetings import create_event, remember_meeting
 
                     clicker = (payload.get("user") or {}).get("id") or ""
                     value = action.get("value") or ""
@@ -2730,6 +3407,16 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                             web.chat_update(channel=channel, ts=msg_ts,
                                             text=message)
                         continue
+                    attendees = pending.get("attendees") or [{
+                        "name": pending.get("attendee", "Attendee"),
+                        "email": (pending.get("emails") or [""])[0]}]
+                    try:
+                        remember_meeting(
+                            event, pending["topic"], slot["start"], slot["end"],
+                            attendees, clicker, pending.get("notes", ""))
+                    except Exception as ex:  # noqa: BLE001 - event exists
+                        print(f"  remember meeting failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
                     state_now["pending_meet"].pop(token, None)
                     Path(STATE).write_text(json.dumps(state_now))
                     link = event.get("hangoutLink") or event.get("htmlLink") or ""
@@ -2775,10 +3462,14 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                         continue
                     rows = load(target)
                     now = datetime.now(MYT)
+                    from .notify import sent_reminders
+
+                    sent = sent_reminders(clicker)
                     try:
                         web.chat_postMessage(
-                            channel=channel, text=format_list(rows, now),
-                            blocks=list_blocks(rows, now))
+                            channel=channel,
+                            text=format_list(rows, now, sent=sent),
+                            blocks=list_blocks(rows, now, sent=sent))
                     except Exception as ex:  # noqa: BLE001 - user can retry
                         print(f"  help list failed: "
                               f"{type(ex).__name__}: {ex}", flush=True)
@@ -2804,6 +3495,21 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     except Exception as ex:  # noqa: BLE001 - user can retry
                         print(f"  triage select failed: "
                               f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
+                if action_id == "inbox_clear_open":
+                    trigger = payload.get("trigger_id") or ""
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target = ledger_for_viewer(clicker)
+                    if not target:
+                        continue
+                    try:
+                        from .triage_ui import inbox_clear_modal
+
+                        web.views_open(trigger_id=trigger,
+                                       view=inbox_clear_modal(load(target)))
+                    except Exception as ex:  # noqa: BLE001 - user can retry
+                        print(f"  inbox modal failed: {type(ex).__name__}: {ex}",
+                              flush=True)
                     continue
                 if action_id == "triage_open":
                     trigger = payload.get("trigger_id") or ""
@@ -2921,6 +3627,72 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                                              thread_ts=msg_ts or None)
             return
         event = (req.payload or {}).get("event") or {}
+        if event.get("type") == "file_shared":
+            from .files import ingest
+
+            try:
+                record = ingest(env, event.get("file_id") or "")
+                if record:
+                    print(f"  file ingested: {record['name']}", flush=True)
+                    from .files import ack_messages
+
+                    for uid, text in ack_messages(
+                            event.get("user_id") or "",
+                            env.get("SLACK_OWNER_ID", ""), [record]):
+                        send_dm_to(env, uid, text)
+            except Exception as ex:  # noqa: BLE001 - file must not stop the bot
+                print(f"  file ingest failed: {type(ex).__name__}: {ex}",
+                      flush=True)
+            return
+        if event.get("type") == "app_home_opened":
+            publish_home(event.get("user") or "")
+            return
+        if event.get("type") == "reaction_added":
+            file_parsed = file_reaction(
+                event, env.get("FILE_REACTION", "page_facing_up"))
+            if file_parsed:
+                from .files import ack_messages, ingest, message_files
+
+                channel, msg_ts, reactor = file_parsed
+                records = []
+                for attachment in message_files(env, channel, msg_ts):
+                    try:
+                        record = ingest(env, attachment.get("id") or "")
+                    except Exception as ex:  # noqa: BLE001 - keep other files
+                        print(f"  file react ingest failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
+                        record = None
+                    if record:
+                        records.append(record)
+                for uid, text in ack_messages(
+                        reactor, env.get("SLACK_OWNER_ID", ""), records):
+                    try:
+                        send_dm_to(env, uid, text)
+                    except Exception as ex:  # noqa: BLE001 - best effort
+                        print(f"  file ack failed: {type(ex).__name__}: {ex}",
+                              flush=True)
+                return
+            parsed = capture_reaction(event,
+                                      env.get("CAPTURE_REACTION", "pushpin"))
+            if parsed:
+                channel, msg_ts, reactor = parsed
+                target = ledger_for_viewer(reactor)
+                text = fetch_message_text(env, channel, msg_ts) if target else ""
+                if target and text:
+                    row = add_slack_capture(
+                        target, text, channel, msg_ts, reactor, users,
+                        datetime.now(MYT),
+                        team=env.get("SLACK_TEAM", "gopantas"),
+                        via="reaction")
+                    try:
+                        send_dm_to(
+                            env, reactor,
+                            f"Added: {text[:160]}\n"
+                            f"<{row.get('source_link')}|open source>")
+                    except Exception as ex:  # noqa: BLE001 - capture is durable
+                        print(f"  reaction ack failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
+            return
         if event.get("bot_id"):
             return
         if event.get("subtype"):

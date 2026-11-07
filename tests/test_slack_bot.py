@@ -2,10 +2,21 @@ from datetime import datetime, timedelta, timezone
 
 from mini_reid.clients import load_clients
 from mini_reid.ledger import load
-from mini_reid.slack_bot import apply_command, parse_command
+from mini_reid.slack_bot import apply_command, is_link_only, parse_command
 
 MYT = timezone(timedelta(hours=8))
 NOW = datetime(2026, 10, 30, 9, 0, tzinfo=MYT)
+
+
+def test_bare_link_is_not_a_note():
+    assert is_link_only(
+        "https://mail.google.com/mail/u/0/#label/IOI+Properties+Group/Qgrc1")
+    assert is_link_only("  <https://pantas.atlassian.net/browse/BO-1>  ")
+    assert is_link_only(
+        "<https://pantas.atlassian.net/browse/BO-8914|[RIJ] Audit activity data units>")
+    assert not is_link_only("check this link https://example.com")
+    assert not is_link_only("note: https://example.com")
+    assert not is_link_only("go to the doctor's office at 2pm")
 
 
 def test_parses_add_with_mention():
@@ -1015,6 +1026,45 @@ def test_owner_reminders_use_slack_scheduling_now():
     assert should_schedule_reminder("remind", "URIDHA", "URIDHA", None)
 
 
+def test_plain_undo_is_a_command_not_a_note():
+    assert parse_command("undo") == ("undo", "")
+    assert parse_command("undo the last change") == ("undo", "")
+
+
+def test_not_rejects_a_question_instead_of_dropping_a_fuzzy_match(tmp_path):
+    ledger = str(tmp_path / "ledger.json")
+    clients = load_clients("clients.json")
+    apply_command("add", "Dashboard audit follow-up", NOW, clients, ledger)
+    reply = apply_command("not", "whats on my to-do", NOW, clients, ledger)
+    assert "reads like a question" in reply
+    assert [r["status"] for r in load(ledger)] == ["open"]
+
+
+def test_slash_command_routes_list_help_and_commands():
+    from mini_reid.slack_bot import slash_route
+
+    assert slash_route("") == "list"
+    assert slash_route("list") == "list"
+    assert slash_route("help") == "help"
+    assert slash_route("add: send the deck") == "command"
+    assert slash_route("add go to the doctor's office at 2pm") == "command"
+    assert slash_route("meet: @Kasib about the deck") == "command"
+    assert slash_route("go to the doctor's office at 2pm") == "add"
+    assert slash_route("whats on my to-do") == "list"
+    assert slash_route("what's on my to-do") == "list"
+    assert slash_route("what did we agree with Eupe?") == "command"
+
+
+def test_member_plain_dm_is_quick_added_but_questions_are_not():
+    from mini_reid.slack_bot import member_quick_add
+
+    assert member_quick_add("D1", "unknown", True, "10 am interview")
+    assert not member_quick_add("D1", "unknown", True, "what is this?")
+    assert not member_quick_add("C1", "unknown", True, "10 am interview")
+    assert not member_quick_add("D1", "unknown", False, "10 am interview")
+    assert not member_quick_add("D1", "add", True, "10 am interview")
+
+
 def test_reminder_is_added_to_the_receivers_list(tmp_path):
     from mini_reid.slack_bot import add_reminder_row
 
@@ -1254,3 +1304,58 @@ def test_abuse_words_are_flagged_not_noted():
     assert ABUSE.search("molest <@U1>")
     assert ABUSE.search("do not rape anyone")
     assert not ABUSE.search("a grape and a drape")
+
+
+def test_multi_remind_shared_text_for_several_people():
+    from mini_reid.slack_bot import parse_multi_remind
+
+    users = {"raj": "UR", "xieyi": "UX", "lynnette": "UL"}
+    out = parse_multi_remind(
+        "@Raj, @XieYi and @Lynnette to send your updates at 5pm today",
+        users, NOW)
+    assert [uid for uid, _ in out] == ["UR", "UX", "UL"]
+    assert all(f["remind_at"].endswith("17:00:00+08:00")
+               for _, f in out)
+    assert all(f["what"] == "send your updates" for _, f in out)
+
+
+def test_multi_remind_line_per_person():
+    from mini_reid.slack_bot import parse_multi_remind
+
+    users = {"raj": "UR", "xieyi": "UX"}
+    out = parse_multi_remind(
+        "@Raj audit agents gameplan\n@XieYi brain implementation\nat 5pm today",
+        users, NOW)
+    assert [(uid, f["what"]) for uid, f in out] == [
+        ("UR", "audit agents gameplan"),
+        ("UX", "brain implementation"),
+    ]
+    assert all(f["remind_at"].endswith("17:00:00+08:00")
+               for _, f in out)
+
+
+def test_single_reminder_is_not_multi():
+    from mini_reid.slack_bot import parse_multi_remind
+
+    assert parse_multi_remind("@Raj to send the deck at 5pm",
+                              {"raj": "UR"}, NOW) is None
+
+
+def test_meeting_cancel_forms():
+    from mini_reid.slack_bot import meeting_cancel_query
+
+    assert meeting_cancel_query("cancel: BD Command Centre") == "BD Command Centre"
+    assert meeting_cancel_query("Meeting: cancel BD Command Centre") == (
+        "BD Command Centre")
+    assert meeting_cancel_query("cancel meeting BD") == "BD"
+    assert meeting_cancel_query("cancel") == ""
+    assert meeting_cancel_query("drop: deck") is None
+
+
+def test_immediate_reminder_drops_the_word_now():
+    from mini_reid.slack_bot import parse_remind
+
+    fields, what = parse_remind("now not to stuff too much", NOW)
+    assert fields["immediate"] is True
+    assert what == "not to stuff too much"
+    assert fields["what"] == "not to stuff too much"

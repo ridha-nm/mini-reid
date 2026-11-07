@@ -41,6 +41,15 @@ def test_list_blocks_offer_a_triage_button():
     assert "Triage" in action["text"]["text"]
 
 
+def test_list_blocks_link_to_the_native_slack_list():
+    blocks = list_blocks([_row("a1", "Real task")], NOW,
+                         list_url="https://slack/lists/T1/F1")
+    link = [e for b in blocks if b.get("type") == "actions"
+            for e in b["elements"] if e.get("url")][0]
+    assert link["url"] == "https://slack/lists/T1/F1"
+    assert link["text"]["text"] == "Open Slack List"
+
+
 def test_confirm_blocks_offer_add_and_dismiss_per_item():
     from mini_reid.triage_ui import confirm_blocks
 
@@ -187,3 +196,50 @@ def test_apply_triage_completed_sets_closed_fields():
     assert out[0]["status"] == "done"
     assert out[0]["closed_at"] == NOW.isoformat()
     assert out[0]["last_activity"] == NOW.isoformat()
+
+
+def test_inbox_clear_modal_ticks_the_false_positives():
+    import json as _json
+
+    from mini_reid.triage_ui import inbox_clear_modal
+
+    rows = [_row(f"id{i}", f"Item {i}", status="inbox") for i in range(12)]
+    view = inbox_clear_modal(rows)
+    text = _json.dumps(view)
+    assert "NOT" in text
+    assert len(_json.loads(view["private_metadata"])) == 10
+    assert "2 more after this page" in text
+
+
+def test_apply_inbox_page_adds_unticked_and_drops_ticked():
+    from mini_reid.triage_ui import apply_inbox_page
+
+    rows = [_row("a", "Keep A", status="inbox"),
+            _row("b", "Junk B", status="inbox"),
+            _row("c", "Keep C", status="inbox")]
+    rows, added, dropped, remaining = apply_inbox_page(
+        rows, ["a", "b", "c"], ["b"], NOW)
+    status = {r["id"]: r["status"] for r in rows}
+    assert status == {"a": "open", "b": "dropped", "c": "open"}
+    assert (added, dropped, remaining) == (2, 1, [])
+
+
+def test_list_offers_clear_inbox_button_with_count():
+    blocks = list_blocks([_row("a", "Real task"),
+                          _row("b", "Maybe", status="inbox"),
+                          _row("c", "Maybe too", status="inbox")], NOW)
+    button = [e for block in blocks if block.get("type") == "actions"
+              for e in block["elements"] if e.get("action_id") == "inbox_clear_open"]
+    assert button and "2" in button[0]["text"]["text"]
+
+
+def test_note_actions_offer_keep_task_discard():
+    from mini_reid.triage_ui import note_action_blocks
+
+    blocks = note_action_blocks("abc123", "Interview notes " * 40)
+    actions = [e for b in blocks if b.get("type") == "actions"
+               for e in b["elements"]]
+    assert [a["action_id"] for a in actions] == [
+        "note_keep", "note_to_task", "note_discard"]
+    assert all(a["value"] == "abc123" for a in actions)
+    assert "Interview notes" in str(blocks)

@@ -28,10 +28,11 @@ domain or text, dropping unrelated external mail. `accounts.json` from the BD Co
 Centre roster fills it at `allow:`; the member can correct it with
 `clients: Eupe, Gamuda` or inspect it with `clients`. GHB/GVC/SAFE are portfolios with
 their member-company domains; child clients carry a `portfolio` tag. Charanya is
-overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 295 tests pass.
+overridden to Eupe, Setia, Allianz, DNex, Edotco and Knight Frank. 361 tests passed at the time.
 
-2026-11-04: every new candidate lands as `inbox` and waits for a click — the
-new-item DM has **Add to list** / **Not a task** per item. The model never decides;
+2026-11-04: a candidate that matches no auto rule lands as `inbox` and waits for a
+click — the new-item DM has **Add to list** / **Not a task** per item (matched
+candidates skip the click since 2026-11-05, below). The model never decides;
 it only rewrites the title. Confirm → `open` and ✅ on the source message; dismiss →
 `dropped`. The click edits the DM in place with the outcome, rebuilds buttons for
 remaining items, and refuses to toggle a row already settled. Unanswered rows stay in
@@ -55,6 +56,109 @@ a missed 09:15 digest is rebuilt and delivered after 09:30 until Slack accepts i
 `assign:` by row id reassigns and mirrors the title; Triage has Select all / Clear;
 a meeting reply can be `moved` / `rescheduled` / `postponed`. Member parity is
 recorded in `docs/MEMBER_PARITY.md`.
+
+2026-11-05: `ask:` routes pending/open/due/task questions to the ledger first,
+with count, due and links, filtered by client name; other questions use live
+Slack search then the KB.
+2026-11-05: `file_shared` files are downloaded, parsed (text, PDF via
+pdftotext, DOCX/XLSX XML) and saved under `data/slack_files/`. `ask:` searches
+them first. Reacting 📄 (`FILE_REACTION`) ingests files attached to a message.
+Uploader/reactor gets names only; Ridha gets the extractive summary plus the
+`ask:` prompt.
+2026-11-05: overdue nudges, stale nudges and local reminders can check Slack
+DND (`dnd:read`), but the gate is **off by default**; set `RESPECT_DND=1` to
+hold messages while the recipient is in Do Not Disturb.
+2026-11-05: `/mini-reid` slash command: list/help ephemeral; add/remind/meet run
+the normal command path in DM. Registered in Slack.
+2026-11-05: App Home is a per-person dashboard: a Block Kit table with 10 stats,
+today's meetings, top 3 focus, Open Slack List, Triage Inbox, Refresh, What I
+can do. Not the full task list. Unknown viewers get a capabilities page with
+**Request access** (DMs Ridha captured name/email/Jira plus an Authorise button)
+and **Message Ridha**; no cross-ledger exposure. Full setup completion DMs both
+Ridha and the member.
+2026-11-05: `ask:` tries live Slack Real-time Search first for Ridha, with
+channel/text/permalink, then falls back to the local KB. Each user's ledger is
+mirrored into a native Slack List (“Mini-Reid — Name”) with title, status, due
+and source; created once, shared write, incremental last 50. Bot scopes
+`lists:read`/`lists:write`. `list` replies include an **Open Slack List** button
+with that user's deep link. Sync is two-way: Slack edits to title/status/due win
+on the next pull; deleting a List row drops the ledger row; dropped/Inbox rows
+are deleted from the List.
+
+2026-11-05 flying-car baseline: `mini_reid.evaluation` scores capture against
+Charanya's self-written list, with `benchmark: false` for tasks that have no
+Slack/Gmail/Jira signal. Her 7-task snapshot: 3 benchmarked, strict recall 0/3.
+Runbook in `docs/EVAL.md`. That zero is the reason for the auto-capture plan.
+
+2026-11-05 auto-capture: rules decide whether a candidate needs a click.
+`slack-direct-ask` (channel @mention with an explicit ask), `slack-dm-ask` (DM
+with an ask or a due date) and `email-direct-ask` (inbox mail addressed to the
+person, with an ask or a due date) stamp `capture: "auto"` and open the row
+straight away; the reason is kept in `capture_why`. Jira assignments are
+detected but ask for approval: they land in `inbox` with **Add to list** /
+**Not a task**. Everything else also stays `inbox`. Rules only — no model, no network; the model still only rewrites
+titles, existing rows are not migrated, and members run the same rules on their
+own ledger.
+
+2026-11-06 unfurls removed: the link cards were never used in practice and the
+digest rendered a card per task link. The Slack scopes, event and domains are
+gone from the manifest; reinstall the app so Slack drops them. Bare pasted
+links still never become notes.
+
+Weekly release notes live in `docs/WEEKLY-UPDATE.md` — append a dated
+capability snapshot every Friday. First entry covers week ending 2026-11-06.
+
+2026-11-06 meeting duration and cancel: `meet:` parses
+`for 45 minutes` / `for 1 hour` (15–180), strips it from the title, and uses it
+for slots and the event. The organiser can reply `cancel <note>` to the meeting
+reminder; the Google event is deleted, the stored record and reminder removed,
+and mapped Slack attendees are DMed.
+
+2026-11-06 attendee reminders and reschedule: meetings created through the bot
+are stored in `created_meetings.json` with event id and attendees. Ten minutes
+before, mapped Slack attendees get a DM with **Attending** / **Can't attend**
+buttons (`meet_rsvp_yes` / `meet_rsvp_no`), recorded in the same file. The
+organiser can reply `reschedule to 3pm <note>`; `meetings.reschedule_nearest`
+patches the Google event, keeps the duration, appends the note, moves the
+stored start and reminder state, and DMs attendees. `moved <note>` only records
+the note.
+
+2026-11-07 tracked Jira epic: `tracked_epics.json` maps `GRE-4129`
+("All Triage tickets") to `software-related-issues`. `epic_tracker.sync` runs
+each watcher cycle: reads the epic's children, keeps tickets whose assignee
+change was authored by Ridha, and upserts one row per open ticket with mapped
+status, assignee, latest Jira comment and latest channel message containing the
+ticket key. Rows use `kind: triage` and render in a **Triage epic** section
+right after My reminders. Done tickets close. Cache `epic_cache.json`
+(gitignored); channel backfills 7 days once, then follows a watermark.
+Limits: only tickets Ridha assigned, only the last comment/message, and the bot
+must be in the tracking channel.
+
+2026-11-06 non-member questions: anyone outside the owner/member list who asks
+a question gets a private DM answer from the local KB only — no ledger, files
+or live Slack search, and nothing posted in the channel. Immediate reminders
+drop a leading "now".
+
+2026-11-06 Jira approval and note prompt: Jira issues no longer auto-open; they
+wait in Inbox for **Add to list**. A long paste from Ridha is saved as a note
+and the reply carries **Keep as note** / **Make it a task** / **Discard**
+(`note_keep`, `note_to_task`, `note_discard`).
+
+2026-11-06 multi-recipient reminders: `remind` takes several people, either a
+shared text (`remind @Raj, @XieYi and @Lynnette to send updates at 5pm`) or
+`remind` on its own line followed by one `@Name <item>` per line and a shared
+time line. Each recipient gets a scheduled DM and a reminder row. Non-members
+may use `remind` only; it grants no ledger access.
+
+2026-11-06 list sections and acks: `list` now shows My reminders, Reminders I
+sent, My tasks, Tagged by others, Inbox and Notes; numbering stays global.
+`Clear Inbox (N)` pages ten pending rows through a modal — tick the ones that
+are NOT tasks, add the rest, auto-advance. New captures keep their per-item DM
+buttons. When a tagged task is marked done by the recipient, the original asker
+gets one `✅ ... marked done` DM; `from_user` is captured per row and
+`done_ack_sent` stops repeats. A person marking rows done in the Slack List
+gets `✅ Marked done: ...` for their own edit; `done:` and the Triage modal
+already reply.
 
 ## Running now
 
@@ -83,9 +187,13 @@ Slack id → name, email and Jira account; rebuild with `python -m mini_reid.dir
 `allow:` reads it, so Jira works immediately from the shared workspace token scoped by
 account id. The watcher scans bot-visible channels for each member's mentions, uses
 their Gmail only after OAuth, and runs their reminders, meeting reminders, overdue
-nudge and 09:15 digest. Their new items get the same model title cleanup, inbox
-confirmation DM, click acknowledgement/lock, grouped `list` with **Triage & update**,
-and 18:00 stale nudge; every button resolves the member's own ledger.
+nudge and 09:15 digest. Their new items get the same auto rules (matching rows open
+directly; only uncertain ones get the model title cleanup and inbox confirmation DM),
+click acknowledgement/lock, grouped `list` with **Triage & update**,
+and 18:00 stale nudge; every button resolves the member's own ledger. A member's
+plain DM to the bot is added as a task, no `add:` prefix, so they can stop writing
+their own Slack list. The **Add to Mini-Reid** message shortcut and the 📌
+(`CAPTURE_REACTION`) reaction capture a message into the clicker's ledger.
 Parity rule and checklist: `docs/MEMBER_PARITY.md` — no feature is done unless
 it works for every authorised member in the same change.
 
@@ -187,7 +295,9 @@ Slack, so they fire on time even when the Mac sleeps. Every reminder is also add
 the recipient's list as `kind: reminder`, open, with `reminded: True` so the watcher
 does not send it twice. An unknown name gets a reply, not a
 silent reminder to the sender. Other people's reminders never touch Ridha's ledger or
-digest. Slack keeps the queue; there is no local copy yet, so there is no cancel or list.
+digest. `reminder_log.json` keeps the audit; `list` shows **My reminders** and
+**Reminders I sent**; `reminders` prints the log. Any workspace member may use
+`remind` (no ledger access), and multi-recipient forms are supported.
 
 ## Digest layout
 
@@ -197,10 +307,13 @@ client name, relative due, sender and channel, source time, link. Email senders 
 their address; a rewritten Slack title quotes the original message.
 
 The watcher schedules a DM 10 minutes before each meeting with the join link and "Are
-you attending?". Reply `yes`, `no <reason>`, or `moved` / `rescheduled` /
-`postponed` (a note like "moved to 3pm" is kept); it is recorded in
-`meeting_reminders.json` and confirmed in the DM. Slack keeps the schedule, so the Mac
-can sleep. A single-instance lock (`.watcher.lock`) stops overlapping runs from
+you attending?". Reply `yes`, `no <reason>`, `moved <note>`, `reschedule to <time>
+<note>` (moves the Google event, keeps its duration, DMs attendees) or `cancel <note>`
+(deletes the event and DMs attendees). `cancel: <meeting name>` cancels the nearest
+upcoming matching event. Meetings created through the bot also DM each mapped Slack
+attendee with **Attending** / **Can't attend** buttons. State lives in
+`meeting_reminders.json` and `created_meetings.json`; Slack keeps the schedule, so the
+Mac can sleep. A single-instance lock (`.watcher.lock`) stops overlapping runs from
 scheduling duplicates.
 
 The daily overdue nudge (first watcher cycle after 09:00) uses the same row renderer as
@@ -211,9 +324,10 @@ The 09:15 job writes `digest_delivered.json` only after Slack accepts the DM. If
 it fails (no DNS on 2, 3 and 5 Nov), the watcher regenerates and delivers after
 09:30, retrying every 10 minutes until the marker says today is done.
 
-A new item does not enter any digest bucket until it is confirmed. The capture DM
-shows each item with **Add to list** / **Not a task**; unanswered items stay in the
-list Inbox and are counted as `N to confirm` in the digest header.
+An Inbox item does not enter any digest bucket until it is confirmed; an
+auto-captured row is already open and does. The capture DM shows each uncertain item
+with **Add to list** / **Not a task**; unanswered items stay in the list Inbox and
+are counted as `N to confirm` in the digest header.
 
 A stale nudge runs at 18:00 for open / in progress / blocked / stalled rows whose
 `last_activity` is older than today. It DMs up to five rows, each with an inline status
@@ -248,7 +362,16 @@ on Friday. Then:
 .venv/bin/python -m mini_reid.scorecard
 ```
 
-It appends recall and missed items to `scorecard.md`.
+It appends recall and missed items to `scorecard.md`. Matching is element-based:
+a row counts when it carries at least half the expected keywords, not only the
+same wording. A line can name the evidence explicitly:
+
+```
+Eupe platform updates | matches: eupe dashboard, eupe change request
+```
+
+The report breaks hits down as wording / elements / override. Current week:
+15/16 (94%), only `IOI Entity Restructuring` missed.
 
 The weekly review is also the classifier's training loop: the Naive Bayes model
 rebuilds from `ledger.json` and `corrections.json` on every call, so new `not:`
@@ -259,13 +382,27 @@ kept or a real ask was missed.
 ## Known limits
 
 - The 3B model only rewrites titles. It does not decide what is a task and cannot drop
-  a captured row; every candidate waits in the inbox for a person's click.
+  a captured row; the auto-capture rules decide whether a candidate needs a click, and
+  anything they do not match waits in the Inbox.
 - 8B local is unusable on 8 GB (about five minutes per answer).
 - Answers are extractive, not composed.
 - Untagged asks in channels and thread replies without a mention are not captured.
 - WhatsApp and calls are manual capture only.
-- macOS sleep pauses the socket; the catch-up sweep (every `CATCHUP_SECONDS`, default
-  300) replays commands and questions missed while asleep or disconnected.
+- Everything runs on this Mac and only while it is awake. Sleep pauses the socket,
+  watcher, digests and reminders; the catch-up sweep (every `CATCHUP_SECONDS`,
+  default 300) replays commands and questions missed while asleep or disconnected.
+  Vercel is not a fit: Socket Mode, local ledger files, the 2-minute watcher and
+  local Ollama need a daemon, and Hobby forbids commercial use.
+- Auto-capture is deliberately narrow. Imperative-only channel mentions, undated
+  DMs without an explicit ask, and shared-alias mail without a direct To stay in
+  Inbox. A rare phrasing such as "please note the deck needs review" can still
+  auto-add because it contains a request word.
+- Attendee reminders and real reschedule (`reschedule to <time>`) only work for
+  meetings created after `created_meetings.json` existed. Older meetings can
+  still be cancelled with `cancel: <meeting name>` or by the 10-minute reminder.
+- Deleting a row directly in the Slack List drops that task in the ledger; use
+  `done:`/`not:` instead. Done rows are removed from the List automatically and
+  stay in the ledger as the archive.
 - Watcher takes about 55 s per cycle after parallel source fetches (sources ~12 s;
   the member cycle and meeting scheduling make up the rest), inside the two-minute
   interval. Before the parallel fix a cycle ran 2+ minutes.
@@ -285,8 +422,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-295 tests passing as of 2026-11-05.
-
+408 tests passing as of 2026-11-07.
 ## Next, agreed
 
 1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's

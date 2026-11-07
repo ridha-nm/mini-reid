@@ -3,27 +3,26 @@ display_information:
   description: Personal commitment ledger. Tag it to add, note or close a task.
   background_color: "#1f2937"
 features:
+  slash_commands:
+    - command: /mini-reid
+      description: Open your list, add a task, remind or book a meeting
+      usage_hint: "[list | add: ... | remind ... | meet: @Name about ...]"
+      should_escape: false
+  shortcuts:
+    - name: Add to Mini-Reid
+      callback_id: add_to_mini_reid
+      type: message
+      description: Add this message as a task
   app_home:
     home_tab_enabled: true
     messages_tab_enabled: true
     messages_tab_read_only_enabled: false
+    agent_tasks_enabled: true
   bot_user:
     display_name: mini-reid
     always_online: true
 oauth_config:
   scopes:
-    bot:
-      - app_mentions:read
-      - chat:write
-      - channels:history
-      - channels:read
-      - groups:history
-      - groups:read
-      - im:history
-      - im:read
-      - im:write
-      - reactions:write
-      - users:read
     user:
       - search:read
       - channels:history
@@ -35,6 +34,56 @@ oauth_config:
       - mpim:history
       - mpim:read
       - users:read
+      - canvases:read
+      - canvases:write
+      - channels:write
+      - chat:write
+      - emoji:read
+      - files:read
+      - files:write
+      - groups:write
+      - im:write
+      - lists:read
+      - lists:write
+      - mpim:write
+      - reactions:read
+      - reactions:write
+      - search:read.files
+      - search:read.im
+      - search:read.mpim
+      - search:read.private
+      - search:read.public
+      - search:read.users
+      - users:read.email
+    bot:
+      - app_mentions:read
+      - chat:write
+      - dnd:read
+      - files:read
+      - channels:history
+      - channels:read
+      - groups:history
+      - groups:read
+      - im:history
+      - im:read
+      - im:write
+      - lists:read
+      - lists:write
+      - reactions:write
+      - users:read
+    user_optional:
+      - canvases:read
+      - canvases:write
+      - chat:write
+      - files:read
+      - files:write
+      - lists:read
+      - lists:write
+      - search:read.files
+      - search:read.im
+      - search:read.mpim
+      - search:read.private
+  pkce_enabled: false
 settings:
   event_subscriptions:
     bot_events:
@@ -42,8 +91,13 @@ settings:
       - message.channels
       - message.groups
       - message.im
+      - reaction_added
+      - app_home_opened
+      - file_shared
   interactivity:
     is_enabled: true
-  socket_mode_enabled: true
   org_deploy_enabled: false
+  socket_mode_enabled: true
+  is_mcp_enabled: true
   token_rotation_enabled: false
+  app_level_token_rotation_enabled: false

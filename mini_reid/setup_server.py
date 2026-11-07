@@ -135,6 +135,15 @@ def _finish(env: dict, user: str, profile: dict) -> None:
                "*Mini-Reid is ready.*\n"
                "Your Slack mentions, email, Jira, reminders and morning digest "
                f"are active. {accounts}\nTry `list` or `add: …`.")
+    owner = env.get("SLACK_OWNER_ID")
+    if owner and owner != user:
+        try:
+            send_dm_to(env, owner,
+                       f"*{(entry.get('name') or user)} is fully set up.*\n"
+                       "Gmail, Calendar, Jira, digest and Slack List are active.")
+        except Exception as ex:  # noqa: BLE001 - member setup already succeeded
+            print(f"setup owner notice failed: {type(ex).__name__}: {ex}",
+                  flush=True)
 
     def first_digest() -> None:
         try:

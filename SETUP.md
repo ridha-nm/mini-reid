@@ -62,6 +62,11 @@ chmod 600 .env
    and to search missed mentions. Treat it as sensitive: it can read DMs.
 6. Your Slack member ID → `SLACK_OWNER_ID` (Profile → More → Copy member ID).
 7. Workspace subdomain → `SLACK_TEAM` (e.g. `gopantas`).
+8. The manifest also enables the **Add to Mini-Reid** message shortcut; the
+   `reaction_added`, `app_home_opened` and `file_shared` events; and bot
+   scopes `reactions:read`, `lists:read`/`lists:write`, `files:read` and
+   `dnd:read`. Reinstall the app whenever scopes or events change; Slack shows
+   a reinstall banner until you do.
 
 Invite `@mini-reid` to the channels you want it to watch. It cannot read
 channels it has not joined.

@@ -55,11 +55,16 @@ def _get_json(url: str, headers: dict, retries: int = 4) -> dict:
 
 # ---------------------------------------------------------------- slack
 
+IGNORE_SLACK_CHANNELS = {"bd-triager-agent", "C0B59LA0X5M"}
+
+
 def parse_slack_search(payload: dict) -> list[dict]:
     out, seen = [], set()
     for m in (payload.get("messages") or {}).get("matches") or []:
         ch = m.get("channel") or {}
         name = ch.get("name") or ch.get("id") or ""
+        if name.lstrip("#") in IGNORE_SLACK_CHANNELS or ch.get("id") in IGNORE_SLACK_CHANNELS:
+            continue
         key = (ch.get("id") or "", m.get("ts") or "")
         if key in seen:
             continue
@@ -71,6 +76,7 @@ def parse_slack_search(payload: dict) -> list[dict]:
             "channel": name,
             "channel_id": ch.get("id") or "",
             "author": m.get("username") or m.get("user") or "?",
+            "from_user": m.get("user") or "",
             "ts": datetime.fromtimestamp(float(m["ts"]), MYT).isoformat(),
             "text": (m.get("text") or "").strip(),
             "link": m.get("permalink") or "",
@@ -103,6 +109,7 @@ def parse_slack_dm_history(channel_id: str, data: dict, me: str,
             "channel": channel_id,
             "channel_id": channel_id,
             "author": m.get("user") or "?",
+            "from_user": m.get("user") or "",
             "ts": datetime.fromtimestamp(float(ts), MYT).isoformat() if ts else "",
             "text": (m.get("text") or "").strip(),
             "link": f"https://{team}.slack.com/archives/{channel_id}/p{ts.replace('.', '')}",
