@@ -362,7 +362,16 @@ on Friday. Then:
 .venv/bin/python -m mini_reid.scorecard
 ```
 
-It appends recall and missed items to `scorecard.md`.
+It appends recall and missed items to `scorecard.md`. Matching is element-based:
+a row counts when it carries at least half the expected keywords, not only the
+same wording. A line can name the evidence explicitly:
+
+```
+Eupe platform updates | matches: eupe dashboard, eupe change request
+```
+
+The report breaks hits down as wording / elements / override. Current week:
+15/16 (94%), only `IOI Entity Restructuring` missed.
 
 The weekly review is also the classifier's training loop: the Naive Bayes model
 rebuilds from `ledger.json` and `corrections.json` on every call, so new `not:`
@@ -413,7 +422,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-407 tests passing as of 2026-11-07.
+408 tests passing as of 2026-11-07.
 ## Next, agreed
 
 1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's

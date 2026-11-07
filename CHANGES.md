@@ -2,6 +2,15 @@
 
 Append-only. Newest first.
 
+## 2026-11-07 (element scorecard)
+
+- Weekly scorecard matches on elements, not exact wording: at least half the
+  expected keywords must appear in the row's title, asker or client. A line can
+  add `| matches: alt1, alt2` for evidence that uses different words.
+- Report now breaks hits down as wording / elements / override. This week:
+  15/16 (94%); only `IOI Entity Restructuring` missed.
+- 408 tests passing.
+
 ## 2026-11-07 (tracked Jira epic: all triage tickets)
 
 - `tracked_epics.json` maps an epic (default `GRE-4129`, "All Triage tickets")
