@@ -164,3 +164,13 @@ def test_cancel_by_title_picks_the_nearest_match(monkeypatch):
     assert deleted == ["e1"]
     assert reply.startswith("Cancelled: Change Request Workflow")
     assert meetings.cancel_by_title({}, "nothing like this", NOW) is None
+
+
+def test_email_to_slack_reads_the_directory(tmp_path):
+    import json
+
+    from mini_reid.meetings import email_to_slack
+
+    path = tmp_path / "directory.json"
+    path.write_text(json.dumps({"U1": {"email": "a@pantas.com"}}))
+    assert email_to_slack(str(path)) == {"a@pantas.com": "U1"}
