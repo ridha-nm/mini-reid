@@ -687,7 +687,8 @@ def main() -> int:
         from .members import ack_done
         from .profiles import load as load_profiles
 
-        acked = ack_done(env, load_profiles(), owner, ledger_path, now)
+        acked = ack_done(env, load_profiles(),
+                         env.get("SLACK_OWNER_ID", ""), ledger_path, now)
         if acked:
             print(f"[{now:%H:%M:%S}] done acks sent: {acked}", flush=True)
     except Exception as ex:  # noqa: BLE001 - ack must not stop capture
