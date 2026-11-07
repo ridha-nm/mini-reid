@@ -173,8 +173,11 @@ activity today are DMed, up to five at a time, each with an inline status picker
 is nudged at most three times; a status change through triage or the picker resets the
 count. Inbox rows are never nudged as stale or overdue.
 
-`list` is split into My reminders, Reminders I sent, My tasks, Tagged by others,
-Inbox and Notes, up to 40 numbered rows. Inside each section the due buckets keep
+`list` is split into My reminders, Reminders I sent, Triage epic, My tasks,
+Tagged by others, Inbox and Notes, up to 40 numbered rows. **Triage epic**
+shows tickets in `tracked_epics.json` that Ridha assigned (Jira changelog),
+with mapped status, assignee and the latest Jira comment or channel message;
+the tracker runs every watcher cycle and closes Done tickets. Inside each section the due buckets keep
 the old order (In progress / Blocked / Overdue / Due today / This week / Later /
 No date). Numbering stays global and matches the order every command uses.
 **Triage & update** opens a modal: select rows (checkboxes chunked ten per Slack

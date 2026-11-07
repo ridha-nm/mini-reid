@@ -43,3 +43,4 @@ slack_lists.json
 
 # subagent scratch
 .superpowers/
+epic_cache.json

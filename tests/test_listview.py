@@ -132,3 +132,12 @@ def test_list_splits_my_tasks_from_tagged_and_sent_reminders():
     assert "Their task" in text
     # Numbers stay global and follow the same order commands use.
     assert "1. [rem]" in text and "2. [mine]" in text and "3. [tagged]" in text
+
+
+def test_triage_tickets_have_their_own_section():
+    rows = [_row("t1", "Configure ESG categories", kind="triage",
+                 status="in progress", assignee="Julian")]
+    text = format_list(rows, NOW)
+    assert "*Triage epic*" in text
+    assert "Configure ESG categories" in text
+    assert "Julian" in text

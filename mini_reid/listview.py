@@ -1,6 +1,7 @@
 """Open-task list: ordered, grouped and short enough to scan."""
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timedelta
 
 from .ledger import _dt
@@ -42,20 +43,23 @@ def _bucket(row: dict, today: date) -> str:
     return "later"
 
 
-SECTIONS = [(0, "My reminders"), (1, "My tasks"), (2, "Tagged by others")]
+SECTIONS = [(0, "My reminders"), (1, "Triage epic"), (2, "My tasks"),
+            (3, "Tagged by others")]
 
 
 def _section(row: dict) -> int:
-    """0 reminders on my list, 2 work someone else put on me, 1 the rest."""
+    """0 reminders, 1 tracked Jira epic, 3 work others put on me, 2 rest."""
     if row.get("kind") == "reminder":
         return 0
+    if row.get("kind") == "triage":
+        return 1
     if ((row.get("direction") or "") == "owed_to_me"
             or row.get("via") in {"assigned", "reassigned"}
             or (row.get("source") == "slack"
                 and row.get("kind") in {"mention", "dm"}
                 and row.get("asker"))):
-        return 2
-    return 1
+        return 3
+    return 2
 
 
 def ordered_rows(rows: list[dict], now: datetime) -> list[dict]:
@@ -111,6 +115,15 @@ def _line(number: int, row: dict, today: date) -> str:
         parts.append(f"· {client}")
     if isinstance(row.get("priority"), int):
         parts.append(f"· P{row['priority']}")
+    if row.get("kind") == "triage":
+        if row.get("assignee"):
+            parts.append(f"· {row['assignee']}")
+        chatter = (row.get("chatter") or {}).get("text") or (
+            row.get("latest_comment") or {}).get("text") or ""
+        if chatter:
+            chatter = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", chatter)).strip()
+            if chatter:
+                parts.append(f"· “{chatter[:80]}”")
     return " ".join(parts) + _ref(row)
 
 

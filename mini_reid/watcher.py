@@ -656,6 +656,16 @@ def main() -> int:
         _stamp_confirmation(ledger_path, {r["id"] for r in pending}, sent)
         print(f"[{now:%H:%M:%S}] asked to confirm {len(pending)} new", flush=True)
     try:
+        from .epic_tracker import sync as sync_epics
+
+        tracked = sync_epics(env, ledger_path)
+        if tracked:
+            print(f"[{now:%H:%M:%S}] epic tickets tracked: {tracked}",
+                  flush=True)
+    except Exception as ex:  # noqa: BLE001 - tracking must not stop capture
+        print(f"[{now:%H:%M:%S}] epic tracker: {type(ex).__name__}: {ex}",
+              flush=True)
+    try:
         from .slack_lists import sync_user as sync_slack_list
 
         synced = sync_slack_list(env, env.get("SLACK_OWNER_ID", ""), "Ridha",

@@ -2,6 +2,21 @@
 
 Append-only. Newest first.
 
+## 2026-11-07 (tracked Jira epic: all triage tickets)
+
+- `tracked_epics.json` maps an epic (default `GRE-4129`, "All Triage tickets")
+  to a Slack tracking channel (`software-related-issues`).
+- The watcher reads the epic's children, keeps only tickets **Ridha assigned**
+  (Jira changelog author = him), and maintains one ledger row per open ticket:
+  summary, Jira status mapped to open/in progress/blocked, assignee, latest
+  Jira comment, and the latest channel message mentioning the ticket key.
+- Those rows render in a dedicated **Triage epic** section near the top of
+  `list`; Done tickets close and leave the section. Jira comments and channel
+  chatter update `last_activity`.
+- Cache in `epic_cache.json` (gitignored) stores changelog checks, comments and
+  the channel watermark; the channel is backfilled 7 days on first run.
+- 406 tests passing.
+
 ## 2026-11-07 (bd-triager-agent filtered at source)
 
 - Slack search results from `#bd-triager-agent` (`C0B59LA0X5M`) are dropped

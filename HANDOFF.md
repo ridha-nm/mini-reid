@@ -123,6 +123,17 @@ patches the Google event, keeps the duration, appends the note, moves the
 stored start and reminder state, and DMs attendees. `moved <note>` only records
 the note.
 
+2026-11-07 tracked Jira epic: `tracked_epics.json` maps `GRE-4129`
+("All Triage tickets") to `software-related-issues`. `epic_tracker.sync` runs
+each watcher cycle: reads the epic's children, keeps tickets whose assignee
+change was authored by Ridha, and upserts one row per open ticket with mapped
+status, assignee, latest Jira comment and latest channel message containing the
+ticket key. Rows use `kind: triage` and render in a **Triage epic** section
+right after My reminders. Done tickets close. Cache `epic_cache.json`
+(gitignored); channel backfills 7 days once, then follows a watermark.
+Limits: only tickets Ridha assigned, only the last comment/message, and the bot
+must be in the tracking channel.
+
 2026-11-06 non-member questions: anyone outside the owner/member list who asks
 a question gets a private DM answer from the local KB only — no ledger, files
 or live Slack search, and nothing posted in the channel. Immediate reminders
@@ -402,7 +413,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-401 tests passing as of 2026-11-07.
+406 tests passing as of 2026-11-07.
 ## Next, agreed
 
 1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's

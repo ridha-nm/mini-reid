@@ -37,8 +37,11 @@ members never see each other's lists.
 
 ### Organising
 
-- `list` is sectioned: **My reminders**, **Reminders I sent**, **My tasks**,
-  **Tagged by others**, **Inbox**, **Notes**. Numbers are global and work in
+- `list` is sectioned: **My reminders**, **Reminders I sent**, **Triage epic**,
+  **My tasks**, **Tagged by others**, **Inbox**, **Notes**.
+- **Triage epic:** tickets you assigned in a tracked Jira epic (default
+  `GRE-4129`) with mapped status, assignee, latest Jira comment and latest
+  `#software-related-issues` chatter. Done tickets leave the section. Numbers are global and work in
   every command; stable short ids (`abc123`) also work.
 - Statuses: open, in progress, blocked, stalled, done, dropped. Priority 1–5.
   Due dates, waiting-on-others, client tags.
@@ -116,7 +119,7 @@ members never see each other's lists.
 - Catch-up sweep replays commands the socket missed while the Mac slept.
 - Everything runs locally on the Mac and only while it is awake. No cloud
   database; client content does not leave the machine for extraction.
-- 401 tests pass.
+- 406 tests pass.
 
 ### Changed this week
 
@@ -137,6 +140,8 @@ members never see each other's lists.
   it and stay archived in the ledger.
 - Non-members can ask general questions privately (KB only); immediate
   reminders drop a leading "now"; festive greetings no longer become tasks.
+- Tracked Jira epic section for tickets you assigned, with progress and chatter.
+- `#bd-triager-agent` is filtered out everywhere.
 - Removed Gmail/Jira link unfurls: unused, and they rendered a card per task
   link in the digest.
 
