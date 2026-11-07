@@ -699,10 +699,6 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
-
-
 def remind_attendees(env: dict, now: datetime,
                      created_path: str = "created_meetings.json",
                      profiles: dict | None = None) -> int:
@@ -764,3 +760,8 @@ def remind_attendees(env: dict, now: datetime,
         Path(created_path).write_text(json.dumps(data, indent=1,
                                                  ensure_ascii=False))
     return sent
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
