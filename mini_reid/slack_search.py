@@ -25,7 +25,11 @@ def search(env: dict, query: str, limit: int = 5) -> list[dict]:
         data = json.load(response)
     if not data.get("ok"):
         raise RuntimeError(f"search.context: {data.get('error')}")
-    return (data.get("results") or {}).get("messages") or []
+    ignored = {"bd-triager-agent", "C0B59LA0X5M"}
+    hits = (data.get("results") or {}).get("messages") or []
+    return [h for h in hits
+            if (h.get("channel_id") or h.get("channel_name") or "") not in ignored
+            and (h.get("channel_name") or "").lstrip("#") not in ignored]
 
 
 def format_hits(hits: list[dict], limit: int = 3) -> str:

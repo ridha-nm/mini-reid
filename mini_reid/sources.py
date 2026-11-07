@@ -55,11 +55,16 @@ def _get_json(url: str, headers: dict, retries: int = 4) -> dict:
 
 # ---------------------------------------------------------------- slack
 
+IGNORE_SLACK_CHANNELS = {"bd-triager-agent", "C0B59LA0X5M"}
+
+
 def parse_slack_search(payload: dict) -> list[dict]:
     out, seen = [], set()
     for m in (payload.get("messages") or {}).get("matches") or []:
         ch = m.get("channel") or {}
         name = ch.get("name") or ch.get("id") or ""
+        if name.lstrip("#") in IGNORE_SLACK_CHANNELS or ch.get("id") in IGNORE_SLACK_CHANNELS:
+            continue
         key = (ch.get("id") or "", m.get("ts") or "")
         if key in seen:
             continue

@@ -2,6 +2,14 @@
 
 Append-only. Newest first.
 
+## 2026-11-07 (bd-triager-agent filtered at source)
+
+- Slack search results from `#bd-triager-agent` (`C0B59LA0X5M`) are dropped
+  before extraction, for both the owner watcher and live `ask:` search. Member
+  scans already skipped it. Prevents the triager's ticket cards from becoming
+  candidates or answering questions.
+- 401 tests passing.
+
 ## 2026-11-06 (greetings are not tasks)
 
 - Festive and social greetings no longer become candidates: "Happy Deepavali",

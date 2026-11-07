@@ -116,7 +116,7 @@ members never see each other's lists.
 - Catch-up sweep replays commands the socket missed while the Mac slept.
 - Everything runs locally on the Mac and only while it is awake. No cloud
   database; client content does not leave the machine for extraction.
-- 400 tests pass.
+- 401 tests pass.
 
 ### Changed this week
 
