@@ -1359,3 +1359,33 @@ def test_immediate_reminder_drops_the_word_now():
     assert fields["immediate"] is True
     assert what == "not to stuff too much"
     assert fields["what"] == "not to stuff too much"
+
+
+def test_sender_footer_is_not_addressing_the_bot():
+    from mini_reid.slack_bot import is_bot_addressed
+
+    bot = "U0CEE242B5E"
+    footer = "*Sent using* <@U0CEE242B5E>"
+    assert not is_bot_addressed(
+        {"channel": "C1", "text": f"Interview notes…\n{footer}"}, bot)
+    assert is_bot_addressed({"channel": "C1", "text": f"<@{bot}> list"}, bot)
+    assert is_bot_addressed(
+        {"channel": "C1", "text": "ask @mini-reid what is due"}, bot)
+
+
+def test_not_reason_buttons_and_row():
+    from mini_reid.slack_bot import (NOT_REASONS, just_not_row,
+                                     not_reason_blocks)
+
+    blocks = not_reason_blocks("abc123", "Book 45-minute interview")
+    buttons = blocks[-1]["elements"]
+    assert [b["value"] for b in buttons] == [
+        f"abc123|{slug}" for slug, _ in NOT_REASONS]
+    assert "Why not a task" in blocks[0]["elements"][0]["text"]
+
+    rows = [{"id": "old", "closed_how": "not_commitment",
+             "closed_at": "2026-11-01T09:00:00+08:00"},
+            {"id": "new", "closed_how": "not_commitment",
+             "closed_at": "2026-11-09T17:00:00+08:00"},
+            {"id": "open", "closed_how": "manual"}]
+    assert just_not_row(rows)["id"] == "new"

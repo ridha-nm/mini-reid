@@ -174,7 +174,10 @@ is nudged at most three times; a status change through triage or the picker rese
 count. Inbox rows are never nudged as stale or overdue.
 
 `list` is split into My reminders, Reminders I sent, Triage epic, My tasks,
-Tagged by others, Inbox and Notes, up to 40 numbered rows. **Triage epic**
+Tagged by others, Inbox and Notes, and paged: 25 numbered rows per page with
+**◀ Previous** / **Next ▶** buttons that edit the same message in place, so no
+row is cut off; page one also carries sent reminders, Inbox and Notes.
+**Triage epic**
 shows tickets in `tracked_epics.json` that Ridha assigned (Jira changelog),
 with mapped status, assignee and the latest Jira comment or channel message;
 the tracker runs every watcher cycle and closes Done tickets. Inside each section the due buckets keep
@@ -210,7 +213,15 @@ local KB; a non-member gets a private DM answer from the local KB only),
 in DM). `meet:` accepts one or more attendees
 (`@Kasib and @Charanya`, comma/and-separated names), reads everyone's freeBusy, proposes five
 slots over five working days at the requested duration (default 30 minutes, 15–180)
-with a formal Title/With/Duration block and a busy snapshot of every calendar, then
+with a formal Title/With/Duration block and a busy snapshot of every calendar; the
+proposal is posted in the channel where the command was typed (threaded), not in
+the DM. The proposal is a day view: it opens on the first working day with a
+free slot and `◀ Previous day` / `Next day ▶` walks the next five working days,
+listing every free 30-minute slot on the selected day (up to 20). Topic separators are `about`, `on`, `for`, `regarding`, `re`, `review`,
+`to discuss`; stray words such as "today" never drop a resolved guest. The
+organiser or any invited attendee may click a slot (email resolved through the
+directory/profiles); the confirmation names `Booked by`, a ✅ acknowledgement is
+posted in the thread, and the creator stays the organiser. Then
 creates the Google event with a Meet link and invites the attendees. Edit title,
 duration and notes, Refresh and Cancel buttons; notes become the event description,
 Meet is always created. Requires `calendar.events` consent.
@@ -241,13 +252,18 @@ Fun) with **My list** and **Triage inbox** buttons, not a command dump.
   **Authorise** button that runs the normal `allow:`) and **Message Ridha**;
   no other ledger is exposed.
 - Each user's ledger is mirrored into a native Slack List (“Mini-Reid — Name”)
-  with title, status, due and source link. The list is created once and shared
+  with title, status, due, source link and **Assigner** — the sender's email
+  for mail, the author's Slack email (user token, `users:read.email`), the Jira
+  reporter's email, or the bot's name when it has no email. The list is shared
   write with that user; the watcher creates/updates up to 500 live tasks, so
-  every open task is mirrored. The `list` reply includes an **Open Slack List**
-  button with the deep link. Two-way: a Slack edit to title/status/due updates
-  the ledger on the next pull; deleting a List row drops the ledger row;
-  dropped, Inbox and `done` rows are deleted from the List. A done row stays in
-  the ledger as the archive.
+  every open task is mirrored, and every mutating command or modal syncs the
+  List immediately rather than waiting for the cycle. The `list` reply includes
+  an **Open Slack List** button with the deep link. Two-way: a Slack edit to
+  title/status/due updates the ledger on the next pull; deleting a List row
+  drops the ledger row; dropped, Inbox and `done` rows are deleted from the
+  List. A done row stays in the ledger as the archive. Slack cannot add a column
+  to a live List: a schema change recreates it and renames the old one
+  "(archived)".
 - A member's plain DM to the bot becomes a task without an `add:` prefix;
   questions and channel messages keep their existing behaviour.
 - The **Add to Mini-Reid** message shortcut captures any message after a prefilled

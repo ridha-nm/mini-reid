@@ -55,7 +55,7 @@ def _get_json(url: str, headers: dict, retries: int = 4) -> dict:
 
 # ---------------------------------------------------------------- slack
 
-IGNORE_SLACK_CHANNELS = {"bd-triager-agent", "C0B59LA0X5M"}
+IGNORE_SLACK_CHANNELS: set[str] = set()
 
 
 def parse_slack_search(payload: dict) -> list[dict]:
@@ -218,7 +218,29 @@ def fetch_slack(days: int, token: str, me: str) -> list[dict]:
         time.sleep(1.2)
     # Search sometimes returns a bare user id; people read names.
     _names_for(token, items)
+    _fill_empty_text(token, items)
     return items
+
+
+def _fill_empty_text(token: str, items: list[dict]) -> None:
+    """App cards come back from search with no text. Read the message itself."""
+    for item in items:
+        if item.get("text") or item.get("source") != "slack":
+            continue
+        channel = item.get("channel_id") or ""
+        ts = item.get("thread_ts") or (item.get("native_id") or "").partition(":")[2]
+        if not channel or not ts:
+            continue
+        try:
+            d = _get_json(
+                "https://slack.com/api/conversations.replies?"
+                + urllib.parse.urlencode({"channel": channel, "ts": ts,
+                                          "limit": 1}),
+                {"Authorization": f"Bearer {token}"})
+            msgs = d.get("messages") or []
+            item["text"] = (msgs[0].get("text") or "").strip() if msgs else ""
+        except Exception:  # noqa: BLE001 - a read failure must not stop capture
+            continue
 
 
 # ---------------------------------------------------------------- gmail
@@ -318,6 +340,8 @@ def parse_jira_issues(data: dict, base: str, me: str | None = None) -> list[dict
         key = issue.get("key", "")
         assignee = (f.get("assignee") or {}).get("displayName")
         reporter = (f.get("reporter") or {}).get("displayName")
+        reporter_email = (f.get("reporter") or {}).get("emailAddress") or ""
+        assignee_email = (f.get("assignee") or {}).get("emailAddress") or ""
         project = ((f.get("project") or {}).get("key")
                    or (f.get("project") or {}).get("name") or "Jira")
         # Auto-assigned board items say nothing. The other person, if any,
@@ -335,6 +359,7 @@ def parse_jira_issues(data: dict, base: str, me: str | None = None) -> list[dict
             "channel": "jira",
             "channel_id": "",
             "author": who,
+            "author_email": reporter_email or assignee_email,
             "ts": f.get("updated") or "",
             "text": f.get("summary", ""),
             "subject": f.get("summary", ""),

@@ -71,6 +71,36 @@ def dedupe_by_link(rows: list[dict]) -> list[dict]:
     return loose + list(kept.values())
 
 
+def _title_key(row: dict) -> str:
+    """Title + client, normalised: the same ask worded by two senders."""
+    text = (row.get("action") or row.get("what") or "").lower()
+    text = re.sub(r"[^a-z0-9 ]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return f"{text}|{(row.get('client') or '').lower()}" if text else ""
+
+
+def drop_duplicate_titles(existing: list[dict],
+                          incoming: list[dict]) -> list[dict]:
+    """Drop new rows that repeat a live task's title ("Book 45-minute
+    interview" arriving four times). Short titles are left alone — they are
+    too generic to prove a duplicate."""
+    live = {_title_key(r) for r in existing
+            if (r.get("status") or "open") not in TERMINAL
+            and r.get("kind") not in {"note", "reminder"}}
+    kept: list[dict] = []
+    seen: set[str] = set()
+    for r in incoming:
+        key = _title_key(r)
+        if (len(key.split("|")[0]) >= 8
+                and (r.get("status") or "open") not in TERMINAL
+                and key in (live | seen)):
+            continue
+        kept.append(r)
+        if (r.get("status") or "open") not in TERMINAL:
+            seen.add(key)
+    return kept
+
+
 def _dt(value: str | None) -> datetime | None:
     if not value:
         return None

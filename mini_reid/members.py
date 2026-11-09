@@ -12,7 +12,8 @@ from pathlib import Path
 
 from .cli import load_clients
 from .clients import match_client
-from .ledger import apply_stalled, load, merge, save
+from .ledger import (apply_stalled, drop_duplicate_titles, load,
+                     merge, save)
 from .notify import send_dm_to
 from .profiles import load as load_profiles
 from .render import render
@@ -22,7 +23,7 @@ from .watcher import (_stamp_confirmation, fire_reminders, format_alert,
                       polish_rows, remind_meetings)
 
 MYT = timezone(timedelta(hours=8))
-IGNORE_CHANNELS = {"bd-triager-agent", "C0B59LA0X5M"}
+IGNORE_CHANNELS: set[str] = set()
 SLACK_SCAN = "slack_scan.json"
 
 
@@ -201,6 +202,7 @@ def refresh(env: dict, user: str, profile: dict, days: int = 1) -> list[dict]:
     fresh = new_rows(items, existing, clients, now,
                      me=profile.get("email") or profile.get("name"))
     fresh = polish_rows(env, items, fresh, now, clients)
+    fresh = drop_duplicate_titles(existing, fresh)
     if fresh:
         save(ledger_path, apply_stalled(merge(existing, fresh), now))
         from .triage_ui import confirm_blocks

@@ -32,6 +32,77 @@ def test_ensure_list_maps_columns_and_status_choices(tmp_path, monkeypatch):
     assert calls == ["slackLists.create", "slackLists.access.set"]
 
 
+def test_assigner_prefers_a_known_email(monkeypatch):
+    monkeypatch.setattr(slack_lists, "_email_for", lambda env, uid: {
+        "U9": "kasib@pantas.com"}.get(uid, ""))
+    assert slack_lists._assigner({}, {"asker": "Arman (arman@pantas.com)"}) == \
+        "Arman (arman@pantas.com)"
+    assert slack_lists._assigner({}, {"source": "slack", "asker": "Kasib",
+                                      "from_user": "U9"}) == \
+        "Kasib (kasib@pantas.com)"
+    assert slack_lists._assigner({}, {"source": "jira", "asker": "BO board",
+                                      "assigner_email": "ridha@pantas.com"}) == \
+        "BO board (ridha@pantas.com)"
+    # A Slack bot has no email; the name is what you can filter on.
+    assert slack_lists._assigner({}, {"source": "slack", "asker": "RIJ Agent",
+                                      "from_user": "U8"}) == "RIJ Agent"
+
+
+def test_old_list_is_archived_and_rebuilt_with_the_assigner_column(
+        tmp_path, monkeypatch):
+    state = tmp_path / "state.json"
+    state.write_text('{"U1": {"list_id": "FOLD", "columns": {"title": "ColT"},'
+                     ' "status_choices": {}}}')
+    calls = []
+
+    def fake(method, token, body):
+        calls.append((method, body))
+        if method == "slackLists.create":
+            return {"ok": True, "list_id": "FNEW", "list_metadata": {"schema": [
+                {"key": "title", "id": "ColT"},
+                {"key": "assigner", "id": "ColA"}]}}
+        return {"ok": True}
+
+    monkeypatch.setattr(slack_lists, "_post", fake)
+    cfg = slack_lists.ensure_list({"SLACK_BOT_TOKEN": "x"}, "U1", "Charanya",
+                                  str(state))
+    assert cfg["list_id"] == "FNEW"
+    assert cfg["columns"]["assigner"] == "ColA"
+    assert cfg["v"] == slack_lists.CFG_VERSION
+    renamed = [b for m, b in calls if m == "slackLists.update"]
+    assert renamed and renamed[0]["id"] == "FOLD"
+    assert "archived" in renamed[0]["name"]
+
+
+def test_sync_recreates_items_after_a_schema_migration(tmp_path, monkeypatch):
+    state = str(tmp_path / "state.json")
+    ledger = str(tmp_path / "ledger.json")
+    from pathlib import Path
+
+    Path(state).write_text('{"U1": {"list_id": "FOLD", "columns": {"title": "ColT"},'
+                           ' "status_choices": {}}}')
+    save(ledger, [{"id": "a", "what": "Send the deck", "status": "open",
+                   "slack_item_id": "RecOld",
+                   "last_activity": "2026-11-05T10:00:00+08:00"}])
+    made = []
+
+    def fake(method, token, body):
+        if method == "slackLists.create":
+            return {"ok": True, "list_id": "FNEW", "list_metadata": {"schema": [
+                {"key": "title", "id": "ColT"}]}}
+        if method == "slackLists.items.list":
+            return {"ok": True, "items": []}
+        if method == "slackLists.items.create":
+            made.append(body)
+            return {"ok": True, "item": {"id": "RecNew"}}
+        return {"ok": True}
+
+    monkeypatch.setattr(slack_lists, "_post", fake)
+    slack_lists.sync_user({"SLACK_BOT_TOKEN": "x"}, "U1", "Ridha", ledger, state)
+    assert len(made) == 1
+    assert load(ledger)[0]["slack_item_id"] == "RecNew"
+
+
 def test_slack_list_edits_flow_back_to_the_ledger():
     rows = [{"id": "a", "what": "Old title", "status": "open",
              "due": "2026-11-06", "slack_item_id": "Rec1",

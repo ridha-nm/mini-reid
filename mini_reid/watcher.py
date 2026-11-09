@@ -9,7 +9,8 @@ from pathlib import Path
 
 from .cli import collect, load_clients, match_client, _domain
 from .extract import extract
-from .ledger import apply_stalled, load, merge, save
+from .ledger import (apply_stalled, drop_duplicate_titles, load,
+                     merge, save)
 from .notify import send_dm, send_dm_to
 from .sources import load_env
 
@@ -436,6 +437,193 @@ def stale_rows(rows: list[dict], now: datetime) -> list[dict]:
     return out
 
 
+TRIAGER_CHANNEL = "C0B59LA0X5M"
+TRIAGER_STATE = "triager_routed.json"
+TRIAGER_APP = "demo app"
+
+
+def route_triager(env: dict, now: datetime,
+                  state_path: str = TRIAGER_STATE,
+                  post=None, fetch=None) -> int:
+    """Tag the account owners on new Demo App tickets in the triager channel.
+
+    Only Demo App's "*Solution proposed*" cards route. SLA notices, the weekly
+    rotation, closed tickets and human chatter are ignored."""
+    from . import routing
+
+    state_file = Path(state_path)
+    state = json.loads(state_file.read_text()) if state_file.exists() else {}
+    if not state.get("since_ts"):
+        # First run: start from now so the backlog is not replied to at once.
+        state["since_ts"] = f"{now.timestamp():.6f}"
+        state_file.write_text(json.dumps(state))
+        return 0
+    blocked_at = state.get("blocked_at") or ""
+    if blocked_at:
+        try:
+            if (now - datetime.fromisoformat(blocked_at)).total_seconds() < 3600:
+                return 0
+        except ValueError:
+            pass
+    if fetch is None:
+        token = env.get("SLACK_USER_TOKEN")
+        if not token:
+            return 0
+
+        def fetch(oldest: str) -> list[dict]:
+            from .sources import _get_json
+
+            out: list[dict] = []
+            cursor = ""
+            for _ in range(10):          # up to 1,000 messages per cycle
+                params = {"channel": TRIAGER_CHANNEL, "oldest": oldest,
+                          "limit": 100}
+                if cursor:
+                    params["cursor"] = cursor
+                d = _get_json(
+                    "https://slack.com/api/conversations.history?"
+                    + urllib.parse.urlencode(params),
+                    {"Authorization": f"Bearer {token}"})
+                out.extend(d.get("messages") or [])
+                cursor = (d.get("response_metadata") or {}).get(
+                    "next_cursor") or ""
+                if not cursor:
+                    break
+            return out
+    try:
+        messages = fetch(state["since_ts"])
+    except Exception as ex:  # noqa: BLE001 - try again next cycle
+        print(f"[{now:%H:%M:%S}] triager read: {type(ex).__name__}: {ex}",
+              flush=True)
+        return 0
+    if post is None:
+        from .notify import _post
+
+        token = env["SLACK_BOT_TOKEN"]
+
+        def post(channel: str, text: str, thread_ts: str) -> None:
+            d = _post("chat.postMessage", token, channel=channel, text=text,
+                      thread_ts=thread_ts)
+            if not d.get("ok"):
+                raise RuntimeError(d.get("error"))
+    routing_data = routing.ensure_fresh()
+    by_email = routing_data.get("emails") or {}
+    by_domain = routing_data.get("domains") or {}
+    by_company = routing_data.get("companies") or {}
+    routed = state.setdefault("tickets", {})
+    stats = state.setdefault("stats", {"total": 0, "fallback": 0,
+                                       "unmapped": {}})
+    closed: set[str] = set()
+    for message in messages:
+        if ((message.get("bot_profile") or {}).get("name") or "").lower() \
+                != TRIAGER_APP:
+            continue
+        if "*Closed*" not in (message.get("text") or ""):
+            continue
+        key = routing.parse_card(message.get("text") or "")["key"]
+        if key:
+            closed.add(key)
+    sent = 0
+    for message in messages:
+        ts = message.get("ts") or ""
+        if ts:
+            state["since_ts"] = max(state.get("since_ts") or "0", ts)
+        text = message.get("text") or ""
+        app = ((message.get("bot_profile") or {}).get("name") or "").lower()
+        if app != TRIAGER_APP:
+            continue
+        # Acknowledge first, propose second: assign on whichever arrives first.
+        if ("*Acknowledged*" not in text
+                and "*Solution proposed*" not in text):
+            continue
+        # Never tag follow-ups ("💬 <name> replied:") on the same ticket.
+        if ":speech_balloon:" in text or " replied:" in text:
+            continue
+        card = routing.parse_card(text)
+        if not card["key"] or card["key"] in routed:
+            continue
+        if card["key"] in closed:
+            # Resolved inside this replay window: no tag needed.
+            routed[card["key"]] = now.isoformat()
+            continue
+        route = by_email.get(card["email"])
+        if not route and "@" in card["email"]:
+            route = by_domain.get(card["email"].rpartition("@")[2])
+        if not route:
+            # No email on the card: match the company (then organisation) name.
+            route = (routing.lookup_company(by_company, card.get("company") or "")
+                     or routing.lookup_company(by_company,
+                                               card.get("organisation") or ""))
+        fallback = False
+        if not route:
+            # Unknown requester: Ridha triages it by hand.
+            route = {"anchor": "Unmapped", "programme": "-",
+                     "owners": ["ridha@pantas.com"]}
+            fallback = True
+            name = (card.get("company") or card.get("organisation")
+                    or card["email"] or "unknown")[:60]
+            stats["unmapped"][name] = stats["unmapped"].get(name, 0) + 1
+        ids = routing.owner_ids(route["owners"]) or routing.owner_ids(
+            routing.PROGRAMME_OWNERS.get(route["programme"], []))
+        owners = " ".join(f"<@{uid}>" for uid in ids) or ", ".join(route["owners"])
+        reply = (f"*{card['key']}* — {card['title']}\n"
+                 f"Requester: {card['email']} · {route['anchor']} "
+                 f"({route['programme']})\nOwner: {owners}")
+        try:
+            post(TRIAGER_CHANNEL, reply, message.get("thread_ts") or ts)
+        except Exception as ex:  # noqa: BLE001 - retry once the bot can post
+            state["blocked_at"] = now.isoformat()
+            state_file.write_text(json.dumps(state))
+            print(f"[{now:%H:%M:%S}] triager route: {type(ex).__name__}: {ex}",
+                  flush=True)
+            return sent
+        routed[card["key"]] = now.isoformat()
+        stats["total"] += 1
+        stats["fallback"] += 1 if fallback else 0
+        stats["unmapped"] = dict(sorted(stats["unmapped"].items(),
+                                        key=lambda kv: -kv[1])[:20])
+        sent += 1
+    state["tickets"] = dict(list(routed.items())[-1000:])
+    _alert_routing(env, state, now)
+    state_file.write_text(json.dumps(state))
+    return sent
+
+
+def _alert_routing(env: dict, state: dict, now: datetime) -> None:
+    """DM Ridha when routing relies on fallbacks or the exports are stale."""
+    from . import routing
+
+    stats = state.get("stats") or {}
+    total = int(stats.get("total") or 0)
+    fallback = int(stats.get("fallback") or 0)
+    age = routing.exports_age_days()
+    if not (routing.needs_alert(total, fallback) or age > routing.EXPORT_MAX_AGE_DAYS):
+        return
+    last = state.get("alerted_at") or ""
+    try:
+        if last and (now - datetime.fromisoformat(last)).total_seconds() < 86400:
+            return
+    except ValueError:
+        pass
+    names = ", ".join(list((stats.get("unmapped") or {}))[:8]) or "-"
+    text = ("*Routing check*\n"
+            f"Last {total} triager tickets: {fallback} had no account match"
+            + (f" ({fallback / total:.0%})." if total else ".")
+            + (f"\nUnmapped companies: {names}." if names else "")
+            + (f"\nExports are {age:.0f} days old — send fresh ChildCompany, "
+               "ChildCompanyUser and lite_user_collection_report exports."
+               if age > routing.EXPORT_MAX_AGE_DAYS else "")
+            + "\nReply with aliases (company → account) for any that should route.")
+    try:
+        from .notify import send_dm
+
+        send_dm(env, text)
+        state["alerted_at"] = now.isoformat()
+    except Exception as ex:  # noqa: BLE001 - alerting must not stop routing
+        print(f"[{now:%H:%M:%S}] routing alert: {type(ex).__name__}: {ex}",
+              flush=True)
+
+
 def nudge_stale(env: dict, ledger_path: str, now: datetime,
                 state_path: str = "watcher_state.json",
                 user_id: str | None = None) -> int:
@@ -639,11 +827,30 @@ def main() -> int:
               flush=True)
 
     items, errors = collect(days=1, offline=False)
+    try:
+        routed = route_triager(env, now)
+        if routed:
+            print(f"[{now:%H:%M:%S}] triager tickets routed: {routed}",
+                  flush=True)
+    except Exception as ex:  # noqa: BLE001 - routing must not stop capture
+        print(f"[{now:%H:%M:%S}] triager route: {type(ex).__name__}: {ex}",
+              flush=True)
     existing = load(ledger_path)
     fresh = new_rows(items, existing, clients, now)
 
     # Rules capture; the model only cleans titles. The stamp decides the status.
     fresh = polish_rows(env, items, fresh, now, clients)
+    fresh = drop_duplicate_titles(existing, fresh)
+    try:
+        from .mutes import learn as learn_mutes
+
+        newly_muted = learn_mutes(apply_stalled(merge(existing, fresh), now))
+        if newly_muted:
+            print(f"[{now:%H:%M:%S}] muted channel(s): "
+                  f"{', '.join(newly_muted)}", flush=True)
+    except Exception as ex:  # noqa: BLE001 - muting must not stop capture
+        print(f"[{now:%H:%M:%S}] mute learn: {type(ex).__name__}: {ex}",
+              flush=True)
 
     if fresh:
         ledger = apply_stalled(merge(existing, fresh), now)

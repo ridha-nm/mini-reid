@@ -102,6 +102,16 @@ def test_new_undated_item_is_not_cut_from_a_long_list():
     assert "… and" not in text
 
 
+def test_long_list_pages_without_cutting_rows():
+    rows = [_row(f"t{i:02d}", f"Task {i}") for i in range(60)]
+    first = format_list(rows, NOW)
+    assert "[t24] Task 24" in first and "[t25]" not in first
+    assert "Page 1/3" in first
+    last = format_list(rows, NOW, page=2)
+    assert "[t59] Task 59" in last
+    assert "Page 3/3" in last
+
+
 def test_undated_items_are_newest_first():
     rows = [_row("old", "Old", created_at="2026-10-01T09:00:00+08:00"),
             _row("new", "New", created_at="2026-11-05T09:00:00+08:00")]

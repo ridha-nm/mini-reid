@@ -157,8 +157,8 @@ def test_jira_keeps_the_issue_type():
     assert parse_jira_issues(data, "https://x")[0]["issue_type"] == "Epic"
 
 
-def test_triager_channel_is_ignored_at_the_source():
+def test_triager_channel_is_read_at_the_source():
     match = {"channel": {"id": "C0B59LA0X5M", "name": "bd-triager-agent"},
              "username": "demo app", "ts": "1.1", "text": "<@U1> ticket",
              "permalink": "l"}
-    assert parse_slack_search({"messages": {"matches": [match]}}) == []
+    assert len(parse_slack_search({"messages": {"matches": [match]}})) == 1

@@ -25,11 +25,11 @@ LEADING_MENTION = re.compile(
 COMMANDS = {"add", "note", "notes", "assign", "reassign", "done", "drop", "due",
             "snooze", "waiting", "find", "list", "not", "remind", "edit", "status",
             "priority", "prio", "combine", "uncombine", "convert", "tonote", "undo",
-            "allow", "setup", "clients", "reminders", "meet"}
+            "allow", "setup", "clients", "reminders", "meet", "alias"}
 MUTATING = {"add", "note", "assign", "reassign", "done", "drop", "due", "snooze",
             "waiting", "not", "remind", "edit", "status", "priority", "prio",
             "combine", "uncombine", "convert", "tonote"}
-IGNORE_CHANNEL_IDS = {"C0B59LA0X5M"}  # bd-triager-agent
+IGNORE_CHANNEL_IDS: set[str] = set()
 # Interpersonal fights are not to-dos. Refuse the relay with a silly line.
 GUARDRAIL = re.compile(
     r"\b(harass\w*|bully\w*|unblock me|tell .{0,40} to stop|"
@@ -810,7 +810,9 @@ def _meeting_people(text: str, users: dict[str, str]) -> list[str]:
             rest = rest[len(name):].strip()
             matched = True
         if not matched:
-            return []
+            # A stray word ("today", topic fragments) is not an attendee; it
+            # must not discard people already resolved from mentions/names.
+            continue
     return found
 
 
@@ -820,7 +822,8 @@ def parse_meeting(body: str, users: dict[str, str],
     text = re.sub(r"^with\s+", "", (body or "").strip(), flags=re.I)
     topic = ""
     m = re.search(
-        r"\s+(?:to\s+)?(?:discuss|talk\s+about|review|about|on|re)\s*:?\s+(.+)$",
+        r"\s+(?:to\s+)?(?:discuss|talk\s+about|review|about|on|for|regarding|re)"
+        r"\s*:?\s+(.+)$",
         text, re.I)
     if m:
         people_text, topic = text[:m.start()].strip(), m.group(1).strip()
@@ -831,6 +834,65 @@ def parse_meeting(body: str, users: dict[str, str],
         return None, ""
     names = ", ".join(_person_name(t, users) for t in targets)
     return targets, (topic or f"Meeting with {names}")[:200]
+
+
+def slot_picker_allowed(pending: dict, clicker: str,
+                        by_email: dict[str, str] | None = None) -> bool:
+    """Who may lock a proposed slot: the organiser or any invited attendee."""
+    if not pending or not clicker:
+        return False
+    if clicker == pending.get("user"):
+        return True
+    if by_email is None:
+        from .meetings import email_to_slack
+        from .profiles import load as load_profiles
+
+        by_email = email_to_slack()
+        for uid, prof in load_profiles().items():
+            email = (prof.get("email") or "").lower()
+            if email:
+                by_email[email] = uid
+    return clicker in {by_email.get((e or "").lower())
+                       for e in pending.get("emails") or []}
+
+
+NOT_REASONS = [
+    ("duplicate", "Duplicate"),
+    ("chatter", "Chatter"),
+    ("fyi", "FYI / minutes"),
+    ("handled", "Handled elsewhere"),
+    ("not_mine", "Not mine"),
+]
+
+
+def not_reason_blocks(row_id: str, title: str = "") -> list[dict]:
+    """One tap files why a row was not a task, so `not:` can be categorised."""
+    return [
+        {"type": "context", "elements": [{
+            "type": "mrkdwn",
+            "text": f"Why not a task? _{(title or '')[:80]}_"}]},
+        {"type": "actions", "elements": [
+            {"type": "button", "action_id": "not_reason",
+             "value": f"{row_id}|{slug}",
+             "text": {"type": "plain_text", "text": label}}
+            for slug, label in NOT_REASONS]},
+    ]
+
+
+def just_not_row(rows: list[dict]) -> dict | None:
+    """The row the single-row `not:` just closed."""
+    closed = [r for r in rows if r.get("closed_how") == "not_commitment"
+              and r.get("closed_at")]
+    return max(closed, key=lambda r: r.get("closed_at") or "") if closed else None
+
+
+def day_links(days: list[str], day: str) -> tuple[str, str]:
+    """The previous/next working day around `day`, empty at either end."""
+    if day not in days:
+        return "", ""
+    i = days.index(day)
+    return (days[i - 1] if i else "",
+            days[i + 1] if i + 1 < len(days) else "")
 
 
 def unresolved_recipient(body: str, users: dict[str, str]) -> str | None:
@@ -1040,6 +1102,11 @@ def load_users(token: str) -> dict[str, str]:
     return {k: next(iter(v)) for k, v in found.items() if len(v) == 1}
 
 
+SENT_SIGNATURE = re.compile(
+    r"\s*\*?\s*sent\s+(?:using|via|with)\s*:?\s*\*?\s*"
+    r"(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@?mini-?reid)\s*$", re.I)
+
+
 def is_bot_addressed(event: dict, bot_user_id: str) -> bool:
     """DMs reach the bot directly; channel messages need a real mention or
     the literal @mini-reid handle (Slack does not always autocomplete)."""
@@ -1047,6 +1114,9 @@ def is_bot_addressed(event: dict, bot_user_id: str) -> bool:
     if channel.startswith("D"):
         return True
     text = event.get("text") or ""
+    # "*Sent using* @mini-reid" is a sender footer, not a request: a message
+    # merely tagged with it must never be captured as a note.
+    text = SENT_SIGNATURE.sub("", text)
     return bool(bot_user_id) and (
         f"<@{bot_user_id}>" in text or bool(re.search(r"@mini-?reid\b", text, re.I)))
 
@@ -1233,6 +1303,9 @@ def parse_command(text: str, bot_user_id: str = "") -> tuple[str, str]:
     m = re.match(r"^(clients?|accounts?)\s*:\s*(.*)$", body, re.I)
     if m:
         return "clients", m.group(2).strip()
+    m = re.match(r"^alias\s*:?\s+(.+)$", body, re.I)
+    if m:
+        return "alias", m.group(1).strip()
     if body.lower() in {"setup", "connect"}:
         return "setup", ""
     if body.lower() in {"clients", "accounts", "client list"}:
@@ -1606,6 +1679,20 @@ def apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
     return reply
 
 
+def sync_slack_list(env: dict, user: str, ledger_path: str) -> None:
+    """Push a just-made ledger change into the person's Slack List now,
+    instead of waiting for the next watcher cycle."""
+    try:
+        from .profiles import load as load_profiles
+        from .slack_lists import sync_user
+
+        name = (load_profiles().get(user) or {}).get("name") or (
+            "Ridha" if user == env.get("SLACK_OWNER_ID") else user)
+        sync_user(env, user, name, ledger_path)
+    except Exception as ex:  # noqa: BLE001 - the reply matters more than the list
+        print(f"  list sync failed: {type(ex).__name__}: {ex}", flush=True)
+
+
 def setup_message(name: str, link: str) -> str:
     return (
         f"*Mini-Reid is enabled for you, {name}.*\n"
@@ -1943,6 +2030,19 @@ def _apply_command(action: str, body: str, now, clients: dict, ledger_path: str,
         }
         save(ledger_path, merge(rows, [row]))
         return f"Reminder set for {fields['remind_at'][:16].replace('T', ' ')}: {clean[:80]}"
+
+    if action == "alias":
+        from .routing import add_alias
+
+        m = re.match(r"^(.+?)\s*(?:=>|->|=|→)\s*(.+)$", body or "")
+        if not m:
+            return "Use: alias: <company name> = <account or parent company>"
+        try:
+            route = add_alias(m.group(1), m.group(2))
+        except Exception as ex:  # noqa: BLE001 - tell the owner why
+            return f"Could not save alias: {type(ex).__name__}: {ex}"
+        return (f"Alias saved: {m.group(1).strip()} → "
+                f"{route['anchor']} ({route['programme']})")
 
     if action == "not":
         from . import learning
@@ -2377,16 +2477,29 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
 
             duration = parse_duration(body) or SLOT_MINUTES
             topic = strip_duration(topic) or topic
+            from .meetings import working_days
+
+            days = working_days()
+            slots: list[dict] = []
             busy: dict = {}
+            day = ""
             try:
-                slots = propose_slots(env, emails, busy_out=busy,
-                                      duration=duration)
+                # Open on the first day that actually has a free slot, then
+                # let the day pager walk the rest of the week.
+                for candidate in days:
+                    busy = {}
+                    slots = propose_slots(env, emails, busy_out=busy,
+                                          duration=duration, day=candidate,
+                                          count=20)
+                    if slots:
+                        day = candidate
+                        break
             except Exception as ex:  # noqa: BLE001 - tell the owner why
                 say(f"Could not read calendars: {type(ex).__name__}: {ex}")
                 _mark(ts)
                 return
             if not slots:
-                say(f"No common free slot with {names} in the next 5 working days.")
+                say(f"No common free slot with {names} this week.")
                 _mark(ts)
                 return
             from secrets import token_hex
@@ -2397,13 +2510,19 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             pending[token] = {"topic": topic, "emails": emails,
                               "attendees": attendees, "attendee": names,
                               "slots": slots, "user": user, "channel": channel,
-                              "duration": duration}
+                              "duration": duration, "days": days, "day": day}
             if len(pending) > 50:
                 state_now["pending_meet"] = dict(list(pending.items())[-50:])
             Path(STATE).write_text(json.dumps(state_now))
-            sent = say(f"Free slots with {names}:",
-                       blocks=slot_blocks(token, topic, attendees, slots,
-                                          busy, duration=duration))
+            prev_day, next_day = day_links(days, day)
+            # The proposal belongs where the request was made, not in a DM.
+            sent = post_reply(channel, f"Free slots with {names}:",
+                              notify=False,
+                              blocks=slot_blocks(token, topic, attendees, slots,
+                                                 busy, duration=duration,
+                                                 day=day, prev_day=prev_day,
+                                                 next_day=next_day),
+                              thread_ts=thread_ts)
             if sent:
                 pending[token]["channel"] = sent.get("channel") or channel
                 pending[token]["message_ts"] = sent.get("ts") or ""
@@ -2859,6 +2978,9 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
         except Exception as ex:  # noqa: BLE001 - never leave the user without a reply
             print(f"[error] {type(ex).__name__}: {ex}", flush=True)
             reply = f"Something broke: {type(ex).__name__}"
+        if action in MUTATING and (user == owner or member):
+            # `not:`/`done:` must leave the Slack List at once, not in 3 minutes.
+            sync_slack_list(env, user, user_ledger)
         if action not in {"unknown", "ack", "help", "list", "notes", "ask"}:
             try:
                 from . import learning
@@ -2899,6 +3021,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
             blocks = note_action_blocks(
                 commitment_id("manual", body.lower(), body), text)
             reply = "Saved as a note. Keep it, make it a task, or discard?"
+        if action == "not" and reply.startswith("Removed as not a commitment:"):
+            row = just_not_row(load(user_ledger))
+            if row:
+                blocks = not_reason_blocks(row.get("id", ""),
+                                           row.get("what", ""))
         if action == "list" and (user == owner or member):
             try:
                 from .notify import sent_reminders
@@ -3104,9 +3231,11 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 dur = max(15, min(180, dur))
                 pending["duration"] = dur
                 busy: dict = {}
+                day = pending.get("day") or ""
                 try:
                     slots = propose_slots(env, pending["emails"], busy_out=busy,
-                                          duration=dur)
+                                          duration=dur, day=day or None,
+                                          count=20 if day else 5)
                     pending["slots"] = slots
                 except Exception:  # noqa: BLE001 - keep the previous slots
                     slots = pending.get("slots") or []
@@ -3117,11 +3246,15 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     "name": pending.get("attendee", "Attendee"),
                     "email": (pending.get("emails") or [""])[0]}]
                 if channel and msg_ts and slots:
+                    prev_day, next_day = day_links(
+                        pending.get("days") or [], day)
                     web.chat_update(
                         channel=channel, ts=msg_ts,
                         text=f"Meeting proposal: {pending['topic']}",
                         blocks=slot_blocks(token, pending["topic"], people,
-                                           slots, busy, duration=dur))
+                                           slots, busy, duration=dur, day=day,
+                                           prev_day=prev_day,
+                                           next_day=next_day))
                 return
             if view.get("callback_id") == "inbox_clear_apply":
                 from .triage_ui import (apply_inbox_page, inbox_clear_modal,
@@ -3142,6 +3275,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                 rows, added, dropped, remaining = apply_inbox_page(
                     load(target), page_ids, ticked, datetime.now(MYT))
                 save(target, rows)
+                sync_slack_list(env, clicker, target)
                 view_id = view.get("id") or ""
                 try:
                     if remaining:
@@ -3182,6 +3316,7 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                                            verdict, datetime.now(MYT))
                 save(target, rows)
                 clicker = (payload.get("user") or {}).get("id") or owner
+                sync_slack_list(env, clicker, target)
                 try:
                     send_dm_to(env, clicker,
                                f"Updated {count} item(s) to *{verdict}*.")
@@ -3351,10 +3486,13 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                                             text="Meeting proposal cancelled.")
                         continue
                     dur = int(pending.get("duration") or 30)
+                    day = pending.get("day") or ""
                     busy: dict = {}
                     try:
                         slots = propose_slots(env, pending["emails"],
-                                              busy_out=busy, duration=dur)
+                                              busy_out=busy, duration=dur,
+                                              day=day or None,
+                                              count=20 if day else 5)
                     except Exception as ex:  # noqa: BLE001 - keep old message
                         if channel and msg_ts:
                             web.chat_update(
@@ -3367,12 +3505,69 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                         people = pending.get("attendees") or [{
                             "name": pending.get("attendee", "Attendee"),
                             "email": (pending.get("emails") or [""])[0]}]
+                        prev_day, next_day = day_links(
+                            pending.get("days") or [], day)
                         blocks = slot_blocks(
                             token, pending["topic"], people, slots, busy,
-                            duration=dur)
+                            duration=dur, day=day, prev_day=prev_day,
+                            next_day=next_day)
                         web.chat_update(channel=channel, ts=msg_ts,
                                         text=f"Free slots with {pending['attendee']}",
                                         blocks=blocks)
+                    continue
+                if action_id == "meet_day":
+                    from .meeting_ui import slot_blocks
+                    from .meetings import propose_slots
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    value = action.get("value") or ""
+                    token, _, day = value.partition("|")
+                    container = payload.get("container") or {}
+                    channel = container.get("channel_id") or ""
+                    msg_ts = container.get("message_ts") or ""
+                    state_now = _state()
+                    pending = (state_now.get("pending_meet") or {}).get(token)
+                    days = (pending or {}).get("days") or []
+                    if not pending or day not in days:
+                        continue
+                    if not slot_picker_allowed(pending, clicker):
+                        try:
+                            web.chat_postEphemeral(
+                                channel=channel, user=clicker,
+                                text="Only the organiser or an invited attendee "
+                                     "can browse the slots.")
+                        except Exception:  # noqa: BLE001 - best effort
+                            pass
+                        continue
+                    duration = int(pending.get("duration") or 30)
+                    busy: dict = {}
+                    try:
+                        slots = propose_slots(env, pending["emails"],
+                                              duration=duration, day=day,
+                                              busy_out=busy, count=20)
+                    except Exception as ex:  # noqa: BLE001 - keep the message
+                        print(f"  day browse failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
+                        continue
+                    pending["slots"] = slots
+                    pending["day"] = day
+                    Path(STATE).write_text(json.dumps(state_now))
+                    if channel and msg_ts:
+                        people = pending.get("attendees") or [{
+                            "name": pending.get("attendee", "Attendee"),
+                            "email": (pending.get("emails") or [""])[0]}]
+                        prev_day, next_day = day_links(days, day)
+                        try:
+                            web.chat_update(
+                                channel=channel, ts=msg_ts,
+                                text=f"Free slots with {pending['attendee']}",
+                                blocks=slot_blocks(
+                                    token, pending["topic"], people, slots,
+                                    busy, duration=duration, day=day,
+                                    prev_day=prev_day, next_day=next_day))
+                        except Exception as ex:  # noqa: BLE001 - user can retry
+                            print(f"  day browse update failed: "
+                                  f"{type(ex).__name__}: {ex}", flush=True)
                     continue
                 if action_id == "meet_slot":
                     from .meeting_ui import confirmation_blocks
@@ -3383,13 +3578,23 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     token, _, start = value.partition("|")
                     state_now = _state()
                     pending = (state_now.get("pending_meet") or {}).get(token)
-                    if not pending or clicker != pending.get("user"):
-                        continue
-                    slot = next((s for s in pending["slots"]
-                                 if s["start"] == start), None)
                     container = payload.get("container") or {}
                     channel = container.get("channel_id") or ""
                     msg_ts = container.get("message_ts") or ""
+                    if not pending:
+                        continue
+                    if not slot_picker_allowed(pending, clicker):
+                        try:
+                            web.chat_postEphemeral(
+                                channel=channel, user=clicker,
+                                text="Only the organiser or an invited attendee "
+                                     "can pick a slot.")
+                        except Exception as ex:  # noqa: BLE001 - best effort
+                            print(f"  slot denial failed: "
+                                  f"{type(ex).__name__}", flush=True)
+                        continue
+                    slot = next((s for s in pending["slots"]
+                                 if s["start"] == start), None)
                     if not slot:
                         continue
                     try:
@@ -3413,7 +3618,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     try:
                         remember_meeting(
                             event, pending["topic"], slot["start"], slot["end"],
-                            attendees, clicker, pending.get("notes", ""))
+                            attendees, pending.get("user") or clicker,
+                            pending.get("notes", ""))
                     except Exception as ex:  # noqa: BLE001 - event exists
                         print(f"  remember meeting failed: "
                               f"{type(ex).__name__}: {ex}", flush=True)
@@ -3421,11 +3627,23 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     Path(STATE).write_text(json.dumps(state_now))
                     link = event.get("hangoutLink") or event.get("htmlLink") or ""
                     blocks = confirmation_blocks(
-                        pending["topic"], slot["start"], slot["end"], link)
+                        pending["topic"], slot["start"], slot["end"], link,
+                        by=clicker)
                     text = blocks[0]["text"]["text"]
                     if channel and msg_ts:
                         web.chat_update(channel=channel, ts=msg_ts,
                                         text=text, blocks=blocks)
+                        # The update is silent; drop an acknowledgement in the
+                        # thread so everyone watching sees it was booked.
+                        try:
+                            web.chat_postMessage(
+                                channel=channel,
+                                thread_ts=(container.get("thread_ts")
+                                           or msg_ts),
+                                text=f"✅ {text}")
+                        except Exception as ex:  # noqa: BLE001 - booked already
+                            print(f"  booked ack failed: "
+                                  f"{type(ex).__name__}: {ex}", flush=True)
                     continue
                 if action_id in {"help_topic", "help_home"}:
                     from .help_ui import home_blocks, topic_blocks, topic_text
@@ -3473,6 +3691,71 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     except Exception as ex:  # noqa: BLE001 - user can retry
                         print(f"  help list failed: "
                               f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
+                if action_id == "list_page":
+                    from .listview import format_list
+                    from .notify import sent_reminders
+                    from .slack_lists import list_url
+                    from .triage_ui import list_blocks
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target = ledger_for_viewer(clicker)
+                    container = payload.get("container") or {}
+                    channel = container.get("channel_id") or ""
+                    msg_ts = container.get("message_ts") or ""
+                    if not target or not channel or not msg_ts:
+                        continue
+                    try:
+                        page = int(action.get("value") or 0)
+                    except ValueError:
+                        continue
+                    rows = load(target)
+                    now = datetime.now(MYT)
+                    sent = sent_reminders(clicker)
+                    try:
+                        web.chat_update(
+                            channel=channel, ts=msg_ts,
+                            text=format_list(rows, now, page=page, sent=sent),
+                            blocks=list_blocks(rows, now, list_url(env, clicker),
+                                               sent=sent, page=page))
+                    except Exception as ex:  # noqa: BLE001 - user can click again
+                        print(f"  list page failed: "
+                              f"{type(ex).__name__}: {ex}", flush=True)
+                    continue
+                if action_id == "not_reason":
+                    from . import learning
+
+                    clicker = (payload.get("user") or {}).get("id") or ""
+                    target = ledger_for_viewer(clicker)
+                    value = action.get("value") or ""
+                    row_id, _, slug = value.partition("|")
+                    labels = dict(NOT_REASONS)
+                    if not target or slug not in labels:
+                        continue
+                    rows = load(target)
+                    row = next((r for r in rows if r.get("id") == row_id), None)
+                    if not row:
+                        continue
+                    row["not_reason"] = slug
+                    row["last_activity"] = datetime.now(MYT).isoformat()
+                    save(target, rows)
+                    learning.add(row.get("what", ""), reason=slug,
+                                 source=row.get("source", ""))
+                    container = payload.get("container") or {}
+                    channel = container.get("channel_id") or ""
+                    msg_ts = container.get("message_ts") or ""
+                    if channel and msg_ts:
+                        try:
+                            web.chat_update(
+                                channel=channel, ts=msg_ts,
+                                text=f"Removed: {row.get('what', '')[:80]} · "
+                                     f"{labels[slug]}",
+                                blocks=[{"type": "context", "elements": [{
+                                    "type": "mrkdwn",
+                                    "text": f"Not a task — *{labels[slug]}*"}]}])
+                        except Exception as ex:  # noqa: BLE001 - saved already
+                            print(f"  not reason update failed: "
+                                  f"{type(ex).__name__}: {ex}", flush=True)
                     continue
                 if action_id in {"triage_select_all", "triage_clear"}:
                     from .triage_ui import triage_modal
@@ -3567,6 +3850,8 @@ def main(env: dict, ledger_path: str = "ledger.json") -> int:
                     rows, row, count = apply_confirmation(
                         load(target), row_id, verdict, datetime.now(MYT))
                     save(target, rows)
+                    if count:
+                        sync_slack_list(env, clicker, target)
                     if not row:
                         continue
 

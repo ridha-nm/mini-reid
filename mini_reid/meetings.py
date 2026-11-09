@@ -8,7 +8,7 @@ import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from .sources import gmail_access
 
@@ -55,37 +55,62 @@ def _overlaps(start: datetime, end: datetime, busy: list[tuple]) -> bool:
     return any(start < b_end and end > b_start for b_start, b_end in busy)
 
 
+def working_days(now: datetime | None = None,
+                 count: int = PROPOSE_DAYS) -> list[str]:
+    """The next `count` weekdays (Mon–Fri), today first."""
+    now = now or datetime.now(MYT)
+    out: list[str] = []
+    day = now.date()
+    while len(out) < count:
+        if day.weekday() < 5:
+            out.append(day.isoformat())
+        day += timedelta(days=1)
+    return out
+
+
 def propose_slots(env: dict, emails: list[str], now: datetime | None = None,
                   duration: int = SLOT_MINUTES, days: int = PROPOSE_DAYS,
                   token_path: str | None = None,
                   client_path: str | None = None,
-                  busy_out: dict | None = None) -> list[dict]:
+                  busy_out: dict | None = None,
+                  day: str | None = None,
+                  count: int = PROPOSE_COUNT) -> list[dict]:
+    """Free slots on every calendar. `day` (YYYY-MM-DD) proposes one whole day."""
     now = now or datetime.now(MYT)
     earliest = now.replace(second=0, microsecond=0) + timedelta(minutes=30)
-    end = (now + timedelta(days=days)).replace(hour=WORK_END, minute=0,
-                                               second=0, microsecond=0)
+    if day:
+        target = date.fromisoformat(day)
+        start = max(earliest, datetime.combine(target, time(WORK_START),
+                                               tzinfo=MYT))
+        end = datetime.combine(target, time(WORK_END), tzinfo=MYT)
+        if target.weekday() >= 5 or start + timedelta(minutes=duration) > end:
+            return []
+    else:
+        start = earliest
+        end = (now + timedelta(days=days)).replace(hour=WORK_END, minute=0,
+                                                   second=0, microsecond=0)
     everyone = [OWNER_EMAIL] + [e for e in emails if e != OWNER_EMAIL]
-    busy = busy_by_email(env, everyone, earliest, end,
+    busy = busy_by_email(env, everyone, start, end,
                          token_path=token_path, client_path=client_path)
     if busy_out is not None:
         busy_out.update(busy)
     slots: list[dict] = []
-    day = earliest.date()
-    while day <= end.date() and len(slots) < PROPOSE_COUNT:
-        if day.weekday() < 5:
-            cursor = datetime.combine(day, time(WORK_START), tzinfo=MYT)
-            if cursor < earliest:
-                cursor = earliest.replace(minute=(earliest.minute // 30) * 30)
-            close = datetime.combine(day, time(WORK_END), tzinfo=MYT)
+    day_cursor = start.date()
+    while day_cursor <= end.date() and len(slots) < count:
+        if day_cursor.weekday() < 5:
+            cursor = datetime.combine(day_cursor, time(WORK_START), tzinfo=MYT)
+            if cursor < start:
+                cursor = start.replace(minute=(start.minute // 30) * 30)
+            close = datetime.combine(day_cursor, time(WORK_END), tzinfo=MYT)
             while cursor + timedelta(minutes=duration) <= close:
                 stop = cursor + timedelta(minutes=duration)
                 if not any(_overlaps(cursor, stop, b) for b in busy.values()):
                     slots.append({"start": cursor.isoformat(),
                                   "end": stop.isoformat()})
-                    if len(slots) >= PROPOSE_COUNT:
+                    if len(slots) >= count:
                         break
                 cursor += timedelta(minutes=30)
-        day += timedelta(days=1)
+        day_cursor += timedelta(days=1)
     return slots
 
 

@@ -31,6 +31,19 @@ def test_long_list_splits_without_cutting_links():
     assert "https://example.com/24/a-long-enough-link" in joined
 
 
+def test_list_blocks_page_buttons_walk_the_pages():
+    from mini_reid.listview import PER_PAGE
+
+    rows = [_row(f"id{i:03d}", f"Task {i}") for i in range(PER_PAGE * 2 + 1)]
+    first = list_blocks(rows, NOW)
+    pager = [b for b in first if b.get("type") == "actions"][-1]["elements"]
+    assert [e["action_id"] for e in pager] == ["list_page"]
+    assert pager[0]["value"] == "1"
+    mid = list_blocks(rows, NOW, page=1)
+    pager = [b for b in mid if b.get("type") == "actions"][-1]["elements"]
+    assert [e["value"] for e in pager] == ["0", "2"]
+
+
 def test_list_blocks_offer_a_triage_button():
     blocks = list_blocks([_row("a1", "Real task"),
                           _row("b2", "Maybe", status="inbox")], NOW)

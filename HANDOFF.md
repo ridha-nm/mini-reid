@@ -51,7 +51,7 @@ with a Meet link and attendee invite. Requires `calendar.events` consent.
 2026-11-05: `help` is a topic picker with My list / Triage buttons; every channel
 reply stays in the triggering thread; pasted `done:`/`not:` lists match tasks and
 notes (including notes that start with `9. [abc123]`); a reminder adds an open
-reminder row to the recipient's list; `list` shows 40 rows, undated newest first;
+reminder row to the recipient's list; `list` pages 25 rows at a time, undated newest first;
 a missed 09:15 digest is rebuilt and delivered after 09:30 until Slack accepts it;
 `assign:` by row id reassigns and mirrors the title; Triage has Select all / Clear;
 a meeting reply can be `moved` / `rescheduled` / `postponed`. Member parity is
@@ -78,12 +78,42 @@ and **Message Ridha**; no cross-ledger exposure. Full setup completion DMs both
 Ridha and the member.
 2026-11-05: `ask:` tries live Slack Real-time Search first for Ridha, with
 channel/text/permalink, then falls back to the local KB. Each user's ledger is
-mirrored into a native Slack List (“Mini-Reid — Name”) with title, status, due
-and source; created once, shared write, incremental last 50. Bot scopes
+mirrored into a native Slack List (“Mini-Reid — Name”) with title, status, due,
+source and assigner; created once, shared write, incremental last 50. Bot scopes
 `lists:read`/`lists:write`. `list` replies include an **Open Slack List** button
 with that user's deep link. Sync is two-way: Slack edits to title/status/due win
 on the next pull; deleting a List row drops the ledger row; dropped/Inbox rows
 are deleted from the List.
+
+2026-11-09: the List gained an **Assigner** column (mail sender, Slack author
+email via the user token, Jira reporter email, or the bot's name) so automation
+like RIJ-Agent is easy to filter. Slack cannot add a column to a live List, so
+each member's List is rebuilt on schema-version change and the old one renamed
+"(archived)". Ledger changes now sync immediately after any mutating command or
+modal, instead of waiting for the next watcher cycle. `list` is paged (25 rows
+a page, Prev/Next) and the digest is delivered as blocks, so neither is split
+into several DMs. Lynnette (`U07KG4XB6E7`) was deauthorised: profile, list
+state and lists removed; her ledger is parked at
+`data/_removed/U07KG4XB6E7-20261109`. `meet:` treats `for`/`regarding` as topic
+separators and ignores stray words like "today"; the slot proposal posts in the
+channel where the command was typed, not in Ridha's DM, and the organiser or any
+invited attendee can click a slot; booking updates that message and posts a ✅
+acknowledgement in the thread. The proposal pages one working day at a time
+(Prev/Next day) across the next five weekdays, listing every free slot that day.
+A single-row `not:` now offers five reason buttons (Duplicate, Chatter, FYI /
+minutes, Handled elsewhere, Not mine), stored as `not_reason` and as the
+correction's reason, so rejects are categorised; one- and two-word DMs are no
+longer captured as tasks unless they carry an action verb. New rows with the
+same normalised title + client as a live task are dropped, and
+`mutes.learn` silences a Slack channel with 3+ rejects and >75% rejected
+(`muted_sources.json`; completed tasks count as proof of real work).
+#bd-triager-agent is read again (filters removed, app cards fetched by message
+id, `demo app` allowed); its cards become candidates from the message text,
+though the bot still cannot press the triager's buttons. `routing.py` tags the
+account owners on each new card's thread: requester → anchor (Lite MV) or
+child→parent, GHB/GVC/SAFE vs ENT, anchor → stocktake-hub client → all its
+members; unmatched requester → Ridha, account without a client → programme
+owners. Exports live in `~/Downloads`; `routing.json` rebuilds when stale.
 
 2026-11-05 flying-car baseline: `mini_reid.evaluation` scores capture against
 Charanya's self-written list, with `benchmark: false` for tasks that have no
@@ -105,7 +135,10 @@ digest rendered a card per task link. The Slack scopes, event and domains are
 gone from the manifest; reinstall the app so Slack drops them. Bare pasted
 links still never become notes.
 
-Weekly release notes live in `docs/WEEKLY-UPDATE.md` — append a dated
+Each learnt behaviour is documented by workflow in `docs/WORKFLOWS.md`
+(capture, corrections, Slack List, list paging, digest, meetings, reminders,
+triager routing) with its state files, code and tests. Weekly release notes
+live in `docs/WEEKLY-UPDATE.md` — append a dated
 capability snapshot every Friday. First entry covers week ending 2026-11-06.
 
 2026-11-06 meeting duration and cancel: `meet:` parses
@@ -424,7 +457,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-408 tests passing as of 2026-11-09.
+415 tests passing as of 2026-11-09.
 ## Next, agreed
 
 1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's

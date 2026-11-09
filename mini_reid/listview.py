@@ -106,7 +106,7 @@ def _due_label(due: datetime, today: date) -> str:
 
 
 def _line(number: int, row: dict, today: date) -> str:
-    parts = [f"{number}. [{row.get('id', '')[:6]}] {_title(row)[:100]}"]
+    parts = [f"{number}. [{row.get('id', '')[:6]}] {_title(row)[:200]}"]
     due = _dt(row.get("due"))
     if due:
         parts.append(f"— {_due_label(due, today)}")
@@ -131,13 +131,27 @@ def _sent_line(reminder: dict) -> str:
     when = (reminder.get("post_at") or "")[:16].replace("T", " ")
     status = ("sent" if reminder.get("status") == "sent" else "pending")
     return (f"• {reminder.get('to_name') or 'someone'} — "
-            f"{(reminder.get('what') or '')[:70]} · {when} · {status}")
+            f"{(reminder.get('what') or '')[:120]} · {when} · {status}")
 
 
-def format_list(rows: list[dict], now: datetime, limit: int = 40,
-                sent: list[dict] | None = None) -> str:
-    """Numbered, grouped text version. Same numbering as `ordered_rows`."""
+PER_PAGE = 25
+
+
+def page_count(rows: list[dict], now: datetime,
+               per_page: int = PER_PAGE) -> int:
+    return max(1, -(-len(ordered_rows(rows, now)) // per_page))
+
+
+def format_list(rows: list[dict], now: datetime, page: int = 0,
+                sent: list[dict] | None = None,
+                per_page: int = PER_PAGE) -> str:
+    """One page of the numbered, grouped list.
+
+    Page 0 also carries the sent reminders, Inbox and Notes; the rows keep
+    counting across pages so a number stays meaningful on every page."""
     ordered = ordered_rows(rows, now)
+    pages = page_count(rows, now, per_page)
+    page = min(max(page, 0), pages - 1)
     inbox = [r for r in rows if (r.get("status") or "").lower() == "inbox"]
     notes = [r for r in rows if r.get("kind") == "note"
              and (r.get("status") or "open") not in {"done", "dropped"}]
@@ -145,18 +159,18 @@ def format_list(rows: list[dict], now: datetime, limit: int = 40,
     if not ordered and not inbox and not notes and not sent:
         return "Nothing open."
 
-    shown = ordered[:limit]
+    shown = ordered[page * per_page:(page + 1) * per_page]
     today = now.date()
     sections: list[str] = []
     current_section = None
     current_bucket = None
-    for number, row in enumerate(shown, 1):
+    for number, row in enumerate(shown, page * per_page + 1):
         section = _section(row)
         if section != current_section:
             current_section = section
             current_bucket = None
             sections.append(f"*{dict(SECTIONS)[section]}*")
-            if section == 0 and sent:
+            if page == 0 and section == 0 and sent:
                 sections.append("*Reminders I sent*")
                 sections.extend(_sent_line(r) for r in sent)
         bucket = _bucket(row, today)
@@ -164,22 +178,20 @@ def format_list(rows: list[dict], now: datetime, limit: int = 40,
             current_bucket = bucket
             sections.append(f"_{dict(BUCKETS)[bucket]}_")
         sections.append(_line(number, row, today))
-    if not any(_section(r) == 0 for r in shown) and sent:
+    if page == 0 and not any(_section(r) == 0 for r in shown) and sent:
         sections.append("*Reminders I sent*")
         sections.extend(_sent_line(r) for r in sent)
-    if len(ordered) > limit:
-        sections.append(f"… and {len(ordered) - limit} more")
+    if pages > 1:
+        sections.append(f"_Page {page + 1}/{pages}_")
 
-    if inbox:
+    if page == 0 and inbox:
         sections.append(f"*Inbox — needs decision ({len(inbox)})*")
-        for row in inbox[:20]:
-            sections.append(f"• [{row.get('id', '')[:6]}] {_title(row)[:100]}")
+        for row in inbox:
+            sections.append(f"• [{row.get('id', '')[:6]}] {_title(row)[:200]}")
 
-    if notes:
+    if page == 0 and notes:
         sections.append(f"*Notes ({len(notes)})*")
-        for row in notes[:20]:
-            sections.append(f"• [{row.get('id', '')[:6]}] {_title(row)[:100]}")
-        if len(notes) > 20:
-            sections.append(f"… and {len(notes) - 20} more notes")
+        for row in notes:
+            sections.append(f"• [{row.get('id', '')[:6]}] {_title(row)[:200]}")
 
     return "\n".join(sections)

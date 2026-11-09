@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
-from .listview import _title, format_list, ordered_rows
+from .listview import _title, format_list, ordered_rows, page_count
 
 VERDICTS = [
     ("open", "Task"),
@@ -55,8 +55,11 @@ def _sections(text: str, limit: int = SECTION_LIMIT) -> list[dict]:
 
 def list_blocks(rows: list[dict], now: datetime,
                 list_url: str | None = None,
-                sent: list[dict] | None = None) -> list[dict]:
-    blocks = _sections(format_list(rows, now, sent=sent))
+                sent: list[dict] | None = None,
+                page: int = 0) -> list[dict]:
+    pages = page_count(rows, now)
+    page = min(max(page, 0), pages - 1)
+    blocks = _sections(format_list(rows, now, page=page, sent=sent))
     selectable = _selectable(rows, now)
     elements = []
     if list_url:
@@ -80,6 +83,17 @@ def list_blocks(rows: list[dict], now: datetime,
         })
     if elements:
         blocks.append({"type": "actions", "elements": elements})
+    if pages > 1:
+        pager = []
+        if page > 0:
+            pager.append({"type": "button", "action_id": "list_page",
+                          "value": str(page - 1),
+                          "text": {"type": "plain_text", "text": "◀ Previous"}})
+        if page < pages - 1:
+            pager.append({"type": "button", "action_id": "list_page",
+                          "value": str(page + 1),
+                          "text": {"type": "plain_text", "text": "Next ▶"}})
+        blocks.append({"type": "actions", "elements": pager})
     return blocks
 
 

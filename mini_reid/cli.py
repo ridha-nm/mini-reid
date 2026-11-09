@@ -12,7 +12,8 @@ from .capture import parse_capture
 from .clients import load_clients, match_client
 from .closure import propose_closures
 from .extract import extract
-from .ledger import apply_stalled, dedupe_by_link, load, merge, reconcile_jira, save
+from .ledger import (apply_stalled, dedupe_by_link, drop_duplicate_titles,
+                     load, merge, reconcile_jira, save)
 from .render import render
 from .sources import (fetch_gmail, fetch_jira, fetch_slack, fetch_slack_dms,
                       load_env, slack_me)
@@ -154,7 +155,8 @@ def main(argv: list[str] | None = None) -> int:
     else:
         incoming += rule_rows
 
-    incoming = triage_incoming(incoming, load(args.ledger))
+    incoming = drop_duplicate_titles(
+        load(args.ledger), triage_incoming(incoming, load(args.ledger)))
     ledger = dedupe_by_link(apply_stalled(merge(load(args.ledger), incoming), now))
     jira_items = [i for i in items if i.get("source") == "jira"]
     if jira_items:

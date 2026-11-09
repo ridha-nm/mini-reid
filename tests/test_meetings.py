@@ -19,6 +19,14 @@ def test_meeting_phrase_parses_to_meet():
         ["U1"], "BD Command Centre")
     assert parse_meeting("with Kasib about the dashboard",
                          {"kasib": "U1"}, "U0") == (["U1"], "the dashboard")
+    # "for <topic>" is as common as "about <topic>".
+    assert parse_command(
+        "set a meeting with @Kasib for BD Command Centre Planning and "
+        "Improvements") == (
+        "meet", "@Kasib for BD Command Centre Planning and Improvements")
+    assert parse_meeting("@Kasib for BD Command Centre Planning and Improvements",
+                         {"kasib": "U1"}, "U0") == (
+        ["U1"], "BD Command Centre Planning and Improvements")
     people = {"kasib": "U1", "charanya": "U2", "arman rahman": "U3"}
     assert parse_meeting("Kasib, Charanya and Arman Rahman about the deck",
                          people, "U0") == (
@@ -26,6 +34,24 @@ def test_meeting_phrase_parses_to_meet():
     assert parse_meeting("Nish and Eden on the Change Request Workflow",
                          {"nish": "U4", "eden": "U5"}, "U0") == (
         ["U4", "U5"], "the Change Request Workflow")
+    # A real mention plus a stray word ("today") must still schedule.
+    assert parse_meeting("<@U1> today", {"kasib": "U1"}, "U0") == (
+        ["U1"], "Meeting with U1")
+
+
+def test_attendees_can_pick_the_slot():
+    from mini_reid.slack_bot import slot_picker_allowed
+
+    pending = {"user": "URIDHA", "emails": ["kasib@pantas.com"]}
+    by_email = {"kasib@pantas.com": "UKASIB"}
+    assert slot_picker_allowed(pending, "URIDHA", by_email)
+    assert slot_picker_allowed(pending, "UKASIB", by_email)
+    assert not slot_picker_allowed(pending, "URANDOM", by_email)
+    assert not slot_picker_allowed({}, "URIDHA", by_email)
+
+    blocks = confirmation_blocks("BD", "2026-11-10T17:00:00+08:00",
+                                 "2026-11-10T17:30:00+08:00", "", by="UKASIB")
+    assert "Booked by <@UKASIB>" in blocks[0]["text"]["text"]
 
 
 def test_propose_slots_skips_busy_and_weekend(monkeypatch):
@@ -48,6 +74,42 @@ def test_propose_slots_skips_busy_and_weekend(monkeypatch):
     for s in starts:
         assert not (s < datetime(2026, 11, 6, 11, 0, tzinfo=MYT)
                     < s + timedelta(minutes=30))
+
+
+def test_day_paging_walks_the_working_week(monkeypatch):
+    from mini_reid import meetings
+    from mini_reid.slack_bot import day_links
+
+    days = meetings.working_days(NOW)
+    assert len(days) == 5
+    assert all(datetime.fromisoformat(d).weekday() < 5 for d in days)
+    assert day_links(days, days[0]) == ("", days[1])
+    assert day_links(days, days[2]) == (days[1], days[3])
+    assert day_links(days, days[-1]) == (days[-2], "")
+
+    # One whole day at a time: every free 30-minute slot that day.
+    monkeypatch.setattr(meetings, "busy_by_email", lambda *a, **k: {})
+    monday = days[0]
+    slots = propose_slots({}, ["kasib@pantas.com"], now=NOW, day=monday,
+                          count=20)
+    assert slots and all(s["start"].startswith(monday) for s in slots)
+    assert len(slots) > 1
+
+    # A weekend asks for nothing.
+    assert propose_slots({}, ["kasib@pantas.com"], now=NOW,
+                         day="2026-11-07") == []
+
+
+def test_slot_blocks_pager_and_empty_day():
+    blocks = slot_blocks("tok", "BD", [{"name": "Kasib", "email": "k@x"}], [],
+                         day="2026-11-10", prev_day="2026-11-09",
+                         next_day="2026-11-11")
+    pager = next(b for b in blocks if b.get("type") == "actions")["elements"]
+    assert [e["action_id"] for e in pager[:2]] == ["meet_day", "meet_day"]
+    assert pager[0]["value"] == "tok|2026-11-09"
+    assert pager[1]["value"] == "tok|2026-11-11"
+    assert "Tue 10 Nov" in str(blocks)
+    assert "_No free slot that day._" in str(blocks)
 
 
 def test_slot_and_confirmation_blocks():

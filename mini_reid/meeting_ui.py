@@ -46,7 +46,8 @@ def _snapshot(busy: dict, attendees: list[dict], slots: list[dict]) -> str:
 
 def slot_blocks(token: str, topic: str, attendees: list[dict],
                 slots: list[dict], busy: dict | None = None,
-                duration: int = SLOT_MINUTES) -> list[dict]:
+                duration: int = SLOT_MINUTES, day: str = "",
+                prev_day: str = "", next_day: str = "") -> list[dict]:
     if isinstance(attendees, str):
         attendees = [{"name": attendees, "email": ""}]
     with_email = "\n".join(
@@ -70,12 +71,18 @@ def slot_blocks(token: str, topic: str, attendees: list[dict],
                              + _snapshot(busy, attendees, slots)
                              + "```"},
         })
+    when = ""
+    if day:
+        when = f"*{datetime.fromisoformat(day):%a %d %b}* · "
     blocks.append({
         "type": "section",
         "text": {"type": "mrkdwn",
-                 "text": "These slots are free on every calendar. Pick one and I "
-                         "create the event and invite them."},
+                 "text": when + "These slots are free on every calendar. "
+                         "Pick one and I create the event and invite them."},
     })
+    if not slots:
+        blocks.append({"type": "section", "text": {
+            "type": "mrkdwn", "text": "_No free slot that day._"}})
     for slot in slots:
         blocks.append({
             "type": "section",
@@ -89,7 +96,16 @@ def slot_blocks(token: str, topic: str, attendees: list[dict],
                 "style": "primary",
             },
         })
-    blocks.append({"type": "actions", "elements": [
+    pager = []
+    if prev_day:
+        pager.append({"type": "button", "action_id": "meet_day",
+                      "value": f"{token}|{prev_day}",
+                      "text": {"type": "plain_text", "text": "◀ Previous day"}})
+    if next_day:
+        pager.append({"type": "button", "action_id": "meet_day",
+                      "value": f"{token}|{next_day}",
+                      "text": {"type": "plain_text", "text": "Next day ▶"}})
+    blocks.append({"type": "actions", "elements": pager + [
         {"type": "button", "action_id": "meet_edit", "value": token,
          "text": {"type": "plain_text", "text": "Edit title / notes"}},
         {"type": "button", "action_id": "meet_refresh", "value": token,
@@ -128,8 +144,10 @@ def edit_modal(token: str, topic: str, notes: str = "",
 
 
 def confirmation_blocks(topic: str, start: str, end: str,
-                        link: str = "") -> list[dict]:
+                        link: str = "", by: str = "") -> list[dict]:
     text = f"*Scheduled:* {topic}\n{_label(start, end)}"
+    if by:
+        text += f"\nBooked by <@{by}>"
     if link:
         text += f"\n<{link}|join>"
     return [{"type": "section", "text": {"type": "mrkdwn", "text": text}}]

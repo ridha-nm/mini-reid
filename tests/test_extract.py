@@ -54,19 +54,32 @@ def test_undated_ask_still_becomes_a_commitment():
     assert rows[0]["evidence"] == "can you look at the dashboard"
 
 
-def test_triager_channel_tags_are_ignored():
+def test_triager_channel_is_read():
     base = {"source": "slack", "native_id": "t1", "kind": "mention", "author": "triager",
             "text": "can you review this issue", "link": "l",
             "ts": "2026-10-30T08:00:00+08:00"}
-    assert extract(dict(base, channel="bd-triager-agent"), None, NOW) == []
-    assert extract(dict(base, channel="other", channel_id="C0B59LA0X5M"), None, NOW) == []
+    assert extract(dict(base, channel="bd-triager-agent"), None, NOW)
+    assert extract(dict(base, channel="other", channel_id="C0B59LA0X5M"), None, NOW)
 
 
 def test_bot_message_is_not_a_commitment():
-    item = {"source": "slack", "native_id": "2", "kind": "mention", "author": "demo app",
+    item = {"source": "slack", "native_id": "2", "kind": "mention",
+            "author": "pantas-green-release",
             "text": "<@U1> build finished", "link": "l",
             "ts": "2026-10-30T08:00:00+08:00"}
     assert extract(item, None, NOW) == []
+
+
+def test_triager_app_card_is_readable(monkeypatch):
+    # Search returns app cards with no text; the message itself has it.
+    from mini_reid import sources
+
+    monkeypatch.setattr(sources, "_get_json", lambda url, headers: {
+        "messages": [{"text": "<@U1> can you review PHD-1561"}]})
+    items = [{"source": "slack", "channel_id": "C1", "text": "",
+              "native_id": "C1:123.4", "thread_ts": None}]
+    sources._fill_empty_text("x", items)
+    assert items[0]["text"] == "<@U1> can you review PHD-1561"
 
 
 def test_mention_markup_is_stripped_from_what_and_evidence():
@@ -286,3 +299,12 @@ def test_festive_greetings_are_not_candidates():
         assert extract(dict(base, text=text), None, NOW) == []
     keeps = dict(base, text="Happy Deepavali! Can you send the deck tomorrow?")
     assert extract(keeps, None, NOW)
+
+
+def test_tiny_dm_chatter_is_not_captured():
+    base = {"source": "slack", "native_id": "D1:1", "kind": "dm",
+            "channel": "D1", "author": "Kasib", "link": "l"}
+    assert extract(dict(base, text="GG"), None, NOW) == []
+    assert extract(dict(base, text="Do it"), None, NOW) == []
+    # An action verb keeps a short, real ask.
+    assert extract(dict(base, text="Send deck"), None, NOW)

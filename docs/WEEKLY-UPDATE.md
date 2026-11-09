@@ -38,7 +38,9 @@ members never see each other's lists.
 ### Organising
 
 - `list` is sectioned: **My reminders**, **Reminders I sent**, **Triage epic**,
-  **My tasks**, **Tagged by others**, **Inbox**, **Notes**.
+  **My tasks**, **Tagged by others**, **Inbox**, **Notes** — and paged: 25 rows
+  per page with **◀ Previous / Next ▶** that edit the same message, so nothing
+  is cut off. Page one also carries sent reminders, Inbox and Notes.
 - **Triage epic:** tickets you assigned in a tracked Jira epic (default
   `GRE-4129`) with mapped status, assignee, latest Jira comment and latest
   `#software-related-issues` chatter. Done tickets leave the section. Numbers are global and work in
@@ -53,10 +55,12 @@ members never see each other's lists.
   notes. Triage modal sets one status across selected rows.
 - **Done acknowledgements:** a Slack-tagged task marked done DMs the original
   asker once. Marking done in the Slack List DMs the person who did it.
-- Native **Slack List mirror** per person: title, status, due, source. Edits
-  flow back; deleting a List row drops the task. Every live task is mirrored
-  (up to 500). Done rows are removed from the List and kept in the ledger as
-  the archive. Source links for Slack rows open the message inside Slack.
+- Native **Slack List mirror** per person: title, status, due, source and
+  **Assigner** (mail sender / Slack author / Jira reporter email, or bot name).
+  Edits flow back; deleting a List row drops the task. Every live task is
+  mirrored (up to 500). Done and `not:` rows are removed on the spot — every
+  mutating command and modal syncs immediately, with the watcher as backstop.
+  Source links for Slack rows open the message inside Slack.
 
 ### Reminders
 
@@ -72,12 +76,17 @@ members never see each other's lists.
 
 ### Meetings
 
-- `meet: @A and @B about <topic>` (also `on`, `to discuss`, `review`) reads all
-  calendars, shows busy blocks, offers five free slots at the requested duration,
-  lets you edit title/duration/notes, then creates the Google event with a Meet link and invites
-  everyone. Meeting reply: `yes`, `no <reason>`, `moved <note>`, or
-  `reschedule to <time> <note>` (moves the event, keeps the duration, notifies
-  attendees) or `cancel <note>`.
+- `meet: @A and @B about <topic>` (also `on`, `for`, `regarding`, `to discuss`,
+  `review`) reads all calendars, shows busy blocks and **one day at a time** —
+  `◀ Previous day` / `Next day ▶` walks the next five working days, listing
+  every free slot that day — lets you edit title/duration/notes, then creates the
+  Google event with a Meet link and invites everyone. The proposal is posted in
+  the channel where you asked (threaded), not in your DM; stray words like
+  "today" next to the guest are ignored, and the organiser **or any invited
+  attendee** can click a slot (confirmation shows who booked and posts a ✅
+  acknowledgement in the thread). Meeting reply: `yes`, `no <reason>`,
+  `moved <note>`, or `reschedule to <time> <note>` (moves the event, keeps the
+  duration, notifies attendees) or `cancel <note>`.
 - Any duration: `meet: @A about X for 45 minutes` / `for 1 hour` (15–180), or
   change it in the **Edit** modal alongside title and notes.
 - 10-minute reminder DM before each meeting. Attendees of bot-created meetings
@@ -121,7 +130,7 @@ members never see each other's lists.
 - Catch-up sweep replays commands the socket missed while the Mac slept.
 - Everything runs locally on the Mac and only while it is awake. No cloud
   database; client content does not leave the machine for extraction.
-- 408 tests pass.
+- 415 tests pass.
 
 ### Changed this week
 
@@ -144,6 +153,23 @@ members never see each other's lists.
   reminders drop a leading "now"; festive greetings no longer become tasks.
 - Tracked Jira epic section for tickets you assigned, with progress and chatter.
 - `#bd-triager-agent` is filtered out everywhere.
+- `list` paged Prev/Next with no row cap; digest stays one DM (blocks, not
+  Slack's 4,000-char split).
+- Slack List **Assigner** column for filtering automation (RIJ); List syncs
+  immediately after every command/modal instead of on the next cycle.
+- `meet:` accepts `for`/`regarding` topics and stray words like "today"; the
+  slot proposal and the booked confirmation live in the channel you asked in.
+- `not:` asks why (Duplicate / Chatter / FYI / Handled elsewhere / Not mine) and
+  stores that category; one- and two-word DMs no longer become tasks.
+- #bd-triager-agent is watched again: app cards read via their message id, and
+  cards mentioning you become candidates (buttons on the card are still the
+  triager app's own — mini-reid cannot press them). Each new card is also
+  routed: requester → account (Lite MV / child→parent) → hub client →
+  all its members tagged in the card's thread; GHB/GVC/SAFE fall back to the
+  programme owners, unknown requesters to Ridha.
+- Duplicate titles are not captured twice (title + client, live rows only), and
+  a channel that is mostly `not:` rejects (>75%, 3+ rejects) is auto-muted for
+  capture via `muted_sources.json`.
 - Removed Gmail/Jira link unfurls: unused, and they rendered a card per task
   link in the digest.
 

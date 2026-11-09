@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -9,6 +10,7 @@ from pathlib import Path
 from .ledger import load, save
 
 STATE = "slack_lists.json"
+CFG_VERSION = 2   # v2 adds the Assigner column; a List cannot gain one in place
 MYT = timezone(timedelta(hours=8))
 STATUSES = [
     ("open", "Open", "yellow"),
@@ -61,6 +63,41 @@ def _team_id(env: dict) -> str:
     return _TEAM_ID
 
 
+_EMAILS: dict[str, str] = {}
+
+
+def _email_for(env: dict, user_id: str) -> str:
+    """Slack email needs users:read.email, which only the user token carries."""
+    if not user_id:
+        return ""
+    if user_id not in _EMAILS:
+        token = env.get("SLACK_USER_TOKEN") or env.get("SLACK_BOT_TOKEN") or ""
+        try:
+            req = urllib.request.Request(
+                "https://slack.com/api/users.info?"
+                + urllib.parse.urlencode({"user": user_id}),
+                headers={"Authorization": f"Bearer {token}"})
+            with urllib.request.urlopen(req, timeout=15) as response:
+                profile = (json.load(response).get("user") or {}).get("profile") or {}
+            _EMAILS[user_id] = profile.get("email") or ""
+        except Exception:  # noqa: BLE001 - an email lookup must never break sync
+            return ""
+    return _EMAILS[user_id]
+
+
+def _assigner(env: dict, row: dict) -> str:
+    """Who handed this over: name plus email whenever one is known."""
+    asker = (row.get("asker") or "").strip()
+    if "@" in asker:          # mail: the asker already carries the address
+        return asker[:120]
+    email = row.get("assigner_email") or ""
+    if not email and row.get("source") == "slack" and row.get("from_user"):
+        email = _email_for(env, row["from_user"])
+    if email:
+        return (f"{asker} ({email})" if asker else email)[:120]
+    return asker[:120]
+
+
 def _source_link(env: dict, row: dict) -> str:
     """A Slack message opens in the app; mail and Jira stay web links."""
     link = row.get("source_link") or ""
@@ -89,9 +126,20 @@ def list_url(env: dict, user: str, state_path: str = STATE) -> str | None:
 def ensure_list(env: dict, user: str, name: str,
                 state_path: str = STATE) -> dict:
     state = _state(state_path)
-    if user in state:
-        return state[user]
+    cfg = state.get(user)
     token = env["SLACK_BOT_TOKEN"]
+    if cfg and cfg.get("v", 1) >= CFG_VERSION:
+        return cfg
+    if cfg and cfg.get("list_id"):
+        # Slack has no API to add a column, so the old List is archived and
+        # a fresh one is created with the new schema.
+        try:
+            _post("slackLists.update", token, {
+                "id": cfg["list_id"],
+                "name": f"Mini-Reid — {name} (archived)"[:100]})
+        except Exception as ex:  # noqa: BLE001 - the new List still gets made
+            print(f"  slack list archive failed: {type(ex).__name__}: {ex}",
+                  flush=True)
     schema = [
         {"key": "title", "name": "Task", "type": "text",
          "is_primary_column": True},
@@ -101,6 +149,7 @@ def ensure_list(env: dict, user: str, name: str,
              for value, label, color in STATUSES]}},
         {"key": "due", "name": "Due", "type": "date"},
         {"key": "source", "name": "Source", "type": "link"},
+        {"key": "assigner", "name": "Assigner", "type": "text"},
     ]
     data = _post("slackLists.create", token, {
         "name": f"Mini-Reid — {name}"[:100], "schema": schema})
@@ -115,6 +164,7 @@ def ensure_list(env: dict, user: str, name: str,
         if key:
             choices[key] = choice.get("id") or key
     state[user] = {
+        "v": CFG_VERSION,
         "list_id": data.get("list_id"),
         "columns": {k: v.get("id") for k, v in columns.items() if v.get("id")},
         "status_choices": choices,
@@ -223,6 +273,10 @@ def _fields(env: dict, cfg: dict, row: dict) -> list[dict]:
         out.append({"column_id": cols["source"], "link": [{
             "original_url": _source_link(env, row), "display_as_url": False,
             "display_name": "open source"}]})
+    if cols.get("assigner"):
+        who = _assigner(env, row)
+        if who:
+            out.append({"column_id": cols["assigner"], "rich_text": _rich(who)})
     return out
 
 
@@ -236,9 +290,18 @@ def newly_done(before: dict[str, str | None],
 def sync_user(env: dict, user: str, name: str, ledger_path: str,
               state_path: str = STATE, limit: int = 500) -> int:
     """Create or update Slack List rows for the most recent ledger rows."""
+    old_id = (_state(state_path).get(user) or {}).get("list_id")
     cfg = ensure_list(env, user, name, state_path)
     token = env["SLACK_BOT_TOKEN"]
     rows = load(ledger_path)
+    rebuilt = 0
+    if old_id and old_id != cfg.get("list_id"):
+        # A schema migration made a fresh List: every row's item id belonged
+        # to the archived one, so the items have to be created again.
+        for row in rows:
+            row.pop("slack_item_id", None)
+            row["slack_synced_at"] = ""
+        rebuilt = 1
     before = {r.get("id"): r.get("status") for r in rows}
     pulled = apply_list_changes(rows, _list_items(token, cfg["list_id"]),
                                 datetime.now(MYT))
@@ -257,7 +320,7 @@ def sync_user(env: dict, user: str, name: str, ledger_path: str,
             print(f"  done ack failed: {type(ex).__name__}: {ex}", flush=True)
     tasks = [r for r in rows if r.get("kind") not in {"note", "reminder"}]
     tasks.sort(key=lambda r: r.get("last_activity") or "", reverse=True)
-    changed = pulled
+    changed = pulled + rebuilt
     for row in tasks[:limit]:
         status = (row.get("status") or "open").lower()
         if status in {"dropped", "inbox", "done"}:

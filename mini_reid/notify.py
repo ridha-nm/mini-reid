@@ -40,11 +40,28 @@ def react(token: str, channel: str, ts: str, name: str = "white_check_mark") -> 
     return bool(d.get("ok"))
 
 
+SPLIT_AT = 3900   # Slack splits a plain-text message much past 4,000 chars
+MAX_BLOCKS = 50   # Slack's per-message block cap
+
+
+def as_blocks(text: str) -> list[dict] | None:
+    """Blocks hold one message; plain text that long arrives as several DMs."""
+    if len(text) <= SPLIT_AT:
+        return None
+    from .triage_ui import _sections
+
+    sections = _sections(text)
+    return sections if len(sections) <= MAX_BLOCKS else None
+
+
 def send_dm_to(env: dict, user_id: str, text: str,
                blocks: list[dict] | None = None) -> dict:
     token = env["SLACK_BOT_TOKEN"]
     ch = dm_channel(token, user_id)
-    data = {"channel": ch, "text": text[:39000]}
+    text = text[:39000]
+    if blocks is None:
+        blocks = as_blocks(text)
+    data = {"channel": ch, "text": text}
     if blocks:
         data["blocks"] = json.dumps(blocks)
     d = _post("chat.postMessage", token, **data)

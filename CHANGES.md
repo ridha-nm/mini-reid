@@ -2,6 +2,119 @@
 
 Append-only. Newest first.
 
+## 2026-11-09 (paged list, one-message digest, Assigner column)
+
+- `list` shows every open row again: the 40-row cap and the 20-row Inbox/Notes
+  caps are gone, and titles are no longer sliced at 100 chars. It is paged
+  instead — 25 numbered rows per page, `◀ Previous` / `Next ▶` edit the same
+  message in place (same trick as the help topic picker), numbering continues
+  across pages, and page one carries Reminders I sent, Inbox and Notes.
+- The daily digest no longer arrives as several DMs. Slack splits plain-text
+  messages past ~4,000 chars; `send_dm` now wraps anything over 3,900 chars in
+  section blocks, so the digest is one message (up to Slack's 50-block limit).
+- The Slack List gained an **Assigner** column: the sender's email for mail,
+  the author's Slack email (resolved with the user token, `users:read.email` —
+  the bot token lacks that scope), the Jira reporter's email from the issue
+  payload, or the bot's name when it has no email. Existing Jira rows were
+  backfilled. Slack has no API to add a column, so each member's List was
+  rebuilt with the new schema and the old ones renamed "(archived)". RIJ files
+  every Jira ticket as `ridha@pantas.com`, so Jira RIJ rows filter by title
+  `[RIJ]`, not by email.
+- A ledger change now reaches the Slack List immediately: every mutating
+  command (`not:`, `done:`, `status:`, `due:`…), the Triage modal, Clear Inbox
+  and the Add to list / Not a task buttons sync right after saving. The watcher
+  cycle stays as the backstop.
+- "set a meeting with @Kasib **for** BD Command Centre Planning and
+  Improvements" works: `for` and `regarding` are topic separators like
+  "about"/"to discuss", instead of the whole sentence being read as the guest
+  list (which fell back to the "Use: meet:" hint). `parse_meeting`, tests added.
+- "set a meeting with @Kasib **today**" also works: a stray word next to a
+  resolved mention/name ("today", topic fragments) no longer discards the
+  attendee list.
+- The meeting proposal is posted **in the channel where the request was made**
+  (threaded), not in Ridha's DM; slot buttons edit that same message.
+- **Anyone invited can lock a slot** — the organiser or any attendee (email
+  mapped through the directory), so Kasib can book without asking Ridha. A
+  stranger who clicks gets an ephemeral "organiser or invited attendee" note.
+  The confirmation says `Booked by @who`; the creator stays the organiser so
+  cancel/reschedule rules do not move.
+- Booking a slot now also posts a `✅ Scheduled: …` acknowledgement into the
+  thread (the in-place update alone was silent, so nobody watching saw it).
+- A trailing `*Sent using* @mini-reid` footer is a signature, not a command:
+  messages merely tagged with it are no longer captured as notes. Any
+  `Sent using/via/with` mention at the end is stripped before the bot decides
+  it was addressed; the two notes it saved from #bd-hiring were dropped.
+- The meeting proposal is now a **day view** with `◀ Previous day` / `Next
+  day ▶` paging across the next five working days. It opens on the first day
+  with a free slot and lists every free 30-minute slot on that day (up to 20);
+  a fully booked day says so. `propose_slots(day=…)` does one day at a time,
+  and Refresh / duration edits stay on the browsed day.
+- `not:` on a single row now asks **why** with five buttons — Duplicate,
+  Chatter, FYI / minutes, Handled elsewhere, Not mine. The choice lands on the
+  row as `not_reason` and in `corrections.json` as the reason, so rejects are
+  categorised instead of all reading "bulk not". Clicking replaces the buttons
+  with the filed reason.
+- One- and two-word DMs ("GG", "Do it") are no longer captured as tasks; an
+  action verb ("Send deck", "Start K2") keeps the short ask.
+- Repeated asks no longer stack: `drop_duplicate_titles` compares a new row's
+  normalised title + client against every live task and drops the copy (closed
+  rows do not block a fresh ask; titles under 8 characters are exempt). Wired
+  into the CLI digest, watcher and member refresh.
+- Channels are muted by evidence: `mutes.learn` runs each watcher cycle, and a
+  Slack channel with ≥3 `not:` rejects and **more than 75%** of everything it
+  yielded rejected goes on `muted_sources.json`; extraction then skips it.
+  Completed tasks count as proof the channel is real, so busy working channels
+  stay. Delete a key from the file to unmute.
+- #bd-triager-agent is read again: the channel came off every ignore list, app
+  cards that Slack search returns with empty text are fetched via
+  `conversations.replies`, and the `demo app` author is no longer discarded as
+  a bot. Cards that mention Ridha now become candidates like any other
+  mention. The bot still cannot press the triager's own buttons — it acts on
+  the message text only.
+- Triager tickets are assigned to the account owners: only **Demo App** cards
+  (`*Acknowledged*` first, `*Solution proposed*` as fallback) are answered, once
+  per ticket key, as a **reply in the card's thread** — SLA notices, the weekly
+  rotation, closed tickets, 💬 "… replied:" follow-ups and human chatter are
+  ignored, and the bot stops at assignment. `routing.py` joins the Django
+  admin exports (MV anchor for Lite users, child→parent otherwise), classifies
+  GHB / GVC / SAFE (Pantas Lite) vs ENT (enterprise), maps the anchor to a
+  stocktake-hub client and tags **all its members** in a reply on the card's
+  thread. Unknown requester → Ridha only; account with no hub client →
+  programme owners (GHB/GVC trio, SAFE Ridha). Fallbacks: requester domain
+  (e.g. `@my.knightfrank.com`), then the card's **Company** (then
+  Organization) name matched against Lite SME names and child companies —
+  conservative, generic names like "Pantas" never match. 210 of 247 historical
+  tickets resolve (was 183). Watcher reads the channel
+  itself (search misses cards that do not mention Ridha), starts from a
+  baseline so the backlog is never mass-replied, and stores route state in
+  `triager_routed.json`. Reply needs the bot to be a channel member.
+- Enterprise accounts use Ridha's explicit tag list (Gamuda → Ridha, IOI →
+  XieYi+Ridha, Sime Darby → KyeWen, Setia → Charanya, PNB → Akasha+Raj,
+  Berjaya → XieYi, EDOTCO → Raj+Charanya, MBM → Azleena, Kelington →
+  KyeWen+Ridha, Bintulu → Azleena, Eupe → Ridha+Charanya, TMK →
+  Azleena+Raj, PKT → Raj+Azleena, Knight Frank → Ridha+Charanya, Allianz →
+  Charanya+Azleena); every other enterprise account tags Ridha alone.
+- Mini-Reid learns routing aliases: `alias: Horizon Hills = Gamuda` stores
+  the company-name mapping in `routing_aliases.json` and the next
+  `routing.json` build uses it. A health check DMs Ridha when **≥10 recent
+  triager tickets with ≥20% fallbacks**, or when the Django exports are **>7
+  days old** — the DM lists the unmapped companies and asks for fresh
+  `ChildCompany`, `ChildCompanyUser` and `lite_user_collection_report`
+  exports (at most once a day).
+- Repo cleanup: dead ledger snapshots moved to `_archive/`, caches removed,
+  `.gitignore` covers every runtime state file (`routing.json`,
+  `triager_routed.json`, `muted_sources.json`, `ledger_undo.json`,
+  `created_meetings.json`).
+- Behaviour is now documented per workflow in `docs/WORKFLOWS.md` with
+  `docs/workflows/{capture,corrections,slack-list,list-paging,digest,`
+  `meetings,reminders,triager-routing}.md` — state files, code and tests for
+  each.
+- Ticket routing backfills after downtime: the `since_ts` watermark survives
+  sleep/restart, the next watcher cycle pages through the whole gap (1,000
+  messages/cycle) and tags tickets that arrived while the Mac was off. A
+  ticket also `Closed` inside that window is skipped.
+- 434 tests passing.
+
 ## 2026-11-07 (element scorecard)
 
 - Weekly scorecard matches on elements, not exact wording: at least half the

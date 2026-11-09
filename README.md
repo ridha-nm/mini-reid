@@ -33,7 +33,11 @@ Gmail, Jira and Google Calendar.
   `meet: @Kasib and @Charanya about X`, plus `for 45 minutes` / `for 1 hour`)
   checks every calendar, shows a busy snapshot with formal details, offers free
   slots at that duration, lets you edit the title, duration and notes, and creates
-  the Meet invite for everyone. `clients` shows the email filter;
+  the Meet invite for everyone. The proposal is posted in the channel where the
+  command was typed, pages one working day at a time (Prev/Next day, every free
+  slot that day), and is updated in place once a slot is booked — the organiser
+  or any invited attendee can pick it.
+  `clients` shows the email filter;
   `clients: Eupe, Gamuda` replaces it. Portfolios GHB/GVC/SAFE are accepted.
   `banter on/off/status` controls sassy replies; only tagged abuse triggers one.
   Untagged messages are always ignored. Banter is allowed only in `#ee-leads-only`
@@ -100,11 +104,14 @@ Gmail, Jira and Google Calendar.
   **Request access** (DMs you an **Authorise** button) and **Message Ridha**,
   never another ledger.
 - **Slack List mirror**: each user's ledger is mirrored into a native Slack List with
-  title, status, due and source; created once and updated every watcher cycle.
-  `list` includes an **Open Slack List** button. Edits in the List flow back to
-  the ledger; deleting a row there drops the task; non-tasks are removed. Rows
-  marked `done` are removed from the List on the next sync and archived in the
-  ledger.
+  title, status, due, source and **assigner** (sender email for mail, author
+  email for Slack, reporter email for Jira, bot name when none). Edits in the
+  List flow back to the ledger; deleting a row there drops the task; non-tasks
+  are removed. Any command, modal or button that changes the ledger syncs the
+  List immediately; the watcher cycle is the backstop. Rows marked `done` are
+  removed from the List and archived in the ledger. A schema change rebuilds
+  the List and renames the old one "(archived)" — Slack cannot add a column in
+  place.
 
 ## Run
 
@@ -176,6 +183,15 @@ Check them with `launchctl list | grep minireid`.
 | `tracked_epics.json` | Jira epics to track and their Slack chatter channel |
 | `created_meetings.json` | bot-created meetings, attendees and RSVPs |
 | `epic_cache.json` | changelog checks, comments and channel watermark (gitignored) |
+| `routing.json` | email/domain/company → account → owners, rebuilt when stale (gitignored) |
+| `routing_aliases.json` | learnt company-name aliases from `alias:` (gitignored) |
+| `triager_routed.json` | tickets already tagged + routing stats (gitignored) |
+| `muted_sources.json` | channels capture has stopped reading (gitignored) |
+| `tools/fetch_lite_mv.py` | read-only pull of the Lite User Collection Report from the Django admin |
+
+Behaviour is documented per workflow in [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md)
+— capture, corrections, Slack List, list paging, digest, meetings, reminders
+and triager routing, each with its state files, code and tests.
 
 ## Credentials
 
