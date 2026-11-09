@@ -440,6 +440,7 @@ def stale_rows(rows: list[dict], now: datetime) -> list[dict]:
 TRIAGER_CHANNEL = "C0B59LA0X5M"
 TRIAGER_STATE = "triager_routed.json"
 TRIAGER_APP = "demo app"
+TRIAGER_BACKFILL = 48 * 3600   # always re-scan the last two days
 
 
 def route_triager(env: dict, now: datetime,
@@ -490,8 +491,11 @@ def route_triager(env: dict, now: datetime,
                 if not cursor:
                     break
             return out
+    # Re-scan a floor even if the watermark moved: a filter change or a bad
+    # cycle must never bury an arrival card. Dedupe keeps it cheap.
+    oldest = min(float(state["since_ts"] or 0), now.timestamp() - TRIAGER_BACKFILL)
     try:
-        messages = fetch(state["since_ts"])
+        messages = fetch(f"{oldest:.6f}")
     except Exception as ex:  # noqa: BLE001 - try again next cycle
         print(f"[{now:%H:%M:%S}] triager read: {type(ex).__name__}: {ex}",
               flush=True)

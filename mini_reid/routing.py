@@ -127,12 +127,14 @@ def parse_card(text: str) -> dict:
                   if "pantas.com" not in m.group(0).lower()), "")
     key = ""
     title = ""
-    tick = TICKET.search(text)
-    if tick:
-        key = tick.group(1)
+    for tick in TICKET.finditer(text):
         tail = text[tick.end():].lstrip(" :")
-        title = re.split(r"\*Requester|\n| \| ", tail, maxsplit=1)[0]
-        title = re.sub(r"[*_`]+", "", title).strip()[:120]
+        found = re.split(r"\*Requester|\n| \| ", tail, maxsplit=1)[0]
+        found = re.sub(r"[*_`]+", "", found).strip()[:120]
+        if found:                 # "New ticket: PHD-x" has no title; the
+            key, title = tick.group(1), found   # block header does
+            break
+        key = key or tick.group(1)
     company = _field(text, "Company")
     organisation = _field(text, "Organization")
     if company.lower() in {"unmapped", ""}:

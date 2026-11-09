@@ -117,7 +117,7 @@ Append-only. Newest first.
   arrival (Block Kit, blocks flattened). Acknowledgements, proposals, replies,
   SLA notices, rotation and closures never tag; the legacy
   Acknowledged/Solution-proposed cards no longer trigger either.
-- 435 tests passing.
+- 436 tests passing.
 
 ## 2026-11-07 (element scorecard)
 

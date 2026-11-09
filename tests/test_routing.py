@@ -161,4 +161,24 @@ def test_block_kit_new_ticket_card_routes(tmp_path, monkeypatch):
                   post=lambda ch, text, ts: posts.append((text, ts)),
                   fetch=lambda oldest: [message])
     assert posts and posts[0][0].startswith("*PHD-1562*")
+    assert "cannot log in" in posts[0][0]
     assert posts[0][1] == "1794228620.189219"
+
+
+def test_arrival_is_rescanned_even_if_watermark_moved(tmp_path, monkeypatch):
+    monkeypatch.setattr(routing, "ensure_fresh", lambda path=routing.OUT: {
+        "emails": {}, "domains": {}, "companies": {}})
+    state = tmp_path / "s.json"
+    # Watermark already past the arrival: it must still be fetched.
+    state.write_text('{"since_ts": "9999999999"}')
+    seen = {}
+
+    def fetch(oldest):
+        seen["oldest"] = oldest
+        return []
+
+    route_triager({}, NOW, str(state), post=lambda ch, t, ts: None,
+                  fetch=fetch)
+    import datetime as _dt
+    oldest = float(seen["oldest"])
+    assert oldest <= NOW.timestamp() - 48 * 3600
