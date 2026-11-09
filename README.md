@@ -144,7 +144,8 @@ Interactivity is on for the reminder clarification buttons. The two message subs
 mention can be acknowledged with ✅; every other channel message is ignored unless it
 addresses the bot. Each message id is answered once; `bot_state.json` tracks handled
 ids across restarts. On startup, catch-up replays missed channel mentions and DMs —
-every command type, not only questions. Tags from `bd-triager-agent` are ignored.
+every command type, not only questions. The bot also replies in `bd-triager-agent`: one tag of the account owners on each
+`New ticket:` arrival card (see `docs/workflows/triager-routing.md`).
 Slack sends no events from DMs the bot is not in, so the watcher polls them for
 `remind` commands with the user token.
 

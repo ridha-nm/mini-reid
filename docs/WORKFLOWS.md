@@ -12,7 +12,7 @@ it. Behaviour changes should update its workflow page in the same change.
 | Daily digest | 09:15 DM as blocks (one message), retry after 09:30 | [digest.md](workflows/digest.md) |
 | Meetings | day-paged proposals in the channel, invitee picks, booked ack | [meetings.md](workflows/meetings.md) |
 | Reminders | Slack-scheduled DMs plus a row on the recipient's list | [reminders.md](workflows/reminders.md) |
-| Triager routing | tag the account owner on the first Demo App card, once | [triager-routing.md](workflows/triager-routing.md) |
+| Triager routing | tag the account owner once on the `New ticket:` arrival card | [triager-routing.md](workflows/triager-routing.md) |
 
 ## Where the evidence lives
 

@@ -7,14 +7,17 @@ Tag the account owner on a new Demo App ticket.
 1. Watcher reads `#bd-triager-agent` history from a stored baseline
    (`since_ts`) every cycle — search is not used (it misses cards that do
    not mention Ridha and lags).
-2. The watermark (`since_ts`) survives sleep and restarts: after the Mac
-   wakes, the next cycle replays the whole gap (paginated, 1,000 messages per
-   cycle) and tags the tickets that arrived while it was off. Tickets that
-   were also **Closed** inside that window are skipped.
+2. The watermark (`since_ts`) survives sleep and restarts, and every cycle
+   re-scans at least the **last 48 hours** regardless of the watermark, so a
+   filter change or a bad cycle cannot bury an arrival (it was how PHD-1562
+   was missed once). Replay is paginated, 1,000 messages per cycle; tickets
+   also **Closed** inside the window are skipped.
 3. **One trigger only**: the arrival card, `New ticket: PHD-xxxx` from
-   **Demo App** (Block Kit — fields flattened before parsing). Nothing after
-   it is ever tagged: acknowledgements, solution proposals, replies, SLA
-   notices, rotation messages or closures. SLA notices, the
+   **Demo App** (Block Kit — blocks are flattened before parsing; the title
+   comes from the block header when the text line has none). Nothing after it
+   is ever tagged: acknowledgements, solution proposals, replies, SLA
+   notices, rotation messages or closures. If the text of the arrival carries
+   no title, `parse_card` falls back to a later mention of the key. SLA notices, the
    weekly rotation, closed cards, `💬 … replied:` follow-ups and human
    chatter are ignored. One tag per ticket key, ever.
 4. Reply goes in the card's thread:

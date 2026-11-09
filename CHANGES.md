@@ -111,8 +111,11 @@ Append-only. Newest first.
   each.
 - Ticket routing backfills after downtime: the `since_ts` watermark survives
   sleep/restart, the next watcher cycle pages through the whole gap (1,000
-  messages/cycle) and tags tickets that arrived while the Mac was off. A
-  ticket also `Closed` inside that window is skipped.
+  messages/cycle) and tags tickets that arrived while the Mac was off. Every
+  cycle also re-scans at least the last 48 hours, so a filter change cannot
+  bury an arrival (PHD-1562 was missed that way once and tagged by hand).
+  A ticket also `Closed` inside the window is skipped. The reply title comes
+  from the Block Kit header when the `New ticket:` line has none.
 - Triager tag fires on **one** card only: Demo App's `New ticket: PHD-xxxx`
   arrival (Block Kit, blocks flattened). Acknowledgements, proposals, replies,
   SLA notices, rotation and closures never tag; the legacy

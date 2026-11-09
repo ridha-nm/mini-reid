@@ -152,7 +152,8 @@ members never see each other's lists.
 - Non-members can ask general questions privately (KB only); immediate
   reminders drop a leading "now"; festive greetings no longer become tasks.
 - Tracked Jira epic section for tickets you assigned, with progress and chatter.
-- `#bd-triager-agent` is filtered out everywhere.
+- `#bd-triager-agent` is watched again: one tag of the account owners on each
+  `New ticket:` arrival card, then nothing.
 - `list` paged Prev/Next with no row cap; digest stays one DM (blocks, not
   Slack's 4,000-char split).
 - Slack List **Assigner** column for filtering automation (RIJ); List syncs

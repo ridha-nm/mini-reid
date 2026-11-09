@@ -64,7 +64,7 @@ guessed.
 | Gmail drafts | ignored; Ridha's own unsent writing is not an ask |
 | Jira | issues assigned to Ridha, excluding Done |
 | Google Calendar | timed events today; on shared calendars only events Ridha is invited to or organises; declined and cancelled dropped |
-| Excluded | tags from `bd-triager-agent`; that bot tags people on every routed issue |
+| Excluded | `bd-triager-agent` app cards as tasks (the channel is watched only to tag account owners on new tickets) |
 | Manual | `@minireid add:` or `note:` |
 
 Not covered: untagged asks in channels, thread replies without a mention, WhatsApp,
@@ -103,7 +103,7 @@ a channel mention. Channel mentions are always kept unless they are pure chatter
 
 - Kept: requests, first-person commitments, Gmail with a direct address or a dated
   request, Jira assignments.
-- Rejected: bots, `bd-triager-agent` tags, calendar responses, Jira notification mail,
+- Rejected: bots, `bd-triager-agent` app cards, calendar responses, Jira notification mail,
   sent mail, chatter, festive/social greetings ("Happy Deepavali", "Have fun",
   "Congrats") unless they also contain an explicit ask,
   playful requests (`give … a hug`, `high five …`),

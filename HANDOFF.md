@@ -249,8 +249,9 @@ Expect up to one 2-minute cycle of latency; the message must contain literal
 Calendar access is a Google scope on the same token as Gmail: `calendar.readonly`,
 granted 2026-11-02. Re-run `mini_reid.google_auth` if it is revoked. Meetings come from
 every visible calendar but only include events Ridha is invited to, on calendars he does
-not own. `#bd-triager-agent` (`C0B59LA0X5M`) is filtered at the Slack source,
-in extraction, in member scans and in the bot.
+not own. `#bd-triager-agent` (`C0B59LA0X5M`) is watched by the watcher only: each
+`New ticket:` arrival card is tagged once with the account owners; the cards are
+not captured as tasks.
 
 ## Commands
 
