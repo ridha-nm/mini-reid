@@ -135,3 +135,30 @@ def test_backlog_is_replayed_but_closed_tickets_are_skipped(
                   fetch=lambda oldest: [ack, closed])
     assert posts == []
     assert "PHD-1561" in json.loads(state.read_text())["tickets"]
+
+
+def test_block_kit_new_ticket_card_routes(tmp_path, monkeypatch):
+    monkeypatch.setattr(routing, "ensure_fresh", lambda path=routing.OUT: {
+        "emails": {}, "domains": {}, "companies": {}})
+    state = tmp_path / "s.json"
+    state.write_text('{"since_ts": "1"}')
+    blocks = [
+        {"type": "header",
+         "text": {"type": "plain_text", "text":
+                  "PHD-1562: cannot log in, need token but i dont have"}},
+        {"type": "section", "fields": [
+            {"type": "mrkdwn", "text": "*Requester:*\ncomiarico1977@gmail.com"},
+            {"type": "mrkdwn", "text": "*Organization:*\nUnmapped"}]},
+        {"type": "section", "fields": [
+            {"type": "mrkdwn",
+             "text": "*Company:*\nMang R Calamansi Juice Processing"}]},
+    ]
+    message = {"ts": "1794228620.189219", "thread_ts": None,
+               "text": "New ticket: PHD-1562", "blocks": blocks,
+               "bot_profile": {"name": "Demo App"}}
+    posts = []
+    route_triager({}, NOW, str(state),
+                  post=lambda ch, text, ts: posts.append((text, ts)),
+                  fetch=lambda oldest: [message])
+    assert posts and posts[0][0].startswith("*PHD-1562*")
+    assert posts[0][1] == "1794228620.189219"

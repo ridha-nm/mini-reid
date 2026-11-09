@@ -92,6 +92,29 @@ def programme(anchor: str, lite_anchors: set[str] | None = None) -> str:
     return "ENT"
 
 
+def flatten_message(message: dict) -> str:
+    """Demo App now posts Block Kit cards; the text is only "New ticket: X".
+    Flatten the blocks so Requester/Company/Description can be parsed."""
+    parts: list[str] = [message.get("text") or ""]
+
+    def walk(node) -> None:
+        if isinstance(node, dict):
+            if node.get("type") == "plain_text" and isinstance(node.get("text"), str):
+                parts.append(node["text"])
+            elif node.get("type") == "mrkdwn" and isinstance(node.get("text"), str):
+                parts.append(node["text"])
+            for value in node.values():
+                if isinstance(value, (dict, list)):
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(message.get("blocks") or [])
+    walk(message.get("attachments") or [])
+    return "\n".join(p for p in parts if p)
+
+
 def _field(text: str, name: str) -> str:
     m = re.search(rf"\*{name}:\*\s*\n?\s*([^\n*]+)", text or "")
     return (m.group(1) if m else "").strip()[:120]

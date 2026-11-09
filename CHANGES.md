@@ -113,7 +113,10 @@ Append-only. Newest first.
   sleep/restart, the next watcher cycle pages through the whole gap (1,000
   messages/cycle) and tags tickets that arrived while the Mac was off. A
   ticket also `Closed` inside that window is skipped.
-- 434 tests passing.
+- Demo App's newer Block Kit cards (`New ticket: PHD-xxxx`, fields in blocks)
+  are flattened and routed like the legacy text cards; previously the text
+  fallback had no Requester and the ticket was skipped.
+- 435 tests passing.
 
 ## 2026-11-07 (element scorecard)
 

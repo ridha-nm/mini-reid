@@ -518,9 +518,10 @@ def route_triager(env: dict, now: datetime,
         if ((message.get("bot_profile") or {}).get("name") or "").lower() \
                 != TRIAGER_APP:
             continue
-        if "*Closed*" not in (message.get("text") or ""):
+        flat = routing.flatten_message(message)
+        if "*Closed*" not in flat:
             continue
-        key = routing.parse_card(message.get("text") or "")["key"]
+        key = routing.parse_card(flat)["key"]
         if key:
             closed.add(key)
     sent = 0
@@ -532,14 +533,19 @@ def route_triager(env: dict, now: datetime,
         app = ((message.get("bot_profile") or {}).get("name") or "").lower()
         if app != TRIAGER_APP:
             continue
-        # Acknowledge first, propose second: assign on whichever arrives first.
-        if ("*Acknowledged*" not in text
-                and "*Solution proposed*" not in text):
+        flat = routing.flatten_message(message)
+        # Initial card: legacy Acknowledged/Solution-proposed text, or the
+        # newer Block Kit "New ticket:" card.
+        initial = ("*Acknowledged*" in flat
+                   or "*Solution proposed*" in flat
+                   or text.strip().startswith("New ticket:"))
+        if not initial:
             continue
-        # Never tag follow-ups ("💬 <name> replied:") on the same ticket.
-        if ":speech_balloon:" in text or " replied:" in text:
+        # Never tag follow-ups or closed cards.
+        if ("*Closed*" in flat or ":speech_balloon:" in flat
+                or " replied:" in flat):
             continue
-        card = routing.parse_card(text)
+        card = routing.parse_card(flat)
         if not card["key"] or card["key"] in routed:
             continue
         if card["key"] in closed:
@@ -578,6 +584,8 @@ def route_triager(env: dict, now: datetime,
                   flush=True)
             return sent
         routed[card["key"]] = now.isoformat()
+        state["tickets"] = dict(list(routed.items())[-1000:])
+        state_file.write_text(json.dumps(state))   # never tag it twice
         stats["total"] += 1
         stats["fallback"] += 1 if fallback else 0
         stats["unmapped"] = dict(sorted(stats["unmapped"].items(),
