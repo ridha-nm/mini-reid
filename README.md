@@ -38,9 +38,9 @@ Gmail, Jira and Google Calendar.
   `banter on/off/status` controls sassy replies; only tagged abuse triggers one.
   Untagged messages are always ignored. Banter is allowed only in `#ee-leads-only`
   and `#probies`.
-  `list` prints a stable short id per row, split into My reminders, Triage epic
-  (tickets you assigned in a tracked Jira epic, with status, assignee and latest
-  chatter), My tasks, Tagged by others, Inbox and Notes; priority and relative due
+  `list` prints a stable short id per row, split into My reminders, Reminders I
+  sent, Triage epic (tickets you assigned in a tracked Jira epic, with status,
+  assignee and latest chatter), My tasks, Tagged by others, Inbox and Notes; priority and relative due
   labels (`3d overdue`, `today`, `in 2d`) still show. **Triage & update** sets a
   status on selected rows; **Clear Inbox (N)** opens 10 pending rows, where you
   tick the ones that are NOT tasks and add the rest in one pass. When someone
@@ -172,7 +172,10 @@ Check them with `launchctl list | grep minireid`.
 | `meeting_reminders.json` | today's meeting reminders and attendance answers |
 | `dm_poll_state.json` | last DM command read by the watcher |
 | `calendar_ignores.json` | meeting titles dismissed with `not:` |
-| `expected.txt` | Friday's manual list for the scorecard |
+| `expected.txt` | Friday's manual list for the scorecard; `| matches:` adds element evidence |
+| `tracked_epics.json` | Jira epics to track and their Slack chatter channel |
+| `created_meetings.json` | bot-created meetings, attendees and RSVPs |
+| `epic_cache.json` | changelog checks, comments and channel watermark (gitignored) |
 
 ## Credentials
 

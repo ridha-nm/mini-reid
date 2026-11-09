@@ -151,7 +151,8 @@ time line. Each recipient gets a scheduled DM and a reminder row. Non-members
 may use `remind` only; it grants no ledger access.
 
 2026-11-06 list sections and acks: `list` now shows My reminders, Reminders I
-sent, My tasks, Tagged by others, Inbox and Notes; numbering stays global.
+sent, Triage epic (added 2026-11-07), My tasks, Tagged by others, Inbox and
+Notes; numbering stays global.
 `Clear Inbox (N)` pages ten pending rows through a modal — tick the ones that
 are NOT tasks, add the rest, auto-advance. New captures keep their per-item DM
 buttons. When a tagged task is marked done by the recipient, the original asker
@@ -215,7 +216,8 @@ Expect up to one 2-minute cycle of latency; the message must contain literal
 Calendar access is a Google scope on the same token as Gmail: `calendar.readonly`,
 granted 2026-11-02. Re-run `mini_reid.google_auth` if it is revoked. Meetings come from
 every visible calendar but only include events Ridha is invited to, on calendars he does
-not own. Tags from `bd-triager-agent` are ignored in extraction and in the bot.
+not own. `#bd-triager-agent` (`C0B59LA0X5M`) is filtered at the Slack source,
+in extraction, in member scans and in the bot.
 
 ## Commands
 
@@ -422,7 +424,7 @@ kept or a real ask was missed.
 ## Repo
 
 `github.com/ridha-nm/mini-reid`, private. CI runs tests only; no secrets in GitHub.
-408 tests passing as of 2026-11-07.
+408 tests passing as of 2026-11-09.
 ## Next, agreed
 
 1. Week starting 2026-11-01: use it daily. Collect `not:` corrections and Friday's
