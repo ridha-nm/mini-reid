@@ -113,7 +113,10 @@ def meetings_for_day(env: dict, now: datetime, token_path: str | None = None,
         cid = cal.get("id")
         if not cid:
             continue
-        payload = _day_events(access, cid, start, end)
+        try:
+            payload = _day_events(access, cid, start, end)
+        except Exception:  # noqa: BLE001 - one bad calendar must not hide the rest
+            continue
         owned = bool(cal.get("primary")) or cal.get("accessRole") == "owner"
         for event in parse_events(payload, cal.get("summary") or cid, day, owned,
                                   owner_email or OWNER_EMAIL):

@@ -12,17 +12,18 @@ from pathlib import Path
 
 from .cli import load_clients
 from .clients import match_client
-from .ledger import apply_stalled, load, merge, save
+from .ledger import (apply_stalled, drop_duplicate_titles, load,
+                     merge, save)
 from .notify import send_dm_to
 from .profiles import load as load_profiles
 from .render import render
 from .sources import _get_json, fetch_gmail, fetch_jira, slack_user_name
 from .watcher import (_stamp_confirmation, fire_reminders, format_alert,
-                      new_rows, nudge_overdue, nudge_stale, polish_rows,
-                      remind_meetings)
+                      new_rows, nudge_overdue, nudge_stale, pending_rows,
+                      polish_rows, remind_meetings)
 
 MYT = timezone(timedelta(hours=8))
-IGNORE_CHANNELS = {"bd-triager-agent", "C0B59LA0X5M"}
+IGNORE_CHANNELS: set[str] = set()
 SLACK_SCAN = "slack_scan.json"
 
 
@@ -140,6 +141,7 @@ def slack_mentions(env: dict, user: str, profile: dict, days: int,
                 "channel": name,
                 "channel_id": cid,
                 "author": slack_user_name(env["SLACK_BOT_TOKEN"], author),
+                "from_user": author,
                 "ts": datetime.fromtimestamp(ts, MYT).isoformat(),
                 "text": text.strip(),
                 "link": f"https://{team}.slack.com/archives/{cid}/"
@@ -200,13 +202,21 @@ def refresh(env: dict, user: str, profile: dict, days: int = 1) -> list[dict]:
     fresh = new_rows(items, existing, clients, now,
                      me=profile.get("email") or profile.get("name"))
     fresh = polish_rows(env, items, fresh, now, clients)
+    fresh = drop_duplicate_titles(existing, fresh)
     if fresh:
-        fresh = [dict(row, status="inbox") for row in fresh]
         save(ledger_path, apply_stalled(merge(existing, fresh), now))
         from .triage_ui import confirm_blocks
 
-        sent = send_dm_to(env, user, format_alert(fresh), blocks=confirm_blocks(fresh))
-        _stamp_confirmation(ledger_path, {r["id"] for r in fresh}, sent)
+        pending = pending_rows(fresh)
+        sent = send_dm_to(env, user, format_alert(fresh),
+                          blocks=confirm_blocks(pending) if pending else None)
+        _stamp_confirmation(ledger_path, {r["id"] for r in pending}, sent)
+    try:
+        from .slack_lists import sync_user as sync_slack_list
+
+        sync_slack_list(env, user, profile.get("name") or user, ledger_path)
+    except Exception as ex:  # noqa: BLE001 - list sync must not stop capture
+        print(f"  member slack list: {type(ex).__name__}: {ex}", flush=True)
     if errors:
         print(f"  member source errors: {errors}", flush=True)
     return fresh
@@ -301,3 +311,35 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def ack_done(env: dict, profiles: dict[str, dict], owner: str,
+             owner_ledger: str, now: datetime) -> int:
+    """DM the asker when a task they tagged someone in is marked done."""
+    targets = [(owner, "Ridha", owner_ledger)]
+    targets += [(uid, p.get("name") or uid,
+                 p.get("ledger") or f"data/{uid}/ledger.json")
+                for uid, p in profiles.items()]
+    sent = 0
+    for uid, name, path in targets:
+        if not Path(path).exists():
+            continue
+        rows = load(path)
+        changed = False
+        for row in rows:
+            asker = row.get("from_user") or ""
+            if (row.get("status") != "done" or not asker or asker == uid
+                    or row.get("done_ack_sent")):
+                continue
+            try:
+                send_dm_to(env, asker,
+                           f"✅ {name} marked done: "
+                           f"{(row.get('what') or '')[:120]}")
+            except Exception:  # noqa: BLE001 - retry on the next cycle
+                continue
+            row["done_ack_sent"] = now.isoformat()
+            changed = True
+            sent += 1
+        if changed:
+            save(path, rows)
+    return sent

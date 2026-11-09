@@ -12,8 +12,9 @@ the same change. A feature is not done because it works in Ridha's DM.
 
 - [ ] Command path: `_apply_command` runs against the sender's ledger, not the
       owner's. Members hit the same parser and the same bulk/text helpers.
-- [ ] Capture path: `members.refresh` gets the same extraction, model title
-      cleanup, `inbox` status and confirmation DM as `watcher.main`.
+- [ ] Capture path: `members.refresh` gets the same extraction, auto-capture
+      rules (matching rows open directly; uncertain rows get the model title
+      cleanup, `inbox` status and confirmation DM) as `watcher.main`.
 - [ ] Buttons and modals resolve the clicker through `ledger_for_viewer`, never
       hard-code `ledger_path`.
 - [ ] `list`, Inbox, Triage & update, stale pickers and the digest all read the
@@ -37,11 +38,19 @@ Not every command applies to members. These stay owner-only or restricted:
 
 That is a permission boundary, not a parity gap.
 
-## Current parity status (2026-11-05)
+## Current parity status (2026-11-09)
 
 | Feature | Owner | Members |
 |---|---|---|
 | Capture + inbox confirmation | yes | yes |
+| Auto-capture rules (obvious rows open without a click) | yes | yes |
+| Sectioned list, Clear Inbox, done acknowledgement | yes | yes |
+| Slack List mirrors every live task; done rows archived | yes | yes |
+| Slack List **Assigner** column; syncs immediately after any change | yes | yes |
+| Paged `list` (25 rows/page, Prev/Next) | yes | yes |
+| Meeting attendee reminder + Attending / Can't attend buttons | yes | yes |
+| Meeting duration edit, reschedule, cancel | yes | owner-only (members cannot create meetings) |
+| Tracked Jira epic section (tickets Ridha assigned) | yes | n/a owner-only |
 | Add / Not a task buttons, click ack + lock | yes | yes |
 | Model title cleanup | yes | yes |
 | Grouped `list` + Inbox + Notes + Triage & update | yes | yes |
@@ -50,6 +59,11 @@ That is a permission boundary, not a parity gap.
 | Overdue nudge, reminders, meetings, digest | yes | yes |
 | Digest delivery retry after 09:30 | yes | yes |
 | Reminder added to the recipient's list | yes | yes |
+| Plain DM becomes a task (no prefix) | n/a | yes |
+| App Home dashboard + meetings + Slack List link | yes | yes |
+| Message shortcut / 📌 capture into own ledger | yes | yes |
+| Native Slack List mirror | yes | yes |
+| Live Slack search in `ask:` | yes | no (owner user token only) |
 | Meeting replies: yes / no / moved | yes | yes |
 | Bulk `done:` / `not:` by refs, pasted tasks and notes | yes | yes |
 

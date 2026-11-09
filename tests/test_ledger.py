@@ -113,3 +113,23 @@ def test_no_activity_for_five_working_days_is_stalled():
     out = apply_stalled([row(last_activity="2026-10-23T09:00:00+08:00")], NOW)
     assert out[0]["status"] == "stalled"
     assert out[0]["stalled_reason"] == "no_activity"
+
+
+def test_repeated_title_is_not_captured_twice():
+    from mini_reid.ledger import drop_duplicate_titles
+
+    existing = [{"id": "a", "what": "Book 45-minute interview",
+                 "status": "open"}]
+    assert drop_duplicate_titles(
+        existing,
+        [{"id": "b", "what": "Book 45-minute interview",
+          "status": "inbox"}]) == []
+    # Different client is a different task.
+    assert drop_duplicate_titles(
+        existing,
+        [{"id": "c", "what": "Book 45-minute interview", "status": "open",
+          "client": "ioi"}])
+    # A closed row does not block a fresh ask.
+    assert drop_duplicate_titles(
+        [{"id": "a", "what": "Book 45-minute interview", "status": "done"}],
+        [{"id": "d", "what": "Book 45-minute interview", "status": "open"}])

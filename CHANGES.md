@@ -2,6 +2,416 @@
 
 Append-only. Newest first.
 
+## 2026-11-09 (paged list, one-message digest, Assigner column)
+
+- `list` shows every open row again: the 40-row cap and the 20-row Inbox/Notes
+  caps are gone, and titles are no longer sliced at 100 chars. It is paged
+  instead — 25 numbered rows per page, `◀ Previous` / `Next ▶` edit the same
+  message in place (same trick as the help topic picker), numbering continues
+  across pages, and page one carries Reminders I sent, Inbox and Notes.
+- The daily digest no longer arrives as several DMs. Slack splits plain-text
+  messages past ~4,000 chars; `send_dm` now wraps anything over 3,900 chars in
+  section blocks, so the digest is one message (up to Slack's 50-block limit).
+- The Slack List gained an **Assigner** column: the sender's email for mail,
+  the author's Slack email (resolved with the user token, `users:read.email` —
+  the bot token lacks that scope), the Jira reporter's email from the issue
+  payload, or the bot's name when it has no email. Existing Jira rows were
+  backfilled. Slack has no API to add a column, so each member's List was
+  rebuilt with the new schema and the old ones renamed "(archived)". RIJ files
+  every Jira ticket as `ridha@pantas.com`, so Jira RIJ rows filter by title
+  `[RIJ]`, not by email.
+- A ledger change now reaches the Slack List immediately: every mutating
+  command (`not:`, `done:`, `status:`, `due:`…), the Triage modal, Clear Inbox
+  and the Add to list / Not a task buttons sync right after saving. The watcher
+  cycle stays as the backstop.
+- "set a meeting with @Kasib **for** BD Command Centre Planning and
+  Improvements" works: `for` and `regarding` are topic separators like
+  "about"/"to discuss", instead of the whole sentence being read as the guest
+  list (which fell back to the "Use: meet:" hint). `parse_meeting`, tests added.
+- "set a meeting with @Kasib **today**" also works: a stray word next to a
+  resolved mention/name ("today", topic fragments) no longer discards the
+  attendee list.
+- The meeting proposal is posted **in the channel where the request was made**
+  (threaded), not in Ridha's DM; slot buttons edit that same message.
+- **Anyone invited can lock a slot** — the organiser or any attendee (email
+  mapped through the directory), so Kasib can book without asking Ridha. A
+  stranger who clicks gets an ephemeral "organiser or invited attendee" note.
+  The confirmation says `Booked by @who`; the creator stays the organiser so
+  cancel/reschedule rules do not move.
+- Booking a slot now also posts a `✅ Scheduled: …` acknowledgement into the
+  thread (the in-place update alone was silent, so nobody watching saw it).
+- A trailing `*Sent using* @mini-reid` footer is a signature, not a command:
+  messages merely tagged with it are no longer captured as notes. Any
+  `Sent using/via/with` mention at the end is stripped before the bot decides
+  it was addressed; the two notes it saved from #bd-hiring were dropped.
+- The meeting proposal is now a **day view** with `◀ Previous day` / `Next
+  day ▶` paging across the next five working days. It opens on the first day
+  with a free slot and lists every free 30-minute slot on that day (up to 20);
+  a fully booked day says so. `propose_slots(day=…)` does one day at a time,
+  and Refresh / duration edits stay on the browsed day.
+- `not:` on a single row now asks **why** with five buttons — Duplicate,
+  Chatter, FYI / minutes, Handled elsewhere, Not mine. The choice lands on the
+  row as `not_reason` and in `corrections.json` as the reason, so rejects are
+  categorised instead of all reading "bulk not". Clicking replaces the buttons
+  with the filed reason.
+- One- and two-word DMs ("GG", "Do it") are no longer captured as tasks; an
+  action verb ("Send deck", "Start K2") keeps the short ask.
+- Repeated asks no longer stack: `drop_duplicate_titles` compares a new row's
+  normalised title + client against every live task and drops the copy (closed
+  rows do not block a fresh ask; titles under 8 characters are exempt). Wired
+  into the CLI digest, watcher and member refresh.
+- Channels are muted by evidence: `mutes.learn` runs each watcher cycle, and a
+  Slack channel with ≥3 `not:` rejects and **more than 75%** of everything it
+  yielded rejected goes on `muted_sources.json`; extraction then skips it.
+  Completed tasks count as proof the channel is real, so busy working channels
+  stay. Delete a key from the file to unmute.
+- #bd-triager-agent is read again: the channel came off every ignore list, app
+  cards that Slack search returns with empty text are fetched via
+  `conversations.replies`, and the `demo app` author is no longer discarded as
+  a bot. Cards that mention Ridha now become candidates like any other
+  mention. The bot still cannot press the triager's own buttons — it acts on
+  the message text only.
+- Triager tickets are assigned to the account owners: only **Demo App** cards
+  (`*Acknowledged*` first, `*Solution proposed*` as fallback) are answered, once
+  per ticket key, as a **reply in the card's thread** — SLA notices, the weekly
+  rotation, closed tickets, 💬 "… replied:" follow-ups and human chatter are
+  ignored, and the bot stops at assignment. `routing.py` joins the Django
+  admin exports (MV anchor for Lite users, child→parent otherwise), classifies
+  GHB / GVC / SAFE (Pantas Lite) vs ENT (enterprise), maps the anchor to a
+  stocktake-hub client and tags **all its members** in a reply on the card's
+  thread. Unknown requester → Ridha only; account with no hub client →
+  programme owners (GHB/GVC trio, SAFE Ridha). Fallbacks: requester domain
+  (e.g. `@my.knightfrank.com`), then the card's **Company** (then
+  Organization) name matched against Lite SME names and child companies —
+  conservative, generic names like "Pantas" never match. 210 of 247 historical
+  tickets resolve (was 183). Watcher reads the channel
+  itself (search misses cards that do not mention Ridha), starts from a
+  baseline so the backlog is never mass-replied, and stores route state in
+  `triager_routed.json`. Reply needs the bot to be a channel member.
+- Enterprise accounts use Ridha's explicit tag list (Gamuda → Ridha, IOI →
+  XieYi+Ridha, Sime Darby → KyeWen, Setia → Charanya, PNB → Akasha+Raj,
+  Berjaya → XieYi, EDOTCO → Raj+Charanya, MBM → Azleena, Kelington →
+  KyeWen+Ridha, Bintulu → Azleena, Eupe → Ridha+Charanya, TMK →
+  Azleena+Raj, PKT → Raj+Azleena, Knight Frank → Ridha+Charanya, Allianz →
+  Charanya+Azleena); every other enterprise account tags Ridha alone.
+- Mini-Reid learns routing aliases: `alias: Horizon Hills = Gamuda` stores
+  the company-name mapping in `routing_aliases.json` and the next
+  `routing.json` build uses it. A health check DMs Ridha when **≥10 recent
+  triager tickets with ≥20% fallbacks**, or when the Django exports are **>7
+  days old** — the DM lists the unmapped companies and asks for fresh
+  `ChildCompany`, `ChildCompanyUser` and `lite_user_collection_report`
+  exports (at most once a day).
+- Repo cleanup: dead ledger snapshots moved to `_archive/`, caches removed,
+  `.gitignore` covers every runtime state file (`routing.json`,
+  `triager_routed.json`, `muted_sources.json`, `ledger_undo.json`,
+  `created_meetings.json`).
+- Behaviour is now documented per workflow in `docs/WORKFLOWS.md` with
+  `docs/workflows/{capture,corrections,slack-list,list-paging,digest,`
+  `meetings,reminders,triager-routing}.md` — state files, code and tests for
+  each.
+- Ticket routing backfills after downtime: the `since_ts` watermark survives
+  sleep/restart, the next watcher cycle pages through the whole gap (1,000
+  messages/cycle) and tags tickets that arrived while the Mac was off. Every
+  cycle also re-scans at least the last 48 hours, so a filter change cannot
+  bury an arrival (PHD-1562 was missed that way once and tagged by hand).
+  A ticket also `Closed` inside the window is skipped. The reply title comes
+  from the Block Kit header when the `New ticket:` line has none.
+- Triager tag fires on **one** card only: Demo App's `New ticket: PHD-xxxx`
+  arrival (Block Kit, blocks flattened). Acknowledgements, proposals, replies,
+  SLA notices, rotation and closures never tag; the legacy
+  Acknowledged/Solution-proposed cards no longer trigger either.
+- 436 tests passing.
+
+## 2026-11-07 (element scorecard)
+
+- Weekly scorecard matches on elements, not exact wording: at least half the
+  expected keywords must appear in the row's title, asker or client. A line can
+  add `| matches: alt1, alt2` for evidence that uses different words.
+- Report now breaks hits down as wording / elements / override. This week:
+  15/16 (94%); only `IOI Entity Restructuring` missed.
+- 408 tests passing.
+
+## 2026-11-07 (tracked Jira epic: all triage tickets)
+
+- `tracked_epics.json` maps an epic (default `GRE-4129`, "All Triage tickets")
+  to a Slack tracking channel (`software-related-issues`).
+- The watcher reads the epic's children, keeps only tickets **Ridha assigned**
+  (Jira changelog author = him), and maintains one ledger row per open ticket:
+  summary, Jira status mapped to open/in progress/blocked, assignee, latest
+  Jira comment, and the latest channel message mentioning the ticket key.
+- Those rows render in a dedicated **Triage epic** section near the top of
+  `list`; Done tickets close and leave the section. Jira comments and channel
+  chatter update `last_activity`.
+- Cache in `epic_cache.json` (gitignored) stores changelog checks, comments and
+  the channel watermark; the channel is backfilled 7 days on first run.
+- 406 tests passing.
+
+## 2026-11-07 (bd-triager-agent filtered at source)
+
+- Slack search results from `#bd-triager-agent` (`C0B59LA0X5M`) are dropped
+  before extraction, for both the owner watcher and live `ask:` search. Member
+  scans already skipped it. Prevents the triager's ticket cards from becoming
+  candidates or answering questions.
+- 401 tests passing.
+
+## 2026-11-06 (greetings are not tasks)
+
+- Festive and social greetings no longer become candidates: "Happy Deepavali",
+  "Wishing you…", "Have fun.", "Congrats", "Merry Christmas" and similar are
+  dropped even when they tag people. A greeting that also contains an explicit
+  ask ("Happy Diwali! Can you send the deck?") is still captured.
+- 400 tests passing.
+
+## 2026-11-06 (safe questions for non-members)
+
+- A non-member who asks a question now gets a private DM answer from the
+  knowledge base only. No ledger, files or live Slack search; never posted in
+  the channel. If the KB has nothing, the DM explains that Ridha can add them.
+- Immediate reminders drop the word "now": `remind @Nish now not to stuff too
+  much` sends `not to stuff too much`.
+- 399 tests passing.
+
+## 2026-11-06 (done rows leave the Slack List)
+
+- A row marked `done` is deleted from the Slack List on the next sync, so the
+  List shows live work only. The ledger row is kept as the archive (`done`,
+  `closed_at`, `closed_how`) and still appears in `list` history/undo paths.
+  Inbox and dropped rows were already removed.
+- 398 tests passing.
+
+## 2026-11-06 (Slack List covers every task)
+
+- The Slack List mirror was capped at the 50 most recently active tasks, so
+  older open work never appeared. Raised to 500 and backfilled the owner's
+  list: 95 live tasks now mirrored.
+- Notes, reminders and Inbox items stay out of the List by design; they remain
+  in `list`, the Inbox modal and the reminder sections.
+- 398 tests passing.
+
+## 2026-11-06 (meeting duration and cancel)
+
+- `meet:` accepts a duration: `meet: @Kasib about the deck for 45 minutes`,
+  `for 1 hour`, `for an hour`. Clamped 15–180 minutes; the phrase is stripped
+  from the title. Slots, the proposal card and the created event all use it.
+  The **Edit** modal has a Duration field next to the title; changing it
+  re-proposes slots at the new length.
+- The organiser can reply `cancel <note>` to the 10-minute meeting reminder.
+  The Google event is deleted with attendee notifications, the stored meeting
+  and reminder are removed, and mapped Slack attendees get a `Cancelled` DM.
+  Meetings created before `created_meetings.json` existed fall back to the
+  reminder state, so older calendar meetings cancel too.
+- `cancel: <meeting name>` in a DM cancels the nearest upcoming calendar event
+  whose title contains that text (next 14 days, across every readable
+  calendar). `Meeting: cancel <name>`, `cancel meeting <name>` and bare `cancel`
+  work too; a bare cancel uses the nearest reminder. No match falls back to the
+  normal task `drop:` behaviour only for a plain `cancel:`, and answers
+  "No upcoming meeting matches" for a `Meeting:` request instead of noting it.
+- 397 tests passing.
+
+## 2026-11-06 (attendee reminders, reschedule with note)
+
+- Meetings created through Mini-Reid are remembered with their event id,
+  attendees and organiser. Ten minutes before, every attendee who maps to a
+  Slack user gets a DM with **Attending** / **Can't attend** buttons; the click
+  is recorded and confirmed. External attendees are skipped (calendar invite
+  still covers them).
+- The organiser reminder now accepts `reschedule to <time> <note>`. It moves the
+  Google event, keeps the original duration, appends the note to the
+  description, updates the stored time, and DMs attendees. `moved <note>` still
+  only records a note without changing the calendar.
+- 390 tests passing.
+
+## 2026-11-06 (Jira approval, note prompt)
+
+- Jira issues no longer auto-open. `jira-assigned` is removed from the auto
+  rules, so assigned issues land in Inbox with **Add to list** / **Not a task**
+  like other uncertain candidates. The other three auto rules are unchanged.
+- A long paste from Ridha (200+ chars or 3+ lines) is still saved as a note,
+  but the reply now carries **Keep as note** / **Make it a task** / **Discard**
+  instead of a silent `Noted.` Short notes keep the old behaviour.
+- 388 tests passing.
+
+## 2026-11-06 (multi-recipient reminders)
+
+- `remind` accepts several people at once. Shared text:
+  `remind @Raj, @XieYi and @Lynnette to send your updates at 5pm today`.
+  Per-person lines: `remind` then one `@Name <item>` per line, with the time
+  on its own line. Each recipient gets their own scheduled DM and reminder row.
+- Any workspace member can use `remind`, not only allowlisted users. It grants
+  no ledger access; other commands stay owner/member-only.
+- 387 tests passing.
+
+## 2026-11-06 (list sections, Clear Inbox, done acks)
+
+- `list` is split into **My reminders**, **Reminders I sent**, **My tasks**,
+  **Tagged by others**, **Inbox** and **Notes**. Numbering stays global and
+  follows the same order commands use.
+- **Clear Inbox (N)** opens a modal of 10 pending rows. Tick the ones that are
+  NOT tasks; everything else on the page is added. Submitting advances to the
+  next page automatically. New items still arrive as per-item DMs with
+  **Add to list** / **Not a task**.
+- When someone marks a task you tagged them in as done, you get one DM:
+  `✅ <name> marked done: <title>`. Slack-tagged rows only, once per row.
+- Marking done from the Slack List now DMs the person who did it:
+  `✅ Marked done: <title>` (up to five titles per message). Command and
+  Triage-modal done paths already reply.
+- 382 tests passing.
+
+## 2026-11-06 (unfurl removed)
+
+- Removed the Gmail/Jira link cards. Not used in practice, and it rendered a
+  card per task link in the digest. Deleted the handler, module and tests;
+  removed `links:read`/`links:write`, the `link_shared` event and the unfurl
+  domains from the manifest. Reinstall the app so Slack drops them.
+- Bare pasted links still never become notes.
+
+## 2026-11-06 (spam fixes)
+
+- The daily 06:00 model job no longer adds rows the rules rejected. The model
+  only renames rule-captured rows in both the watcher and the CLI, so chatter
+  DMs and boilerplate email can no longer become open tasks.
+- The bot no longer unfurls links inside its own messages
+  (`is_sharing_user_bot`), so a digest no longer turns into a wall of
+  Mini-Reid task cards.
+- Removed 41 model-invented Slack DM rows from the ledger; backup at
+  `ledger.json.bak-20261106-spam`.
+- 379 tests passing.
+
+## 2026-11-05 (auto-capture)
+
+- A new candidate that matches an auto rule now lands already open
+  (`capture: "auto"`) instead of waiting for a click. Everything else stays
+  `capture: "inbox"` with the **Add to list** / **Not a task** buttons. The
+  deciding rule is kept in `capture_why`.
+- `jira-assigned`: any assigned, non-Done, non-Epic Jira issue.
+- `slack-direct-ask`: a channel @mention with an explicit ask — can/could/would/
+  will you, `please`/`pls`/`kindly` followed by a request verb, `action
+  required`, or `we need`/`need you/your/the`.
+- `slack-dm-ask`: a Slack DM with an explicit ask or a due date.
+- `email-direct-ask`: a Gmail inbox mail addressed directly to the person in
+  the To header, with an explicit ask or a due date. A name appearing only in
+  the body of shared-alias mail does not auto-add.
+- Rules only: no model, no network. The model still only rewrites the title and
+  never decides. Existing rows are not migrated. The owner and every allowlisted
+  member run the same rules against their own ledger.
+- 378 tests passing.
+
+## 2026-11-05 (link unfurls)
+
+- Gmail and Jira links shared in Slack unfurl into a Mini-Reid task card with
+  status, due date and a **Mark done** button when the link is already tracked.
+- Row lookup spans Ridha's ledger and every allowlisted member's ledger. The
+  button only closes the clicker's own task; someone else's task stays put.
+- Untracked links get no unfurl in channels; in a DM they show a small
+  "not on your list — add it with `add: …`" card, so the bot never goes silent.
+- A message that is only a link is no longer captured as a note; it is left
+  to the unfurl.
+- Bot scopes `links:read` and `links:write`; bot event `link_shared`; unfurl
+  domains `mail.google.com` and `pantas.atlassian.net`. App reinstalled and
+  live-tested in the bot DM; the test message was deleted after.
+- 367 tests passing.
+
+## 2026-11-05 (Slack file ingestion)
+
+- `file_shared` events download the file, extract text and save it under
+  `data/slack_files/` for the KB and `ask:` search.
+- Parsers: plain text/markdown/CSV/JSON, PDF via `pdftotext`, DOCX and XLSX via
+  their XML. Unsupported types are skipped.
+- `ask:` checks ingested files before live Slack search and the local KB, with
+  file name, snippet and Slack permalink.
+- Uploads and `FILE_REACTION` (default 📄) ingest files attached to a message.
+  The uploader/reactor gets a name-only ack; only Ridha gets the extractive
+  summary and the `ask:` prompt.
+- A generic question such as `ask: what is this file about` falls back to the
+  most recently ingested file's summary instead of live Slack.
+- Bot scope `files:read`; event `file_shared`. Live upload, reaction and summary
+  tests passed, then cleaned up.
+- 360 tests passing.
+
+## 2026-11-05 (Do Not Disturb quiet hours)
+
+- Overdue nudges, stale nudges and local reminders can check Slack DND for the
+  recipient and stay silent while it is on. The gate is **off by default** now;
+  set `RESPECT_DND=1` to enable. When on, the date marker is not written, so the
+  nudge retries after DND ends.
+- Bot scope `dnd:read`; installed.
+- 351 tests passing.
+
+## 2026-11-05 (`/mini-reid` slash command)
+
+- `/mini-reid` with no args or `list` returns the grouped list ephemerally with
+  Open Slack List and Triage buttons. `/mini-reid help` returns HELP.
+- `/mini-reid add: …`, `remind …`, `meet: …` run the normal command path and
+  reply in DM. Plain text with no command (`go to the doctor's office at 2pm`)
+  is added as a task and confirmed ephemerally. `whats on my to-do` and similar
+  queries show the list instead of becoming tasks. Non-members get the allow
+  prompt.
+- `not: whats on my to-do` now refuses as a question instead of fuzzy-matching
+  and dropping a real task. The wrongly dropped dashboard task was restored.
+- Plain `undo` is recognised as the undo command, not fuzzy-matched to a note.
+  The accidental note was removed.
+- Registered in the Slack app and manifest.
+- 344 tests passing.
+
+## 2026-11-05 (App Home dashboard)
+
+- Mini-Reid's Home tab is a per-person dashboard: a native Block Kit **table**
+  with 10 stats (open, overdue, due today, this week, in progress, blocked,
+  waiting, done 7d, Inbox, notes),
+  today's meetings, top 3 focus items, **Open Slack List**, **Triage Inbox**,
+  **Refresh** and **What I can do**. It no longer dumps the whole task list.
+  Members see their own ledger plus a **What I can do** block; anyone not
+  authorised sees **What Mini-Reid can do**, what works now, what approval
+  unlocks, **Request access** and **Message Ridha**. Request access DMs Ridha with
+  the captured Slack/name/email/Jira details and an **Authorise and send setup**
+  button; one click runs the normal `allow:` setup and sends the requester their
+  link. The requester gets a confirmation, and Ridha gets a second DM when
+  Google setup actually completes. No other ledger is exposed.
+- `app_home_opened` event subscribed; the owner Home view is published now.
+- 335 tests passing.
+
+## 2026-11-05 (live Slack search + native Slack List)
+
+- `ask:` with pending / open / due / task wording now answers from the ledger
+  first, filtered by any named client, with count, due dates and source links.
+  Other questions use live Slack search.
+- `ask:` for the owner now searches Slack first with the Real-time Search API
+  (`assistant.search.context`), returns channel, text and permalink, and falls
+  back to the local knowledge base when there are no hits or an error.
+- The watcher mirrors each user's ledger into a native Slack List
+  (“Mini-Reid — Name”): title, status, due and source link. The list is created
+  once, shared with the user, and rows are created or updated incrementally
+  (last 50).
+- `list` replies now carry an **Open Slack List** button that deep-links to that
+  user's native list next to **Triage & update**.
+- Two-way sync: editing title, status or due in the Slack List updates the
+  ledger on the next watcher cycle. Deleting a row in Slack, or setting it to
+  Not a task, drops the ledger row. Dropped and Inbox rows are deleted from the
+  Slack List, not shown.
+- Bot scopes `lists:read` / `lists:write`; live list created for Ridha.
+- 329 tests passing.
+
+## 2026-11-05 (message shortcut and reaction capture)
+
+- **Add to Mini-Reid** message shortcut: right-click any message, edit the
+  prefilled title, submit. The task links back to the source message and gets ✅.
+- Reacting with 📌 (`CAPTURE_REACTION=pushpin`) adds that message to the reactor's
+  list with no modal, then DMs `Added: <task>` with the source link. Shortcut and
+  reaction captures created today appear in a **Just added** section at the top of
+  `list`. Owner and members resolve their own ledger.
+- Slack app manifest: message shortcut, `reaction_added` event, `reactions:read`.
+- 324 tests passing.
+
+## 2026-11-05 (seamless member capture + benchmark flags)
+
+- A member's plain DM to the bot is now added as a task, no `add:` prefix.
+  Questions and channel messages are unchanged. Charanya can stop writing to
+  herself and write to Mini-Reid instead.
+- Eval labels accept `benchmark: false` for tasks with no Slack, Gmail or Jira
+  signal; they are reported as manual-only and excluded from recall.
+- Charanya snapshot: 7 tasks, 4 manual-only, 3 benchmarked, strict recall 0/3.
+- 320 tests passing.
+
 ## 2026-11-05 (schedule meetings from free/busy)
 
 - `meet: @Kasib about BD Command Centre`, or plain `set meeting with Kasib to

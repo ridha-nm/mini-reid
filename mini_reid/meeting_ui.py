@@ -1,7 +1,7 @@
 """Slack UI for a meeting proposal and its free slots."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from .meetings import OWNER_EMAIL, SLOT_MINUTES
@@ -16,12 +16,18 @@ def _label(start: str, end: str) -> str:
 
 
 def _busy_on(intervals: list[tuple], day) -> str:
+    day_start = datetime.combine(day, time.min, tzinfo=MYT)
+    day_end = day_start + timedelta(days=1)
     parts = []
     for start, end in intervals:
         s, e = start.astimezone(MYT), end.astimezone(MYT)
-        if s.date() != day and e.date() != day:
+        if e <= day_start or s >= day_end:
             continue
-        parts.append(f"{s:%H:%M}–{e:%H:%M}")
+        if s <= day_start and e >= day_end:
+            parts.append("all day")
+        else:
+            parts.append(f"{max(s, day_start):%H:%M}–"
+                         f"{min(e, day_end):%H:%M}")
     return ", ".join(parts) or "free"
 
 
@@ -39,7 +45,9 @@ def _snapshot(busy: dict, attendees: list[dict], slots: list[dict]) -> str:
 
 
 def slot_blocks(token: str, topic: str, attendees: list[dict],
-                slots: list[dict], busy: dict | None = None) -> list[dict]:
+                slots: list[dict], busy: dict | None = None,
+                duration: int = SLOT_MINUTES, day: str = "",
+                prev_day: str = "", next_day: str = "") -> list[dict]:
     if isinstance(attendees, str):
         attendees = [{"name": attendees, "email": ""}]
     with_email = "\n".join(
@@ -51,7 +59,7 @@ def slot_blocks(token: str, topic: str, attendees: list[dict],
         {"type": "section", "fields": [
             {"type": "mrkdwn", "text": f"*Title*\n{topic}"},
             {"type": "mrkdwn", "text": f"*With*\n{with_email}"},
-            {"type": "mrkdwn", "text": f"*Duration*\n{SLOT_MINUTES} minutes"},
+            {"type": "mrkdwn", "text": f"*Duration*\n{duration} minutes"},
             {"type": "mrkdwn", "text": "*Time zone*\nMYT (Asia/Kuala_Lumpur)"},
         ]},
     ]
@@ -63,12 +71,18 @@ def slot_blocks(token: str, topic: str, attendees: list[dict],
                              + _snapshot(busy, attendees, slots)
                              + "```"},
         })
+    when = ""
+    if day:
+        when = f"*{datetime.fromisoformat(day):%a %d %b}* · "
     blocks.append({
         "type": "section",
         "text": {"type": "mrkdwn",
-                 "text": "These slots are free on both calendars. Pick one and I "
-                         "create the event and invite them."},
+                 "text": when + "These slots are free on every calendar. "
+                         "Pick one and I create the event and invite them."},
     })
+    if not slots:
+        blocks.append({"type": "section", "text": {
+            "type": "mrkdwn", "text": "_No free slot that day._"}})
     for slot in slots:
         blocks.append({
             "type": "section",
@@ -82,7 +96,16 @@ def slot_blocks(token: str, topic: str, attendees: list[dict],
                 "style": "primary",
             },
         })
-    blocks.append({"type": "actions", "elements": [
+    pager = []
+    if prev_day:
+        pager.append({"type": "button", "action_id": "meet_day",
+                      "value": f"{token}|{prev_day}",
+                      "text": {"type": "plain_text", "text": "◀ Previous day"}})
+    if next_day:
+        pager.append({"type": "button", "action_id": "meet_day",
+                      "value": f"{token}|{next_day}",
+                      "text": {"type": "plain_text", "text": "Next day ▶"}})
+    blocks.append({"type": "actions", "elements": pager + [
         {"type": "button", "action_id": "meet_edit", "value": token,
          "text": {"type": "plain_text", "text": "Edit title / notes"}},
         {"type": "button", "action_id": "meet_refresh", "value": token,
@@ -93,7 +116,8 @@ def slot_blocks(token: str, topic: str, attendees: list[dict],
     return blocks
 
 
-def edit_modal(token: str, topic: str, notes: str = "") -> dict:
+def edit_modal(token: str, topic: str, notes: str = "",
+               duration: int = SLOT_MINUTES) -> dict:
     return {
         "type": "modal",
         "callback_id": "meet_edit",
@@ -107,6 +131,10 @@ def edit_modal(token: str, topic: str, notes: str = "") -> dict:
              "element": {"type": "plain_text_input", "action_id": "value",
                          "initial_value": topic[:200],
                          "max_length": 200}},
+            {"type": "input", "block_id": "duration",
+             "label": {"type": "plain_text", "text": "Duration (minutes)"},
+             "element": {"type": "plain_text_input", "action_id": "value",
+                         "initial_value": str(duration)}},
             {"type": "input", "block_id": "notes", "optional": True,
              "label": {"type": "plain_text", "text": "Notes (event description)"},
              "element": {"type": "plain_text_input", "action_id": "value",
@@ -116,8 +144,10 @@ def edit_modal(token: str, topic: str, notes: str = "") -> dict:
 
 
 def confirmation_blocks(topic: str, start: str, end: str,
-                        link: str = "") -> list[dict]:
+                        link: str = "", by: str = "") -> list[dict]:
     text = f"*Scheduled:* {topic}\n{_label(start, end)}"
+    if by:
+        text += f"\nBooked by <@{by}>"
     if link:
         text += f"\n<{link}|join>"
     return [{"type": "section", "text": {"type": "mrkdwn", "text": text}}]

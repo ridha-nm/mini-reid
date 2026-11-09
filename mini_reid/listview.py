@@ -1,6 +1,7 @@
 """Open-task list: ordered, grouped and short enough to scan."""
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timedelta
 
 from .ledger import _dt
@@ -9,6 +10,7 @@ from .render import _client_name
 # Rows a person still has to act on, in display order.
 LIVE = {"open", "stalled", "in progress", "blocked"}
 BUCKETS = [
+    ("recent", "Just added"),
     ("in progress", "In progress"),
     ("blocked", "Blocked"),
     ("overdue", "Overdue"),
@@ -21,6 +23,10 @@ BUCKETS = [
 
 def _bucket(row: dict, today: date) -> str:
     status = (row.get("status") or "open").lower()
+    created = _dt(row.get("created_at"))
+    if (row.get("via") in {"shortcut", "reaction"} and created
+            and created.date() == today):
+        return "recent"
     if status == "in progress":
         return "in progress"
     if status == "blocked":
@@ -37,6 +43,25 @@ def _bucket(row: dict, today: date) -> str:
     return "later"
 
 
+SECTIONS = [(0, "My reminders"), (1, "Triage epic"), (2, "My tasks"),
+            (3, "Tagged by others")]
+
+
+def _section(row: dict) -> int:
+    """0 reminders, 1 tracked Jira epic, 3 work others put on me, 2 rest."""
+    if row.get("kind") == "reminder":
+        return 0
+    if row.get("kind") == "triage":
+        return 1
+    if ((row.get("direction") or "") == "owed_to_me"
+            or row.get("via") in {"assigned", "reassigned"}
+            or (row.get("source") == "slack"
+                and row.get("kind") in {"mention", "dm"}
+                and row.get("asker"))):
+        return 3
+    return 2
+
+
 def ordered_rows(rows: list[dict], now: datetime) -> list[dict]:
     """Rows the numbered list shows, in the order the numbers use."""
     live = [r for r in rows if (r.get("status") or "open").lower() in LIVE
@@ -46,6 +71,7 @@ def ordered_rows(rows: list[dict], now: datetime) -> list[dict]:
     # Without this, a new undated assignment sits at the end and gets cut.
     newest = sorted(live, key=lambda r: r.get("created_at") or "", reverse=True)
     return sorted(newest, key=lambda r: (
+        _section(r),
         order.index(_bucket(r, now.date())),
         r.get("priority") if isinstance(r.get("priority"), int) else 99,
         r.get("due") or "9999-12-31",
@@ -80,7 +106,7 @@ def _due_label(due: datetime, today: date) -> str:
 
 
 def _line(number: int, row: dict, today: date) -> str:
-    parts = [f"{number}. [{row.get('id', '')[:6]}] {_title(row)[:100]}"]
+    parts = [f"{number}. [{row.get('id', '')[:6]}] {_title(row)[:200]}"]
     due = _dt(row.get("due"))
     if due:
         parts.append(f"— {_due_label(due, today)}")
@@ -89,42 +115,83 @@ def _line(number: int, row: dict, today: date) -> str:
         parts.append(f"· {client}")
     if isinstance(row.get("priority"), int):
         parts.append(f"· P{row['priority']}")
+    if row.get("kind") == "triage":
+        if row.get("assignee"):
+            parts.append(f"· {row['assignee']}")
+        chatter = (row.get("chatter") or {}).get("text") or (
+            row.get("latest_comment") or {}).get("text") or ""
+        if chatter:
+            chatter = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", chatter)).strip()
+            if chatter:
+                parts.append(f"· “{chatter[:80]}”")
     return " ".join(parts) + _ref(row)
 
 
-def format_list(rows: list[dict], now: datetime, limit: int = 40) -> str:
-    """Numbered, grouped text version. Same numbering as `ordered_rows`."""
+def _sent_line(reminder: dict) -> str:
+    when = (reminder.get("post_at") or "")[:16].replace("T", " ")
+    status = ("sent" if reminder.get("status") == "sent" else "pending")
+    return (f"• {reminder.get('to_name') or 'someone'} — "
+            f"{(reminder.get('what') or '')[:120]} · {when} · {status}")
+
+
+PER_PAGE = 25
+
+
+def page_count(rows: list[dict], now: datetime,
+               per_page: int = PER_PAGE) -> int:
+    return max(1, -(-len(ordered_rows(rows, now)) // per_page))
+
+
+def format_list(rows: list[dict], now: datetime, page: int = 0,
+                sent: list[dict] | None = None,
+                per_page: int = PER_PAGE) -> str:
+    """One page of the numbered, grouped list.
+
+    Page 0 also carries the sent reminders, Inbox and Notes; the rows keep
+    counting across pages so a number stays meaningful on every page."""
     ordered = ordered_rows(rows, now)
+    pages = page_count(rows, now, per_page)
+    page = min(max(page, 0), pages - 1)
     inbox = [r for r in rows if (r.get("status") or "").lower() == "inbox"]
     notes = [r for r in rows if r.get("kind") == "note"
              and (r.get("status") or "open") not in {"done", "dropped"}]
-    if not ordered and not inbox and not notes:
+    sent = sent or []
+    if not ordered and not inbox and not notes and not sent:
         return "Nothing open."
 
-    shown = ordered[:limit]
+    shown = ordered[page * per_page:(page + 1) * per_page]
     today = now.date()
     sections: list[str] = []
-    current = None
-    for number, row in enumerate(shown, 1):
+    current_section = None
+    current_bucket = None
+    for number, row in enumerate(shown, page * per_page + 1):
+        section = _section(row)
+        if section != current_section:
+            current_section = section
+            current_bucket = None
+            sections.append(f"*{dict(SECTIONS)[section]}*")
+            if page == 0 and section == 0 and sent:
+                sections.append("*Reminders I sent*")
+                sections.extend(_sent_line(r) for r in sent)
         bucket = _bucket(row, today)
-        if bucket != current:
-            current = bucket
-            title = dict(BUCKETS)[bucket]
-            sections.append(f"*{title}*")
+        if bucket != current_bucket:
+            current_bucket = bucket
+            sections.append(f"_{dict(BUCKETS)[bucket]}_")
         sections.append(_line(number, row, today))
-    if len(ordered) > limit:
-        sections.append(f"… and {len(ordered) - limit} more")
+    if page == 0 and not any(_section(r) == 0 for r in shown) and sent:
+        sections.append("*Reminders I sent*")
+        sections.extend(_sent_line(r) for r in sent)
+    if pages > 1:
+        sections.append(f"_Page {page + 1}/{pages}_")
 
-    if inbox:
+    if page == 0 and inbox:
         sections.append(f"*Inbox — needs decision ({len(inbox)})*")
-        for row in inbox[:20]:
-            sections.append(f"• [{row.get('id', '')[:6]}] {_title(row)[:100]}")
+        for row in inbox:
+            sections.append(f"• [{row.get('id', '')[:6]}] {_title(row)[:200]}")
 
-    if notes:
+    if page == 0 and notes:
         sections.append(f"*Notes ({len(notes)})*")
-        for row in notes[:20]:
-            sections.append(f"• [{row.get('id', '')[:6]}] {_title(row)[:100]}")
-        if len(notes) > 20:
-            sections.append(f"… and {len(notes) - 20} more notes")
+        for row in notes:
+            sections.append(f"• [{row.get('id', '')[:6]}] {_title(row)[:200]}")
 
     return "\n".join(sections)

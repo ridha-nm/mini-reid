@@ -79,6 +79,19 @@ def test_due_dates_read_relative():
     assert "in 2d" in text
 
 
+def test_shortcut_capture_lands_at_the_top():
+    rows = [
+        _row("old", "Overdue thing", due="2026-11-01",
+             created_at="2026-11-01T09:00:00+08:00"),
+        _row("new", "Pinned task", via="reaction",
+             created_at="2026-11-04T18:00:00+08:00"),
+    ]
+    assert [r["id"] for r in ordered_rows(rows, NOW)] == ["new", "old"]
+    lines = format_list(rows, NOW).splitlines()
+    assert lines[0] == "*My tasks*"
+    assert lines[1] == "_Just added_"
+
+
 def test_new_undated_item_is_not_cut_from_a_long_list():
     rows = [_row(f"old{i:02d}", f"Old thing {i}",
                  created_at=f"2026-10-{i + 1:02d}T09:00:00+08:00")
@@ -87,6 +100,16 @@ def test_new_undated_item_is_not_cut_from_a_long_list():
     text = format_list(rows, NOW)
     assert "[new1] New assignment" in text
     assert "… and" not in text
+
+
+def test_long_list_pages_without_cutting_rows():
+    rows = [_row(f"t{i:02d}", f"Task {i}") for i in range(60)]
+    first = format_list(rows, NOW)
+    assert "[t24] Task 24" in first and "[t25]" not in first
+    assert "Page 1/3" in first
+    last = format_list(rows, NOW, page=2)
+    assert "[t59] Task 59" in last
+    assert "Page 3/3" in last
 
 
 def test_undated_items_are_newest_first():
@@ -100,3 +123,31 @@ def test_list_line_shows_client_and_priority():
     line = format_list(rows, NOW)
     assert "Eupe" in line
     assert "P1" in line
+
+
+def test_list_splits_my_tasks_from_tagged_and_sent_reminders():
+    rows = [
+        _row("mine", "My own task", source="gmail"),
+        _row("tagged", "Their task", source="slack", kind="mention",
+             asker="Kasib"),
+        _row("rem", "Call the bank", kind="reminder"),
+    ]
+    sent = [{"to_name": "Kasib", "what": "check dashboard",
+             "post_at": "2026-11-04T15:00:00+08:00", "status": "scheduled"}]
+    text = format_list(rows, NOW, sent=sent)
+    assert text.index("*My reminders*") < text.index("*Reminders I sent*")
+    assert text.index("*Reminders I sent*") < text.index("*My tasks*")
+    assert text.index("*My tasks*") < text.index("*Tagged by others*")
+    assert "Kasib — check dashboard" in text
+    assert "Their task" in text
+    # Numbers stay global and follow the same order commands use.
+    assert "1. [rem]" in text and "2. [mine]" in text and "3. [tagged]" in text
+
+
+def test_triage_tickets_have_their_own_section():
+    rows = [_row("t1", "Configure ESG categories", kind="triage",
+                 status="in progress", assignee="Julian")]
+    text = format_list(rows, NOW)
+    assert "*Triage epic*" in text
+    assert "Configure ESG categories" in text
+    assert "Julian" in text

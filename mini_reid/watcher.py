@@ -9,7 +9,8 @@ from pathlib import Path
 
 from .cli import collect, load_clients, match_client, _domain
 from .extract import extract
-from .ledger import apply_stalled, load, merge, save
+from .ledger import (apply_stalled, drop_duplicate_titles, load,
+                     merge, save)
 from .notify import send_dm, send_dm_to
 from .sources import load_env
 
@@ -43,7 +44,7 @@ def new_rows(items: list[dict], existing: list[dict], clients: dict, now: dateti
 
 def polish_rows(env: dict, items: list[dict], fresh: list[dict],
                 now: datetime, clients) -> list[dict]:
-    """Clean titles with the local model; every row still waits in the inbox."""
+    """Clean titles with the local model; the rule's stamp decides the status."""
     if not fresh:
         return fresh
     from .providers import OllamaProvider, extract_batch_safe
@@ -61,27 +62,35 @@ def polish_rows(env: dict, items: list[dict], fresh: list[dict],
 
 
 def triage_rows(fresh: list[dict], rewritten: list[dict]) -> list[dict]:
-    """Every rule-captured row waits for a person; the model only cleans the title.
+    """The rule's capture stamp decides the status; the model only cleans the title.
 
-    A row the model rewrote keeps its wording. A row the model omitted, rejected
-    or failed on keeps the rule text. Nothing is dropped here: confirming or
-    dismissing is the person's click, not the model's call.
+    A row the rules stamped ``capture == "auto"`` is already open. Any other
+    row waits in the inbox for a person. A row the model rewrote keeps its
+    wording. A row the model omitted, rejected or failed on keeps the rule
+    text. Nothing is dropped here: confirming or dismissing an inbox row is the
+    person's click, not the model's call — and the model never adds a row.
     """
     model_by_nid = {r["native_id"]: r for r in rewritten if r.get("native_id")}
-    seen = {r.get("native_id") for r in fresh}
     out: list[dict] = []
     for row in fresh:
         nid = row.get("native_id")
         better = model_by_nid.pop(nid, None)
+        status = "open" if row.get("capture") == "auto" else "inbox"
         if better:
-            out.append(dict(better, status="inbox",
+            out.append(dict(better, status=status,
+                            capture=row.get("capture", "inbox"),
+                            capture_why=row.get("capture_why", ""),
+                            from_user=row.get("from_user") or "",
                             client=row.get("client"),
                             asker=row.get("asker") or better.get("asker")))
         else:
-            out.append(dict(row, status="inbox"))
-    out.extend(dict(r, status="inbox") for nid, r in model_by_nid.items()
-               if nid not in seen)
+            out.append(dict(row, status=status))
     return out
+
+
+def pending_rows(rows: list[dict]) -> list[dict]:
+    """Only uncertain captures get Add / Not a task buttons."""
+    return [r for r in rows if (r.get("status") or "") == "inbox"]
 
 
 def format_alert(rows: list[dict]) -> str:
@@ -123,8 +132,13 @@ def format_alert(rows: list[dict]) -> str:
 
 def fire_reminders(env: dict, ledger_path: str, now: datetime,
                    user_id: str | None = None) -> int:
+    from .quiet import dnd_active
+
     rows = load(ledger_path)
     fired = 0
+    recipient = user_id or env.get("SLACK_OWNER_ID", "")
+    if dnd_active(env, recipient):
+        return 0
     for r in rows:
         if r.get("kind") != "reminder" or r.get("reminded"):
             continue
@@ -304,7 +318,8 @@ def remind_meetings(env: dict, now: datetime, state_path: str = MEETINGS_STATE,
         text = (f"*Meeting in 10 minutes*\n{span(meeting)} · {meeting['title']}"
                 + (f"\n<{meeting['link']}|join>" if meeting.get("link") else "")
                 + "\n\nAre you attending? Reply `yes`, `no <reason>`, "
-                  "or `moved` if the time changed.")
+                  "`moved <note>`, `reschedule to <time> <note>`, or "
+                  "`cancel <note>`.")
         remind_at = start - timedelta(minutes=10)
         if remind_at <= now:
             if user_id:
@@ -422,6 +437,202 @@ def stale_rows(rows: list[dict], now: datetime) -> list[dict]:
     return out
 
 
+TRIAGER_CHANNEL = "C0B59LA0X5M"
+TRIAGER_STATE = "triager_routed.json"
+TRIAGER_APP = "demo app"
+TRIAGER_BACKFILL = 48 * 3600   # always re-scan the last two days
+
+
+def route_triager(env: dict, now: datetime,
+                  state_path: str = TRIAGER_STATE,
+                  post=None, fetch=None) -> int:
+    """Tag the account owners on new Demo App tickets in the triager channel.
+
+    Only Demo App's "*Solution proposed*" cards route. SLA notices, the weekly
+    rotation, closed tickets and human chatter are ignored."""
+    from . import routing
+
+    state_file = Path(state_path)
+    state = json.loads(state_file.read_text()) if state_file.exists() else {}
+    if not state.get("since_ts"):
+        # First run: start from now so the backlog is not replied to at once.
+        state["since_ts"] = f"{now.timestamp():.6f}"
+        state_file.write_text(json.dumps(state))
+        return 0
+    blocked_at = state.get("blocked_at") or ""
+    if blocked_at:
+        try:
+            if (now - datetime.fromisoformat(blocked_at)).total_seconds() < 3600:
+                return 0
+        except ValueError:
+            pass
+    if fetch is None:
+        token = env.get("SLACK_USER_TOKEN")
+        if not token:
+            return 0
+
+        def fetch(oldest: str) -> list[dict]:
+            from .sources import _get_json
+
+            out: list[dict] = []
+            cursor = ""
+            for _ in range(10):          # up to 1,000 messages per cycle
+                params = {"channel": TRIAGER_CHANNEL, "oldest": oldest,
+                          "limit": 100}
+                if cursor:
+                    params["cursor"] = cursor
+                d = _get_json(
+                    "https://slack.com/api/conversations.history?"
+                    + urllib.parse.urlencode(params),
+                    {"Authorization": f"Bearer {token}"})
+                out.extend(d.get("messages") or [])
+                cursor = (d.get("response_metadata") or {}).get(
+                    "next_cursor") or ""
+                if not cursor:
+                    break
+            return out
+    # Re-scan a floor even if the watermark moved: a filter change or a bad
+    # cycle must never bury an arrival card. Dedupe keeps it cheap.
+    oldest = min(float(state["since_ts"] or 0), now.timestamp() - TRIAGER_BACKFILL)
+    try:
+        messages = fetch(f"{oldest:.6f}")
+    except Exception as ex:  # noqa: BLE001 - try again next cycle
+        print(f"[{now:%H:%M:%S}] triager read: {type(ex).__name__}: {ex}",
+              flush=True)
+        return 0
+    if post is None:
+        from .notify import _post
+
+        token = env["SLACK_BOT_TOKEN"]
+
+        def post(channel: str, text: str, thread_ts: str) -> None:
+            d = _post("chat.postMessage", token, channel=channel, text=text,
+                      thread_ts=thread_ts)
+            if not d.get("ok"):
+                raise RuntimeError(d.get("error"))
+    routing_data = routing.ensure_fresh()
+    by_email = routing_data.get("emails") or {}
+    by_domain = routing_data.get("domains") or {}
+    by_company = routing_data.get("companies") or {}
+    routed = state.setdefault("tickets", {})
+    stats = state.setdefault("stats", {"total": 0, "fallback": 0,
+                                       "unmapped": {}})
+    closed: set[str] = set()
+    for message in messages:
+        if ((message.get("bot_profile") or {}).get("name") or "").lower() \
+                != TRIAGER_APP:
+            continue
+        flat = routing.flatten_message(message)
+        if "*Closed*" not in flat:
+            continue
+        key = routing.parse_card(flat)["key"]
+        if key:
+            closed.add(key)
+    sent = 0
+    for message in messages:
+        ts = message.get("ts") or ""
+        if ts:
+            state["since_ts"] = max(state.get("since_ts") or "0", ts)
+        text = message.get("text") or ""
+        app = ((message.get("bot_profile") or {}).get("name") or "").lower()
+        if app != TRIAGER_APP:
+            continue
+        flat = routing.flatten_message(message)
+        # One trigger only: the arrival card ("New ticket: PHD-xxxx").
+        # Nothing after it — not acknowledgements, not proposals.
+        if not text.strip().startswith("New ticket:"):
+            continue
+        # Never tag follow-ups or closed cards.
+        if ("*Closed*" in flat or ":speech_balloon:" in flat
+                or " replied:" in flat):
+            continue
+        card = routing.parse_card(flat)
+        if not card["key"] or card["key"] in routed:
+            continue
+        if card["key"] in closed:
+            # Resolved inside this replay window: no tag needed.
+            routed[card["key"]] = now.isoformat()
+            continue
+        route = by_email.get(card["email"])
+        if not route and "@" in card["email"]:
+            route = by_domain.get(card["email"].rpartition("@")[2])
+        if not route:
+            # No email on the card: match the company (then organisation) name.
+            route = (routing.lookup_company(by_company, card.get("company") or "")
+                     or routing.lookup_company(by_company,
+                                               card.get("organisation") or ""))
+        fallback = False
+        if not route:
+            # Unknown requester: Ridha triages it by hand.
+            route = {"anchor": "Unmapped", "programme": "-",
+                     "owners": ["ridha@pantas.com"]}
+            fallback = True
+            name = (card.get("company") or card.get("organisation")
+                    or card["email"] or "unknown")[:60]
+            stats["unmapped"][name] = stats["unmapped"].get(name, 0) + 1
+        ids = routing.owner_ids(route["owners"]) or routing.owner_ids(
+            routing.PROGRAMME_OWNERS.get(route["programme"], []))
+        owners = " ".join(f"<@{uid}>" for uid in ids) or ", ".join(route["owners"])
+        reply = (f"*{card['key']}* — {card['title']}\n"
+                 f"Requester: {card['email']} · {route['anchor']} "
+                 f"({route['programme']})\nOwner: {owners}")
+        try:
+            post(TRIAGER_CHANNEL, reply, message.get("thread_ts") or ts)
+        except Exception as ex:  # noqa: BLE001 - retry once the bot can post
+            state["blocked_at"] = now.isoformat()
+            state_file.write_text(json.dumps(state))
+            print(f"[{now:%H:%M:%S}] triager route: {type(ex).__name__}: {ex}",
+                  flush=True)
+            return sent
+        routed[card["key"]] = now.isoformat()
+        state["tickets"] = dict(list(routed.items())[-1000:])
+        state_file.write_text(json.dumps(state))   # never tag it twice
+        stats["total"] += 1
+        stats["fallback"] += 1 if fallback else 0
+        stats["unmapped"] = dict(sorted(stats["unmapped"].items(),
+                                        key=lambda kv: -kv[1])[:20])
+        sent += 1
+    state["tickets"] = dict(list(routed.items())[-1000:])
+    _alert_routing(env, state, now)
+    state_file.write_text(json.dumps(state))
+    return sent
+
+
+def _alert_routing(env: dict, state: dict, now: datetime) -> None:
+    """DM Ridha when routing relies on fallbacks or the exports are stale."""
+    from . import routing
+
+    stats = state.get("stats") or {}
+    total = int(stats.get("total") or 0)
+    fallback = int(stats.get("fallback") or 0)
+    age = routing.exports_age_days()
+    if not (routing.needs_alert(total, fallback) or age > routing.EXPORT_MAX_AGE_DAYS):
+        return
+    last = state.get("alerted_at") or ""
+    try:
+        if last and (now - datetime.fromisoformat(last)).total_seconds() < 86400:
+            return
+    except ValueError:
+        pass
+    names = ", ".join(list((stats.get("unmapped") or {}))[:8]) or "-"
+    text = ("*Routing check*\n"
+            f"Last {total} triager tickets: {fallback} had no account match"
+            + (f" ({fallback / total:.0%})." if total else ".")
+            + (f"\nUnmapped companies: {names}." if names else "")
+            + (f"\nExports are {age:.0f} days old — send fresh ChildCompany, "
+               "ChildCompanyUser and lite_user_collection_report exports."
+               if age > routing.EXPORT_MAX_AGE_DAYS else "")
+            + "\nReply with aliases (company → account) for any that should route.")
+    try:
+        from .notify import send_dm
+
+        send_dm(env, text)
+        state["alerted_at"] = now.isoformat()
+    except Exception as ex:  # noqa: BLE001 - alerting must not stop routing
+        print(f"[{now:%H:%M:%S}] routing alert: {type(ex).__name__}: {ex}",
+              flush=True)
+
+
 def nudge_stale(env: dict, ledger_path: str, now: datetime,
                 state_path: str = "watcher_state.json",
                 user_id: str | None = None) -> int:
@@ -429,10 +640,14 @@ def nudge_stale(env: dict, ledger_path: str, now: datetime,
     from .ledger import save
     from .triage_ui import stale_blocks
 
+    from .quiet import dnd_active
+
     state = Path(state_path)
     today = now.date().isoformat()
     seen = json.loads(state.read_text()) if state.exists() else {}
     if now.hour < STALE_NUDGE_HOUR or seen.get("stale_date") == today:
+        return 0
+    if dnd_active(env, user_id or env.get("SLACK_OWNER_ID", "")):
         return 0
     rows = stale_rows(load(ledger_path), now)
     state.write_text(json.dumps({**seen, "stale_date": today}))
@@ -468,10 +683,14 @@ def nudge_overdue(env: dict, ledger_path: str, now: datetime,
     """Once a day after 09:00, restate what is overdue. Silence is how things rot."""
     from .render import _line
 
+    from .quiet import dnd_active
+
     state = Path(state_path)
     today = now.date().isoformat()
     seen = json.loads(state.read_text()) if state.exists() else {}
     if now.hour < 9 or seen.get("overdue_date") == today:
+        return 0
+    if dnd_active(env, user_id or env.get("SLACK_OWNER_ID", "")):
         return 0
     rows = overdue_today(load(ledger_path), now)
     if rows:
@@ -582,6 +801,10 @@ def main() -> int:
         print(f"[{now:%H:%M:%S}] fired {fired} reminder(s)", flush=True)
     try:
         reminded = remind_meetings(env, now)
+        from .profiles import load as load_profiles
+
+        attendees = remind_attendees(env, now, profiles=load_profiles())
+        reminded += attendees
         if reminded:
             print(f"[{now:%H:%M:%S}] scheduled {reminded} meeting reminder(s)", flush=True)
     except Exception as ex:  # noqa: BLE001 - calendar must not stop the watcher
@@ -613,20 +836,61 @@ def main() -> int:
               flush=True)
 
     items, errors = collect(days=1, offline=False)
+    try:
+        routed = route_triager(env, now)
+        if routed:
+            print(f"[{now:%H:%M:%S}] triager tickets routed: {routed}",
+                  flush=True)
+    except Exception as ex:  # noqa: BLE001 - routing must not stop capture
+        print(f"[{now:%H:%M:%S}] triager route: {type(ex).__name__}: {ex}",
+              flush=True)
     existing = load(ledger_path)
     fresh = new_rows(items, existing, clients, now)
 
-    # Rules capture; the model only cleans titles. Every row waits for a click.
+    # Rules capture; the model only cleans titles. The stamp decides the status.
     fresh = polish_rows(env, items, fresh, now, clients)
+    fresh = drop_duplicate_titles(existing, fresh)
+    try:
+        from .mutes import learn as learn_mutes
+
+        newly_muted = learn_mutes(apply_stalled(merge(existing, fresh), now))
+        if newly_muted:
+            print(f"[{now:%H:%M:%S}] muted channel(s): "
+                  f"{', '.join(newly_muted)}", flush=True)
+    except Exception as ex:  # noqa: BLE001 - muting must not stop capture
+        print(f"[{now:%H:%M:%S}] mute learn: {type(ex).__name__}: {ex}",
+              flush=True)
 
     if fresh:
         ledger = apply_stalled(merge(existing, fresh), now)
         save(ledger_path, ledger)
         from .triage_ui import confirm_blocks
 
-        sent = send_dm(env, format_alert(fresh), blocks=confirm_blocks(fresh))
-        _stamp_confirmation(ledger_path, {r["id"] for r in fresh}, sent)
-        print(f"[{now:%H:%M:%S}] asked to confirm {len(fresh)} new", flush=True)
+        pending = pending_rows(fresh)
+        sent = send_dm(env, format_alert(fresh),
+                       blocks=confirm_blocks(pending) if pending else None)
+        _stamp_confirmation(ledger_path, {r["id"] for r in pending}, sent)
+        print(f"[{now:%H:%M:%S}] asked to confirm {len(pending)} new", flush=True)
+    try:
+        from .epic_tracker import sync as sync_epics
+
+        tracked = sync_epics(env, ledger_path)
+        if tracked:
+            print(f"[{now:%H:%M:%S}] epic tickets tracked: {tracked}",
+                  flush=True)
+    except Exception as ex:  # noqa: BLE001 - tracking must not stop capture
+        print(f"[{now:%H:%M:%S}] epic tracker: {type(ex).__name__}: {ex}",
+              flush=True)
+    try:
+        from .slack_lists import sync_user as sync_slack_list
+
+        synced = sync_slack_list(env, env.get("SLACK_OWNER_ID", ""), "Ridha",
+                                 ledger_path)
+        if synced:
+            print(f"[{now:%H:%M:%S}] slack list synced: {synced}", flush=True)
+    except Exception as ex:  # noqa: BLE001 - list sync must not stop capture
+        print(f"[{now:%H:%M:%S}] slack list: {type(ex).__name__}: {ex}",
+              flush=True)
     try:
         from .members import cycle as member_cycle
 
@@ -635,11 +899,86 @@ def main() -> int:
             print(f"[{now:%H:%M:%S}] members checked: {handled}", flush=True)
     except Exception as ex:  # noqa: BLE001 - member work must not stop the owner
         print(f"[{now:%H:%M:%S}] member cycle: {type(ex).__name__}: {ex}", flush=True)
+    try:
+        from .members import ack_done
+        from .profiles import load as load_profiles
+
+        acked = ack_done(env, load_profiles(),
+                         env.get("SLACK_OWNER_ID", ""), ledger_path, now)
+        if acked:
+            print(f"[{now:%H:%M:%S}] done acks sent: {acked}", flush=True)
+    except Exception as ex:  # noqa: BLE001 - ack must not stop capture
+        print(f"[{now:%H:%M:%S}] done ack: {type(ex).__name__}: {ex}",
+              flush=True)
     print(f"[{now:%H:%M:%S}] checked {len(items)} items, {len(fresh)} new", flush=True)
     if errors:
         print(f"[{now:%H:%M:%S}] source errors: {errors}", flush=True)
     return 0
 
 
+def remind_attendees(env: dict, now: datetime,
+                     created_path: str = "created_meetings.json",
+                     profiles: dict | None = None) -> int:
+    """DM every Slack attendee of a bot-created meeting 10 minutes before."""
+    from .meetings import email_to_slack, load_created
+    from .notify import schedule_dm
+
+    data = load_created(created_path)
+    by_email = email_to_slack()
+    for uid, profile in (profiles or {}).items():
+        email = (profile.get("email") or "").lower()
+        if email:
+            by_email[email] = uid
+    sent = 0
+    changed = False
+    for eid, rec in data.items():
+        if rec.get("attendee_reminded"):
+            continue
+        try:
+            start = datetime.fromisoformat(rec.get("start") or "")
+        except ValueError:
+            continue
+        rec["attendee_reminded"] = now.isoformat()
+        changed = True
+        if start <= now:
+            continue
+        end = datetime.fromisoformat(rec.get("end") or rec.get("start") or "")
+        when = start - timedelta(minutes=10)
+        if when <= now:
+            when = now + timedelta(seconds=30)
+        text = (f"*Meeting in 10 minutes*\n{start:%H:%M}–{end:%H:%M} · "
+                f"{rec.get('title', '')}"
+                + (f"\n<{rec['link']}|join>" if rec.get("link") else "")
+                + "\n\nAre you attending?")
+        blocks = [
+            {"type": "section", "text": {"type": "mrkdwn", "text": text}},
+            {"type": "actions", "elements": [
+                {"type": "button", "action_id": "meet_rsvp_yes",
+                 "value": eid,
+                 "text": {"type": "plain_text", "text": "Attending"},
+                 "style": "primary"},
+                {"type": "button", "action_id": "meet_rsvp_no",
+                 "value": eid,
+                 "text": {"type": "plain_text", "text": "Can't attend"},
+                 "style": "danger"},
+            ]},
+        ]
+        for person in rec.get("attendees") or []:
+            uid = by_email.get((person.get("email") or "").lower())
+            if not uid or uid == rec.get("creator"):
+                continue
+            try:
+                schedule_dm(env, uid, text, int(when.timestamp()), blocks=blocks)
+                sent += 1
+            except Exception as ex:  # noqa: BLE001 - one DM must not stop others
+                print(f"  attendee reminder failed: "
+                      f"{type(ex).__name__}: {ex}", flush=True)
+    if changed:
+        Path(created_path).write_text(json.dumps(data, indent=1,
+                                                 ensure_ascii=False))
+    return sent
+
 if __name__ == "__main__":
     raise SystemExit(main())
+
+

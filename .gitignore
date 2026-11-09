@@ -36,3 +36,20 @@ auth.log
 
 # digest delivery marker
 digest_delivered.json
+
+
+# Slack List mapping
+slack_lists.json
+
+# subagent scratch
+.superpowers/
+epic_cache.json
+
+# runtime state and learnt caches
+routing.json
+triager_routed.json
+created_meetings.json
+muted_sources.json
+ledger_undo.json
+.watcher.lock
+_archive/

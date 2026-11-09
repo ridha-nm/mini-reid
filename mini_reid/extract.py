@@ -7,16 +7,29 @@ from datetime import datetime, timedelta
 from .ledger import commitment_id
 
 BOT_AUTHOR = re.compile(
-    r"(demo app|\[bot\]|^jira$|automation for jira|pantas-green-release|^mini-?reid$)",
+    r"(\[bot\]|^jira$|automation for jira|pantas-green-release|^mini-?reid$)",
     re.I)
 JIRA_NOTIFY = re.compile(r"atlassian\.net|\(jira\)|jira automation", re.I)
 # The triager bot tags people on every routed issue; those are not asks.
-IGNORE_CHANNELS = {"bd-triager-agent", "C0B59LA0X5M"}
+IGNORE_CHANNELS: set[str] = set()
 REQUEST_MODAL = re.compile(r"\b(?:can|could|would|will)\s+(?:you|u)\b", re.I)
 REQUEST_POLITE = re.compile(
     r"\b(?:please|pls|plz|kindly|action required)\b", re.I)
 REQUEST_NEED = re.compile(
     r"\b(?:we\s+need|need\s+(?:you|your|the|a|an|it|this|that|by))\b", re.I)
+# A polite word alone is politeness, not an ask: "please note the office is
+# closed" must not skip the click. It needs a request verb in the same sentence.
+POLITE_REQUEST = re.compile(
+    r"\b(?:please|pls|plz|kindly)\b[^.!?\n]{0,60}?"
+    r"\b(?:can|could|would|will|send|share|provide|confirm|review|approve|update|"
+    r"check|prepare|draft|book|schedule|fix|add|remove|create|complete|finish|"
+    r"submit|sign|pay|call|join|reply|respond|get|start|do|make|write|build|test|"
+    r"read|open|close|look|take|follow|need)\b", re.I)
+ACTION_REQUIRED = re.compile(r"\baction required\b", re.I)
+EXPLICIT_ASK = re.compile(
+    REQUEST_MODAL.pattern + "|" + REQUEST_NEED.pattern + "|"
+    + ACTION_REQUIRED.pattern + "|" + POLITE_REQUEST.pattern,
+    re.I)
 IMPERATIVE = re.compile(
     r"^(?:please\s+)?(?:send|share|provide|confirm|review|approve|update|check|"
     r"prepare|draft|book|schedule|fix|add|remove|create|complete|finish|submit|"
@@ -27,6 +40,12 @@ MENTION = re.compile(r"<@[A-Z0-9]+>")
 CHATTER = re.compile(
     r"\b(lol|haha+|bahaha+|im tired|i'?m tired|no worries|working on it|"
     r"noted|got it|sure|yep|yeah|okay|ok|thanks|thank you|see you|hmm)\b", re.I)
+# Festive and social messages are not commitments, even when they tag people.
+GREETING = re.compile(
+    r"^(?:happy|merry|wishing|wish|congrats|congratulations|cheers|"
+    r"have fun|well done|kudos)\b"
+    r"|\b(?:wishing you|happy (?:diwali|deepavali|birthday|holidays|new year)|"
+    r"merry christmas|eid mubarak|gong xi|selamat hari raya|have fun)\b", re.I)
 # Playful requests to the bot are never commitments, tagged or not.
 PLAY_REQUEST = re.compile(
     r"(?:\b(?:give|send)\s+"
@@ -36,6 +55,11 @@ PLAY_REQUEST = re.compile(
     r"(?:<@[A-Z0-9]+(?:\|[^>]*)?>|@?[\w.'-]+))", re.I)
 BOILERPLATE_TEXT = re.compile(
     r"accounts\.google\.com|gmail is email that|unsubscribe", re.I)
+ACTION_VERB = re.compile(
+    r"\b(send|submit|share|review|confirm|book|reply|revert|check|update|fix|"
+    r"prepare|draft|approve|attach|follow|schedule|pay|sign|file|call|email|"
+    r"ping|meet|join|start|make|write|create|build|plan|order|buy|raise|"
+    r"escalate|save|add|remove|delete|request)\b", re.I)
 SIGNATURE = re.compile(
     r"(ridha mohamed\s+sustainability data analyst|best regards,?\s*ridha|"
     r"mobile\. \+60|web\. www\.pantas\.com|address\. unit)",
@@ -147,6 +171,26 @@ def looks_actionable(text: str, item: dict) -> bool:
     return asked
 
 
+def auto_reason(item: dict, text: str, due: str | None,
+                me: str | None) -> str | None:
+    """Why this row can skip the click, or None to keep it in Inbox."""
+    source = item.get("source") or ""
+    kind = item.get("kind") or ""
+    ask = bool(EXPLICIT_ASK.search(text or ""))
+    if source == "slack" and kind == "mention" and ask:
+        return "slack-direct-ask"
+    if source == "slack" and kind == "dm" and (ask or due):
+        return "slack-dm-ask"
+    if source == "gmail" and kind == "inbox":
+        needle = (me or "Ridha").split("@")[0].lower()
+        # Stricter than the Inbox gate: a body mention is enough to keep the
+        # mail, but only a To: address may skip the click.
+        direct = needle in (item.get("to") or "").lower()
+        if direct and (ask or due):
+            return "email-direct-ask"
+    return None
+
+
 def _clean(text: str) -> str:
     import html
 
@@ -170,6 +214,12 @@ def extract(item: dict, client: dict | None, now: datetime,
     if item.get("source") == "slack" and (item.get("channel") in IGNORE_CHANNELS
                                           or item.get("channel_id") in IGNORE_CHANNELS):
         return []
+    # A channel the owner has mostly rejected stops producing candidates.
+    if item.get("source") == "slack" and item.get("channel"):
+        from .mutes import is_muted
+
+        if is_muted(str(item.get("channel"))):
+            return []
     # Calendar responses are not work items. One invite can generate several.
     if item.get("source") == "gmail" and re.match(
             r"^\s*(accepted|declined|tentative|invitation|updated invitation|"
@@ -183,6 +233,11 @@ def extract(item: dict, client: dict | None, now: datetime,
         return []
     text = _clean(item.get("text") or "")
     if len(text) < 8:
+        return []
+    # A one- or two-word DM is chatter ("GG", "Do it"), not a commitment,
+    # unless it carries an action verb ("Send deck").
+    if (item.get("source") == "slack" and item.get("kind") == "dm"
+            and len(text.split()) <= 2 and not ACTION_VERB.search(text)):
         return []
     if PLAY_REQUEST.search(text):
         return []
@@ -198,6 +253,12 @@ def extract(item: dict, client: dict | None, now: datetime,
 
     gate_text = f"{item.get('subject') or ''} {text}".strip()
     if not looks_actionable(gate_text, item):
+        return []
+    # A greeting that tags people is still a greeting, unless it also asks.
+    if (GREETING.search(gate_text)
+            and not (REQUEST_MODAL.search(gate_text)
+                     or REQUEST_POLITE.search(gate_text)
+                     or REQUEST_NEED.search(gate_text))):
         return []
 
     if item.get("due"):
@@ -215,6 +276,7 @@ def extract(item: dict, client: dict | None, now: datetime,
     # A subject line is a task name. The body opens with "Hi X, thanks for..."
     subject = re.sub(r"^\s*((re|fw|fwd)\s*:\s*)+", "", item.get("subject") or "", flags=re.I)
     what_text = subject.strip() if (item.get("source") == "gmail" and subject.strip()) else text
+    reason = auto_reason(item, gate_text, due, me)
 
     return [{
         "id": commitment_id(item.get("source", ""), item.get("native_id", ""), what_text),
@@ -222,15 +284,19 @@ def extract(item: dict, client: dict | None, now: datetime,
         "what": what_text[:200],
         # A draft is Ridha replying, so the asker is whoever he is replying to.
         "asker": _asker(item.get("to") or "") if item.get("kind") == "draft" else _asker(author),
+        "assigner_email": item.get("author_email") or "",
         "via": via_for(item),
         "source": item.get("source", ""),
         "native_id": item.get("native_id", ""),
         "kind": item.get("kind", ""),
+        "from_user": item.get("from_user") or "",
         "source_link": item.get("link", ""),
         "evidence": text[:200],
         "due": due,
         "due_confidence": conf,
         "cycle": (client or {}).get("cycle"),
+        "capture": "auto" if reason else "inbox",
+        "capture_why": reason or "",
         "status": "open",
         "stalled_since": None,
         "ack_policy": "bot_may_ack",

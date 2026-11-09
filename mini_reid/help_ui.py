@@ -50,9 +50,11 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     ),
     "meet": (
         "Schedule a meeting",
-        "I read both calendars and offer free slots, then create the event and invite.",
+        "I read everyone's calendars and offer free slots, then create the event and invite.",
         ["`meet: @Kasib about BD Command Centre`",
          "`meet: @Kasib and @Charanya about the deck` — multiple people",
+         "`meet: @Kasib about the deck for 45 minutes` — any duration 15–180",
+         "`cancel: Change Request` — cancel the nearest matching meeting",
          "or just `set meeting with Kasib to discuss BD Command Centre`",
          "I propose five 30-minute slots in the next five working days",
          "Pick a slot — Google Calendar event + Meet link + invite sent"],
@@ -63,7 +65,8 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
         ["`remind me to send the deck in 2 minutes` — Slack schedules it",
          "`remind @Arman to send the deck at 3pm` — DM someone else",
          "`reminders` — sent, pending, replied",
-         "Meeting DM — reply `yes`, `no <reason>`, or `moved` / `rescheduled`"],
+         "Meeting DM — reply `yes`, `no <reason>`, `moved <note>`, or "
+         "`reschedule to <time> <note>`"],
     ),
     "team": (
         "Team and setup",

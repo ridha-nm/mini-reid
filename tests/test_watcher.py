@@ -51,6 +51,13 @@ def test_triage_keeps_rows_the_model_did_not_rewrite():
     assert out[0]["status"] == "inbox"
 
 
+def test_triage_drops_model_rows_the_rules_rejected():
+    from mini_reid.watcher import triage_rows
+
+    model_only = [dict(_rule("chat1"), what="Respond to Kasib")]
+    assert triage_rows([], model_only) == []
+
+
 def test_triage_keeps_the_rule_client_and_asker():
     from mini_reid.watcher import triage_rows
 
@@ -59,6 +66,23 @@ def test_triage_keeps_the_rule_client_and_asker():
     out = triage_rows(fresh, model)
     assert out[0]["client"] == "eupe"
     assert out[0]["asker"] == "Daniel"
+
+
+def test_triage_auto_capture_skips_the_click():
+    from mini_reid.watcher import triage_rows
+    fresh = [dict(_rule("m1"), capture="auto", capture_why="jira-assigned")]
+    out = triage_rows(fresh, [])
+    assert out[0]["status"] == "open"
+
+
+def test_model_rewrite_cannot_change_the_capture_decision():
+    from mini_reid.watcher import triage_rows
+    fresh = [dict(_rule("m1"), capture="auto")]
+    model = [dict(_rule("m1"), what="Review the deck")]
+    out = triage_rows(fresh, model)
+    assert out[0]["what"] == "Review the deck"
+    assert out[0]["status"] == "open"
+    assert out[0]["capture"] == "auto"
 
 
 def test_stamp_confirmation_links_rows_to_the_dm(tmp_path, monkeypatch):
@@ -131,6 +155,23 @@ def test_stale_nudge_can_go_to_a_member(tmp_path, monkeypatch):
                          "state.json", "U2") == 1
     assert sent and sent[0][0] == "U2"
     assert sent[0][2]
+
+
+def test_stale_nudge_waits_out_do_not_disturb(tmp_path, monkeypatch):
+    from mini_reid import watcher as w
+    from mini_reid.ledger import load, save
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("mini_reid.quiet.dnd_active", lambda env, user: True)
+    sent = []
+    monkeypatch.setattr(w, "send_dm", lambda env, text, blocks=None: sent.append(text))
+    save("ledger.json", [{"id": "a", "what": "Old thing", "status": "open",
+                          "last_activity": "2026-10-28T09:00:00+08:00"}])
+    state = str(tmp_path / "state.json")
+    assert w.nudge_stale({}, "ledger.json", NOW.replace(hour=19), state) == 0
+    assert sent == []
+    assert not (tmp_path / "state.json").exists()
+    assert load("ledger.json")[0].get("nudges", 0) == 0
 
 
 def test_stale_nudge_asks_once_a_day_and_counts_up(tmp_path, monkeypatch):
@@ -298,6 +339,12 @@ def test_alert_is_compact_and_has_a_link():
     text = format_alert(rows)
     assert "confirm the waste mapping" in text
     assert "https://x/1" in text
+
+
+def test_pending_rows_are_the_ones_needing_a_click():
+    from mini_reid.watcher import pending_rows
+    rows = [{"id": "a", "status": "open"}, {"id": "b", "status": "inbox"}]
+    assert [r["id"] for r in pending_rows(rows)] == ["b"]
 
 
 def test_slack_alert_shows_sender_time_link_and_source_quote():

@@ -12,7 +12,8 @@ from .capture import parse_capture
 from .clients import load_clients, match_client
 from .closure import propose_closures
 from .extract import extract
-from .ledger import apply_stalled, dedupe_by_link, load, merge, reconcile_jira, save
+from .ledger import (apply_stalled, dedupe_by_link, drop_duplicate_titles,
+                     load, merge, reconcile_jira, save)
 from .render import render
 from .sources import (fetch_gmail, fetch_jira, fetch_slack, fetch_slack_dms,
                       load_env, slack_me)
@@ -29,6 +30,26 @@ IGNORE_DOMAINS = {"pantas.com", "gmail.com", "google.com", "googlegroups.com",
 def _domain(sender: str) -> str | None:
     m = re.search(r"@([A-Za-z0-9.-]+)", sender or "")
     return m.group(1).lower().rstrip(".") if m else None
+
+
+def triage_incoming(incoming: list[dict], existing: list[dict]) -> list[dict]:
+    """New rows take their capture status; existing rows keep theirs."""
+    by_id = {r.get("id"): r for r in existing}
+    out = []
+    for row in incoming:
+        row = dict(row)
+        old = by_id.get(row.get("id"))
+        if old:
+            row["status"] = old.get("status") or row.get("status") or "open"
+            for key in ("capture", "capture_why"):
+                if key in old:
+                    row[key] = old[key]
+                else:
+                    row.pop(key, None)
+        elif "capture" in row:
+            row["status"] = "open" if row["capture"] == "auto" else "inbox"
+        out.append(row)
+    return out
 
 
 def collect(days: int, offline: bool) -> tuple[list[dict], list[str]]:
@@ -123,12 +144,19 @@ def main(argv: list[str] | None = None) -> int:
             better = by_nid.pop(r["native_id"], None) if r["native_id"] in attempted else None
             if better:
                 # Client comes from rules, never from the model. It invents "ioi".
-                better = dict(better, client=r.get("client"), asker=r.get("asker"))
+                # The rule row also owns the capture decision; the model only renames.
+                better = dict(better, client=r.get("client"), asker=r.get("asker"),
+                              from_user=r.get("from_user") or "",
+                              capture=r.get("capture", "inbox"),
+                              capture_why=r.get("capture_why", ""))
             merged.append(better or r)
-        incoming += merged + list(by_nid.values())
+        # The model never introduces a row the rules rejected.
+        incoming += merged
     else:
         incoming += rule_rows
 
+    incoming = drop_duplicate_titles(
+        load(args.ledger), triage_incoming(incoming, load(args.ledger)))
     ledger = dedupe_by_link(apply_stalled(merge(load(args.ledger), incoming), now))
     jira_items = [i for i in items if i.get("source") == "jira"]
     if jira_items:

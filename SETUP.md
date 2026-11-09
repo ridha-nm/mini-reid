@@ -57,11 +57,18 @@ chmod 600 .env
    buttons. Socket Mode needs no request URL.
 4. **OAuth & Permissions**: install to the workspace → copy the bot token
    (`xoxb-…`) to `SLACK_BOT_TOKEN`.
-5. Create a user token with `search:read`, `im:history`, `users:read`
-   (`xoxp-…`) → `SLACK_USER_TOKEN`. It is used to read DMs the bot is not in
-   and to search missed mentions. Treat it as sensitive: it can read DMs.
+5. Create a user token with `search:read`, `im:history`, `users:read` and
+   `users:read.email` (`xoxp-…`) → `SLACK_USER_TOKEN`. It is used to read DMs
+   the bot is not in, to search missed mentions, and to resolve the Slack
+   author's email for the Slack List **Assigner** column (the bot token cannot
+   read emails). Treat it as sensitive: it can read DMs.
 6. Your Slack member ID → `SLACK_OWNER_ID` (Profile → More → Copy member ID).
 7. Workspace subdomain → `SLACK_TEAM` (e.g. `gopantas`).
+8. The manifest also enables the **Add to Mini-Reid** message shortcut; the
+   `reaction_added`, `app_home_opened` and `file_shared` events; and bot
+   scopes `reactions:read`, `lists:read`/`lists:write`, `files:read` and
+   `dnd:read`. Reinstall the app whenever scopes or events change; Slack shows
+   a reinstall banner until you do.
 
 Invite `@mini-reid` to the channels you want it to watch. It cannot read
 channels it has not joined.

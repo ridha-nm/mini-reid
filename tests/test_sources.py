@@ -155,3 +155,10 @@ def test_jira_keeps_the_issue_type():
     data = {"issues": [{"id": "1", "key": "BO-1", "fields": {
         "summary": "Eupe Corporation Berhad", "issuetype": {"name": "Epic"}}}]}
     assert parse_jira_issues(data, "https://x")[0]["issue_type"] == "Epic"
+
+
+def test_triager_channel_is_read_at_the_source():
+    match = {"channel": {"id": "C0B59LA0X5M", "name": "bd-triager-agent"},
+             "username": "demo app", "ts": "1.1", "text": "<@U1> ticket",
+             "permalink": "l"}
+    assert len(parse_slack_search({"messages": {"matches": [match]}})) == 1

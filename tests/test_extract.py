@@ -54,19 +54,32 @@ def test_undated_ask_still_becomes_a_commitment():
     assert rows[0]["evidence"] == "can you look at the dashboard"
 
 
-def test_triager_channel_tags_are_ignored():
+def test_triager_channel_is_read():
     base = {"source": "slack", "native_id": "t1", "kind": "mention", "author": "triager",
             "text": "can you review this issue", "link": "l",
             "ts": "2026-10-30T08:00:00+08:00"}
-    assert extract(dict(base, channel="bd-triager-agent"), None, NOW) == []
-    assert extract(dict(base, channel="other", channel_id="C0B59LA0X5M"), None, NOW) == []
+    assert extract(dict(base, channel="bd-triager-agent"), None, NOW)
+    assert extract(dict(base, channel="other", channel_id="C0B59LA0X5M"), None, NOW)
 
 
 def test_bot_message_is_not_a_commitment():
-    item = {"source": "slack", "native_id": "2", "kind": "mention", "author": "demo app",
+    item = {"source": "slack", "native_id": "2", "kind": "mention",
+            "author": "pantas-green-release",
             "text": "<@U1> build finished", "link": "l",
             "ts": "2026-10-30T08:00:00+08:00"}
     assert extract(item, None, NOW) == []
+
+
+def test_triager_app_card_is_readable(monkeypatch):
+    # Search returns app cards with no text; the message itself has it.
+    from mini_reid import sources
+
+    monkeypatch.setattr(sources, "_get_json", lambda url, headers: {
+        "messages": [{"text": "<@U1> can you review PHD-1561"}]})
+    items = [{"source": "slack", "channel_id": "C1", "text": "",
+              "native_id": "C1:123.4", "thread_ts": None}]
+    sources._fill_empty_text("x", items)
+    assert items[0]["text"] == "<@U1> can you review PHD-1561"
 
 
 def test_mention_markup_is_stripped_from_what_and_evidence():
@@ -232,3 +245,66 @@ def test_email_asker_keeps_the_full_address():
             "ts": "2026-10-30T08:00:00+08:00"}
     row = extract(item, None, NOW)[0]
     assert row["asker"] == "Quekjoelyn (bd@pantas.com)"
+
+
+def test_auto_capture_matrix():
+    from mini_reid.extract import auto_reason
+    slack = {"source": "slack", "kind": "mention"}
+    dm = {"source": "slack", "kind": "dm"}
+    mail = {"source": "gmail", "kind": "inbox",
+            "to": "Ridha <ridha@pantas.com>"}
+    jira = {"source": "jira", "kind": "issue"}
+    assert auto_reason(jira, "Audit data units", None, None) is None
+    assert auto_reason(slack, "can you review the deck", None, None) == "slack-direct-ask"
+    assert auto_reason(slack, "the office is closed tomorrow", None, None) is None
+    # "please" alone is politeness, not an ask: it must not skip the click.
+    assert auto_reason(slack, "please note the office is closed tomorrow", None, None) is None
+    assert auto_reason(slack, "please review the deck", None, None) == "slack-direct-ask"
+    assert auto_reason(dm, "send the deck", None, None) is None
+    assert auto_reason(dm, "send the deck by Friday", "2026-11-06", None) == "slack-dm-ask"
+    assert auto_reason(mail, "please confirm the mapping", None, "Ridha") == "email-direct-ask"
+    alias = dict(mail, to="BD <bd@pantas.com>")
+    assert auto_reason(alias, "please confirm the mapping", None, "Ridha") is None
+    # The alias mail is kept in Inbox by the body mention, but auto needs the To.
+    assert auto_reason(
+        alias, "Ridha will follow up. Please review the mapping.", None,
+        "Ridha") is None
+
+
+def test_uncertain_mention_is_stamped_inbox():
+    item = {"source": "slack", "native_id": "s2", "kind": "mention",
+            "author": "kasib", "text": "please note the office is closed tomorrow",
+            "link": "l", "ts": "2026-10-30T08:00:00+08:00"}
+    row = extract(item, None, NOW)[0]
+    assert row["capture"] == "inbox"
+    assert row["capture_why"] == ""
+
+
+def test_extract_stamps_capture_mode():
+    item = {"source": "slack", "native_id": "s1", "kind": "mention",
+            "author": "kasib", "text": "can you review the deck", "link": "l",
+            "ts": "2026-10-30T08:00:00+08:00"}
+    row = extract(item, None, NOW)[0]
+    assert row["capture"] == "auto"
+    assert row["capture_why"] == "slack-direct-ask"
+
+
+def test_festive_greetings_are_not_candidates():
+    base = {"source": "slack", "native_id": "g1", "kind": "mention",
+            "author": "max", "link": "l",
+            "ts": "2026-11-06T15:10:00+08:00"}
+    for text in ("Happy Deepavali to all celebrating, esp. <@U1> and <@U2>. "
+                 "Wishing you and your loved ones joy",
+                 "Have fun."):
+        assert extract(dict(base, text=text), None, NOW) == []
+    keeps = dict(base, text="Happy Deepavali! Can you send the deck tomorrow?")
+    assert extract(keeps, None, NOW)
+
+
+def test_tiny_dm_chatter_is_not_captured():
+    base = {"source": "slack", "native_id": "D1:1", "kind": "dm",
+            "channel": "D1", "author": "Kasib", "link": "l"}
+    assert extract(dict(base, text="GG"), None, NOW) == []
+    assert extract(dict(base, text="Do it"), None, NOW) == []
+    # An action verb keeps a short, real ask.
+    assert extract(dict(base, text="Send deck"), None, NOW)
