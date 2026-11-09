@@ -9,6 +9,8 @@ NOW = datetime(2026, 11, 9, 19, 0, tzinfo=MYT)
 CARD = (":bulb: *Solution proposed* by <@U1> PHD-1561: Can't access the site "
         "*Requester:* creativlystudiofinance@gmail.com *Organization:* Unmapped "
         "*Assigned to:* <@U029RLGND8D>")
+ARRIVAL = ("New ticket: PHD-1561\n*Requester:* creativlystudiofinance@gmail.com"
+           "\n*Company:* Creativly Studio")
 
 
 def test_card_fields_parse():
@@ -48,7 +50,7 @@ def test_route_tags_owners_and_falls_back_to_ridha(tmp_path, monkeypatch):
     posts = []
     route_triager({}, NOW, str(state),
                   post=lambda ch, text, ts: posts.append(text),
-                  fetch=lambda oldest: [_msg(CARD)])
+                  fetch=lambda oldest: [_msg(ARRIVAL)])
     assert posts and "<@U0A33EDVAKH>" in posts[0]     # unmapped -> Ridha
 
 
@@ -57,13 +59,13 @@ def test_closed_cards_and_other_apps_are_not_routed(tmp_path, monkeypatch):
         "emails": {}, "domains": {}})
     state = tmp_path / "s.json"
     state.write_text('{"since_ts": "1"}')
-    closed = _msg(CARD.replace("*Solution proposed*", "*Closed*"))
+    ack = _msg(CARD.replace("*Solution proposed*", "*Acknowledged*"))
     sla = _msg("SLA Breach: PHD-1", ts="1794225001.0")
-    other = _msg(CARD, ts="1794225002.0", app="Some Other App")
+    other = _msg(ARRIVAL, ts="1794225002.0", app="Some Other App")
     posts = []
     route_triager({}, NOW, str(state),
                   post=lambda ch, text, ts: posts.append(text),
-                  fetch=lambda oldest: [closed, sla, other])
+                  fetch=lambda oldest: [ack, sla, other])
     assert posts == []
 
 
@@ -73,9 +75,8 @@ def test_first_card_per_ticket_wins(tmp_path, monkeypatch):
     state = tmp_path / "s.json"
     state.write_text('{"since_ts": "1"}')
     posts = []
-    ack = _msg(CARD.replace("*Solution proposed*", "*Acknowledged*"),
-               ts="1794225000.0")
-    proposal = _msg(CARD, ts="1794225005.0")
+    ack = _msg(ARRIVAL, ts="1794225000.0")
+    proposal = _msg(ARRIVAL, ts="1794225005.0")
     route_triager({}, NOW, str(state),
                   post=lambda ch, text, ts: posts.append((text, ts)),
                   fetch=lambda oldest: [ack, proposal])
@@ -125,9 +126,8 @@ def test_backlog_is_replayed_but_closed_tickets_are_skipped(
         "emails": {}, "domains": {}, "companies": {}})
     state = tmp_path / "s.json"
     state.write_text('{"since_ts": "1"}')
-    ack = _msg(CARD.replace("*Solution proposed*", "*Acknowledged*"),
-               ts="1794225000.0")
-    closed = _msg(CARD.replace("*Solution proposed*", "*Closed*"),
+    ack = _msg(ARRIVAL, ts="1794225000.0")
+    closed = _msg("New ticket: PHD-1561\n*Requester:* x@y.com\n*Closed*",
                   ts="1794225100.0")
     posts = []
     route_triager({}, NOW, str(state),

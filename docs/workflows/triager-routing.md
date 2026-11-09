@@ -11,10 +11,10 @@ Tag the account owner on a new Demo App ticket.
    wakes, the next cycle replays the whole gap (paginated, 1,000 messages per
    cycle) and tags the tickets that arrived while it was off. Tickets that
    were also **Closed** inside that window are skipped.
-3. Only messages from **Demo App** that are the ticket's **first** card
-   route: the legacy `*Acknowledged*` / `*Solution proposed*` text cards, or
-   the newer Block Kit **`New ticket: PHD-xxxx`** card (fields such as
-   Requester/Company live in blocks, so they are flattened before parsing). SLA notices, the
+3. **One trigger only**: the arrival card, `New ticket: PHD-xxxx` from
+   **Demo App** (Block Kit — fields flattened before parsing). Nothing after
+   it is ever tagged: acknowledgements, solution proposals, replies, SLA
+   notices, rotation messages or closures. SLA notices, the
    weekly rotation, closed cards, `💬 … replied:` follow-ups and human
    chatter are ignored. One tag per ticket key, ever.
 4. Reply goes in the card's thread:

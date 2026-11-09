@@ -534,12 +534,9 @@ def route_triager(env: dict, now: datetime,
         if app != TRIAGER_APP:
             continue
         flat = routing.flatten_message(message)
-        # Initial card: legacy Acknowledged/Solution-proposed text, or the
-        # newer Block Kit "New ticket:" card.
-        initial = ("*Acknowledged*" in flat
-                   or "*Solution proposed*" in flat
-                   or text.strip().startswith("New ticket:"))
-        if not initial:
+        # One trigger only: the arrival card ("New ticket: PHD-xxxx").
+        # Nothing after it — not acknowledgements, not proposals.
+        if not text.strip().startswith("New ticket:"):
             continue
         # Never tag follow-ups or closed cards.
         if ("*Closed*" in flat or ":speech_balloon:" in flat
